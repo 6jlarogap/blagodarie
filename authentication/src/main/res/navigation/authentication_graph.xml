@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/authentication_graph"
+    app:startDestination="@id/greetingFragment">
+
+    <fragment
+        android:id="@+id/greetingFragment"
+        android:name="org.blagodarie.authentication.GreetingFragment"
+        android:label="GreetingFragment" >
+        <action
+            android:id="@+id/action_greetingFragment_to_enterFragment"
+            app:destination="@id/enterFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/enterFragment"
+        android:name="org.blagodarie.authentication.EnterFragment"
+        android:label="EnterFragment" />
+</navigation>
