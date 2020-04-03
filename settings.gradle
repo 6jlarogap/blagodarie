@@ -1,2 +1,2 @@
-include ':app', ':authentication'
+include ':app', ':authentication', ':server'
 rootProject.name='blagodarie'

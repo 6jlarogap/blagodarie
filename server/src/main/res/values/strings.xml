@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">server</string>
+    <string name="base_api_url">https://api.благодарие.рф/api/</string>
+</resources>
