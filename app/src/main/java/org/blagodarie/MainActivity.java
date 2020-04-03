@@ -35,9 +35,8 @@ public final class MainActivity
         super.onCreate(savedInstanceState);
         initUserId();
         final MainActivityBinding mainActivityBinding = DataBindingUtil.setContentView(this, R.layout.main_activity);
-        final SymptomsAdapter symptomsAdapter = new SymptomsAdapter(this::createUserSymptom);
         final MainViewModel mViewModel = new ViewModelProvider(this).get(MainViewModel.class);
-        mViewModel.getSymptoms().observe(this, symptoms -> symptomsAdapter.setSymptoms(new ArrayList<>(symptoms)));
+        final SymptomsAdapter symptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getSymptoms()), this::createUserSymptom);
         mainActivityBinding.rvSymptoms.setAdapter(symptomsAdapter);
     }
 
