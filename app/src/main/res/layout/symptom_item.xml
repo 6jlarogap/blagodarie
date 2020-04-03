@@ -4,7 +4,8 @@
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="5dp">
+        android:layout_margin="5dp"
+        android:background="@{(System.currentTimeMillis() - DisplaySymptom.lastTimestamp) >= 60000L ? @android:color/white : @android:color/holo_green_light}">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -14,7 +15,9 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_gravity="center"
                 android:layout_margin="5dp"
+                android:gravity="center"
                 android:text="@{DisplaySymptom.symptom.name}"
                 android:textAppearance="@style/TextAppearance.AppCompat.Large" />
 

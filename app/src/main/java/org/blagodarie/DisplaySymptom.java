@@ -27,7 +27,7 @@ public final class DisplaySymptom
         return mSymptom;
     }
 
-    final Long getLastTimestamp () {
+    public final Long getLastTimestamp () {
         return mLastTimestamp;
     }
 

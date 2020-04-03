@@ -1,5 +1,6 @@
 package org.blagodarie;
 
+import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,7 +13,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.blagodarie.databinding.SymptomItemBinding;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -22,12 +22,17 @@ import java.util.List;
 final class SymptomsAdapter
         extends RecyclerView.Adapter<SymptomsAdapter.SymptomViewHolder> {
 
+    @NonNull
     private List<DisplaySymptom> mDisplaySymptoms;
 
     @NonNull
     private final UserSymptomCreator mUserSymptomCreator;
 
-    SymptomsAdapter (@NonNull final UserSymptomCreator userSymptomCreator) {
+    SymptomsAdapter (
+            @NonNull final List<DisplaySymptom> displaySymptoms,
+            @NonNull final UserSymptomCreator userSymptomCreator
+    ) {
+        mDisplaySymptoms = displaySymptoms;
         mUserSymptomCreator = userSymptomCreator;
     }
 
@@ -43,37 +48,31 @@ final class SymptomsAdapter
     public void onBindViewHolder (@NonNull SymptomViewHolder holder, int position) {
         final DisplaySymptom displaySymptom = mDisplaySymptoms.get(position);
         if (displaySymptom != null) {
-            holder.bind(displaySymptom, new View.OnClickListener() {
-                @Override
-                public void onClick (View v) {
-                    final long timestamp = System.currentTimeMillis();
-                    displaySymptom.setLastTimestamp(timestamp);
-                    notifyItemChanged(position);
-                    order();
-                    mUserSymptomCreator.create(displaySymptom.getSymptom(), timestamp);
-                }
+            holder.bind(displaySymptom, v -> {
+                final long timestamp = System.currentTimeMillis();
+                displaySymptom.setLastTimestamp(timestamp);
+                notifyItemChanged(position);
+                order();
+                new Handler().postDelayed(() -> notifyItemChanged(position), 60000L);
+                mUserSymptomCreator.create(displaySymptom.getSymptom(), timestamp);
             });
         }
     }
 
     @Override
     public int getItemCount () {
-        return mDisplaySymptoms == null ? 0 : mDisplaySymptoms.size();
-    }
-
-    void setSymptoms (@NonNull final List<DisplaySymptom> displaySymptoms) {
-        Collections.sort(displaySymptoms);
-        final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomDiffUtilCallBack(displaySymptoms, mDisplaySymptoms));
-        diffResult.dispatchUpdatesTo(this);
-        mDisplaySymptoms = displaySymptoms;
+        return mDisplaySymptoms.size();
     }
 
     private void order () {
         final List<DisplaySymptom> newDisplaySymptoms = new ArrayList<>(mDisplaySymptoms);
-        setSymptoms(newDisplaySymptoms);
+        //Collections.sort(newDisplaySymptoms);
+        final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomDiffUtilCallBack(newDisplaySymptoms, mDisplaySymptoms));
+        diffResult.dispatchUpdatesTo(this);
+        mDisplaySymptoms = newDisplaySymptoms;
     }
 
-    class SymptomViewHolder
+    static final class SymptomViewHolder
             extends RecyclerView.ViewHolder {
 
         @NonNull
@@ -99,12 +98,13 @@ final class SymptomsAdapter
         }
     }
 
-    private final class DisplaySymptomDiffUtilCallBack extends DiffUtil.Callback {
+    private static final class DisplaySymptomDiffUtilCallBack
+            extends DiffUtil.Callback {
 
         final List<DisplaySymptom> mNewList;
         final List<DisplaySymptom> mOldList;
 
-        public DisplaySymptomDiffUtilCallBack (
+        DisplaySymptomDiffUtilCallBack (
                 final List<DisplaySymptom> newList,
                 final List<DisplaySymptom> oldList
         ) {

@@ -1,7 +1,6 @@
 package org.blagodarie;
 
 import androidx.annotation.NonNull;
-import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
 import java.util.HashSet;
@@ -15,21 +14,19 @@ public final class MainViewModel
         extends ViewModel {
 
     @NonNull
-    private final MutableLiveData<Set<DisplaySymptom>> mSymptoms = new MutableLiveData<>();
+    private final Set<DisplaySymptom> mSymptoms = new HashSet<>();
 
     {
-        final Set<DisplaySymptom> symptomTreeSet = new HashSet<>();
         for (Symptom symptom : Symptom.getSymptoms()) {
-            symptomTreeSet.add(new DisplaySymptom(symptom));
+            mSymptoms.add(new DisplaySymptom(symptom));
         }
-        mSymptoms.setValue(symptomTreeSet);
     }
 
     public MainViewModel () {
         super();
     }
 
-    final MutableLiveData<Set<DisplaySymptom>> getSymptoms () {
+    final Set<DisplaySymptom> getSymptoms () {
         return mSymptoms;
     }
 }
