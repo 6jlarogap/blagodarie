@@ -20,8 +20,10 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
@@ -29,6 +31,8 @@ import okhttp3.Response;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class ServerDataSource {
+
+    private static final MediaType JSON_TYPE = MediaType.parse("application/json; charset=utf-8");
 
     @NonNull
     private final String mApiBaseUrl;
@@ -108,5 +112,18 @@ public final class ServerDataSource {
             }
         }
         return userId;
+    }
+
+    public void addUserSymptom(@NonNull final String jsonContent) throws IOException {
+        final RequestBody body = RequestBody.create(jsonContent, JSON_TYPE);
+        final Request request = new Request.Builder()
+                .url(mApiBaseUrl + "addusersymptom")
+                .post(body)
+                .build();
+        final Response response = sendRequestAndGetResponse(request);
+        if (response.body() != null){
+            final String responseBody = response.body().string();
+            boolean a = responseBody.isEmpty();
+        }
     }
 }
