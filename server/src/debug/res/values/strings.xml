@@ -1,0 +1,3 @@
+<resources>
+    <string name="base_api_url">https://api.dev.благодарие.рф/api/</string>
+</resources>

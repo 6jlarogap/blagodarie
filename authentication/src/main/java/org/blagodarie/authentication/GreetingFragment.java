@@ -26,13 +26,13 @@ public final class GreetingFragment
             final ViewGroup container,
             final Bundle savedInstanceState
     ) {
-        this.mGreetingFragmentBinding = GreetingFragmentBinding.inflate(inflater, container, false);
-        return this.mGreetingFragmentBinding.getRoot();
+        mGreetingFragmentBinding = GreetingFragmentBinding.inflate(inflater, container, false);
+        return mGreetingFragmentBinding.getRoot();
     }
 
     @Override
     public void onActivityCreated (@Nullable final Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        this.mGreetingFragmentBinding.setAuthenticationNavigator((AuthenticationNavigator) getActivity());
+        mGreetingFragmentBinding.setAuthenticationNavigator((AuthenticationNavigator) getActivity());
     }
 }

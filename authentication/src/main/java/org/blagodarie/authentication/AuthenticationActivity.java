@@ -46,7 +46,7 @@ public final class AuthenticationActivity
             finish();
         } else {
             setContentView(R.layout.authentication_activity);
-            this.mNavController = Navigation.findNavController(this, R.id.nav_host_fragment);
+            mNavController = Navigation.findNavController(this, R.id.nav_host_fragment);
         }
     }
 
@@ -63,7 +63,7 @@ public final class AuthenticationActivity
 
     @Override
     public void fromGreetingToEnter () {
-        this.mNavController.navigate(R.id.action_greetingFragment_to_enterFragment);
+        mNavController.navigate(R.id.action_greetingFragment_to_enterFragment);
     }
 
     @Override

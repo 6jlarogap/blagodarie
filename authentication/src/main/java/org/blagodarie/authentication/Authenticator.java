@@ -24,7 +24,7 @@ public final class Authenticator
 
     Authenticator(@NonNull final Context context) {
         super(context);
-        this.mContext = context;
+        mContext = context;
     }
 
     @Override
@@ -43,7 +43,7 @@ public final class Authenticator
             final String[] requiredFeatures,
             final Bundle options
     ) throws NetworkErrorException {
-        final Intent intent = AuthenticationActivity.createIntent(this.mContext, accountType, response);
+        final Intent intent = AuthenticationActivity.createIntent(mContext, accountType, response);
         final Bundle bundle = new Bundle();
         if (options != null) {
             bundle.putAll(options);

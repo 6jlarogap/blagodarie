@@ -25,7 +25,7 @@ public final class SplashActivity
     protected final void onCreate (@Nullable final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        this.mAccountManager = AccountManager.get(this);
+        mAccountManager = AccountManager.get(this);
 
         final Account[] accounts = mAccountManager.getAccountsByType(getString(R.string.account_type));
 
@@ -38,7 +38,7 @@ public final class SplashActivity
 
     private void addNewAccount (String accountType, String authTokenType) {
 
-        this.mAccountManager.addAccount(
+        mAccountManager.addAccount(
                 accountType,
                 authTokenType,
                 null,
@@ -47,14 +47,14 @@ public final class SplashActivity
                 new AccountManagerCallback<Bundle>() {
                     @Override
                     public void run (AccountManagerFuture<Bundle> future) {
-                        Bundle bnd = null;
-                        try {
-                            bnd = future.getResult();
-                            final String authtoken = bnd.getString(AccountManager.KEY_AUTHTOKEN);
+                        //Bundle bnd = null;
+                        //try {
+                            //bnd = future.getResult();
+                            //final String authtoken = bnd.getString(AccountManager.KEY_AUTHTOKEN);
                             toMainActivity();
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+                        //} catch (Exception e) {
+                        //    e.printStackTrace();
+                        //}
                     }
                 }, null);
     }
