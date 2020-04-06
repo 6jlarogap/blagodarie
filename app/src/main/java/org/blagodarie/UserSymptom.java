@@ -19,14 +19,22 @@ final class UserSymptom {
     @NonNull
     private final Long mTimestamp;
 
+    private final Double mLatitude;
+
+    private final Double mLongitude;
+
     UserSymptom (
             @NonNull final Long userId,
             @NonNull final Long symptomId,
-            @NonNull final Long timestamp
+            @NonNull final Long timestamp,
+            final Double latitude,
+            final Double longitude
     ) {
         mUserId = userId;
         mSymptomId = symptomId;
         mTimestamp = timestamp;
+        mLatitude = latitude;
+        mLongitude = longitude;
     }
 
     @NonNull
@@ -42,6 +50,14 @@ final class UserSymptom {
     @NonNull
     public final Long getTimestamp () {
         return mTimestamp;
+    }
+
+    public final Double getLatitude () {
+        return mLatitude;
+    }
+
+    public final Double getLongitude () {
+        return mLongitude;
     }
 
     @Override
@@ -66,6 +82,8 @@ final class UserSymptom {
                 "mUserId=" + mUserId +
                 ", mSymptomId=" + mSymptomId +
                 ", mTimestamp=" + mTimestamp +
+                ", mLatitude=" + mLatitude +
+                ", mLongitude=" + mLongitude +
                 '}';
     }
 }

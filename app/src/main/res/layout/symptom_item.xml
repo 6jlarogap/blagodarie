@@ -31,15 +31,31 @@
                     android:layout_gravity="start"
                     android:layout_margin="5dp"
                     android:text='@{DisplaySymptom.lastTimestampLikeDateString}'
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+                    android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                    android:visibility="@{DisplaySymptom.lastTimestamp != null ? View.VISIBLE : View.GONE}" />
 
-                <TextView
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="end"
                     android:layout_margin="5dp"
-                    android:text="GPS"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+                    android:layout_gravity="end"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{String.format(@string/latitude, DisplaySymptom.lastLatitude)}"
+                        android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                        android:visibility="@{DisplaySymptom.lastLatitude != null ? View.VISIBLE : View.GONE}" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{String.format(@string/longitude, DisplaySymptom.lastLongitude)}"
+                        android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                        android:visibility="@{DisplaySymptom.lastLongitude != null ? View.VISIBLE : View.GONE}" />
+
+                </LinearLayout>
 
             </FrameLayout>
 
@@ -48,6 +64,8 @@
     </androidx.cardview.widget.CardView>
 
     <data>
+
+        <import type="android.view.View" />
 
         <variable
             name="DisplaySymptom"

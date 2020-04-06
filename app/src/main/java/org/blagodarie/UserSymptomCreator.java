@@ -8,7 +8,6 @@ import androidx.annotation.NonNull;
  */
 interface UserSymptomCreator {
     void create (
-            @NonNull final Symptom symptom,
-            final long timestamp
+            @NonNull final DisplaySymptom displaySymptom
     );
 }

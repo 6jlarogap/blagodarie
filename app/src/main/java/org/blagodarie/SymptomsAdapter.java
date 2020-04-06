@@ -49,12 +49,12 @@ final class SymptomsAdapter
         final DisplaySymptom displaySymptom = mDisplaySymptoms.get(position);
         if (displaySymptom != null) {
             holder.bind(displaySymptom, v -> {
-                final long timestamp = System.currentTimeMillis();
-                displaySymptom.setLastTimestamp(timestamp);
+                //final long timestamp = System.currentTimeMillis();
+                //displaySymptom.setLastTimestamp(timestamp);
+                mUserSymptomCreator.create(displaySymptom);
                 notifyItemChanged(position);
                 order();
                 new Handler().postDelayed(() -> notifyItemChanged(position), 60000L);
-                mUserSymptomCreator.create(displaySymptom.getSymptom(), timestamp);
             });
         }
     }
