@@ -5,4 +5,7 @@
     <string name="permission_rationale">Необходимо разрешение на определение местоположения.</string>
     <string name="latitude">Широта: %f</string>
     <string name="longitude">Долгота: %f</string>
+
+    <string name="location_disabled">Для улучшения работы включите геолокацию.</string>
+    <string name="location_enable">Включить</string>
 </resources>
