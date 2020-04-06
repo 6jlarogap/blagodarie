@@ -209,7 +209,7 @@ public final class MainActivity
         mLocationRequest = new LocationRequest();
         mLocationRequest.setInterval(UPDATE_INTERVAL_IN_MILLISECONDS);
         mLocationRequest.setFastestInterval(FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
     }
 
     private void createLocationCallback () {
@@ -219,7 +219,8 @@ public final class MainActivity
                 super.onLocationResult(locationResult);
 
                 mCurrentLocation = locationResult.getLastLocation();
-                mViewModel.mLocation.set(mCurrentLocation.toString());
+                mViewModel.mCurrentLatitude.set(mCurrentLocation.getLatitude());
+                mViewModel.mCurrentLongitude.set(mCurrentLocation.getLongitude());
             }
         };
     }
@@ -262,15 +263,19 @@ public final class MainActivity
                 .addOnFailureListener(this, e -> {
                     int statusCode = ((ApiException) e).getStatusCode();
                     switch (statusCode) {
+
                         case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
                             Log.i(TAG, "Location settings are not satisfied. Attempting to upgrade " +
                                     "location settings ");
-                            try {
-                                ResolvableApiException rae = (ResolvableApiException) e;
-                                rae.startResolutionForResult(MainActivity.this, REQUEST_CHECK_SETTINGS);
-                            } catch (IntentSender.SendIntentException sie) {
-                                Log.i(TAG, "PendingIntent unable to execute request.");
-                            }
+                            showSnackbar(R.string.location_disabled, R.string.location_enable, v->{
+
+                                try {
+                                    ResolvableApiException rae = (ResolvableApiException) e;
+                                    rae.startResolutionForResult(MainActivity.this, REQUEST_CHECK_SETTINGS);
+                                } catch (IntentSender.SendIntentException sie) {
+                                    Log.i(TAG, "PendingIntent unable to execute request.");
+                                }
+                            });
                             break;
                         case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
                             String errorMessage = "Location settings are inadequate, and cannot be " +
@@ -301,6 +306,7 @@ public final class MainActivity
 
         if (shouldProvideRationale) {
             Log.i(TAG, "Displaying permission rationale to provide additional context.");
+            mPermissionDeniedExplanationShowed = false;
             showSnackbar(R.string.permission_rationale,
                     android.R.string.ok, view -> {
                         ActivityCompat.requestPermissions(MainActivity.this,

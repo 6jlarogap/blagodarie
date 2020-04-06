@@ -7,6 +7,42 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/tvDateTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:text='@{ViewModel.mCurrentDataTime ?? ""}'
+                android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvLatitude"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@{String.format(@string/latitude, ViewModel.mCurrentLatitude)}"
+                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+
+                <TextView
+                    android:id="@+id/tvLongitude"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@{String.format(@string/longitude, ViewModel.mCurrentLongitude)}"
+                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+
+            </LinearLayout>
+
+        </FrameLayout>
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvSymptoms"
             android:layout_width="match_parent"
