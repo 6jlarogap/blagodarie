@@ -18,6 +18,10 @@ public final class DisplaySymptom
 
     private Long mLastTimestamp;
 
+    private Double mLastLatitude;
+
+    private Double mLastLongitude;
+
     public DisplaySymptom (@NonNull final Symptom symptom) {
         mSymptom = symptom;
     }
@@ -27,12 +31,28 @@ public final class DisplaySymptom
         return mSymptom;
     }
 
+    public void setLastLatitude (Double mLastLatitude) {
+        this.mLastLatitude = mLastLatitude;
+    }
+
+    public void setLastLongitude (Double mLastLongitude) {
+        this.mLastLongitude = mLastLongitude;
+    }
+
     public final Long getLastTimestamp () {
         return mLastTimestamp;
     }
 
     final void setLastTimestamp (Long mLastTimestamp) {
         this.mLastTimestamp = mLastTimestamp;
+    }
+
+    public Double getLastLatitude () {
+        return mLastLatitude;
+    }
+
+    public Double getLastLongitude () {
+        return mLastLongitude;
     }
 
     public final String getLastTimestampLikeDateString () {

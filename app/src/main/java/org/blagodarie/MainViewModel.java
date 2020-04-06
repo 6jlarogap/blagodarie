@@ -1,6 +1,7 @@
 package org.blagodarie;
 
 import androidx.annotation.NonNull;
+import androidx.databinding.ObservableField;
 import androidx.lifecycle.ViewModel;
 
 import java.util.HashSet;
@@ -12,6 +13,8 @@ import java.util.Set;
  */
 public final class MainViewModel
         extends ViewModel {
+
+    public ObservableField<String> mLocation = new ObservableField<>("");
 
     @NonNull
     private final Set<DisplaySymptom> mSymptoms = new HashSet<>();
