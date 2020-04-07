@@ -1,6 +1,12 @@
 package org.blagodarie;
 
+import android.os.Handler;
+
 import androidx.annotation.NonNull;
+import androidx.databinding.ObservableBoolean;
+import androidx.databinding.ObservableDouble;
+import androidx.databinding.ObservableField;
+import androidx.databinding.ObservableLong;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -13,50 +19,68 @@ import java.util.Objects;
 public final class DisplaySymptom
         implements Comparable<DisplaySymptom> {
 
-    @NonNull
-    private final Symptom mSymptom;
-
-    private Long mLastTimestamp;
-
-    private Double mLastLatitude;
-
-    private Double mLastLongitude;
-
-    public DisplaySymptom (@NonNull final Symptom symptom) {
-        mSymptom = symptom;
-    }
+    /**
+     * Время подсветки в миллисекундах.
+     */
+    private static final long HIGHLIGHT_TIME = 6000;
 
     @NonNull
-    public final Symptom getSymptom () {
-        return mSymptom;
+    private final Long mSymptomId;
+
+    @NonNull
+    private final String mSymptomName;
+
+    private ObservableField<Date> mLastAdd = new ObservableField<>();
+
+    private ObservableDouble mLastLatitude = new ObservableDouble();
+
+    private ObservableDouble mLastLongitude = new ObservableDouble();
+
+    private ObservableBoolean mInLoadProgress = new ObservableBoolean(false);
+
+    private ObservableBoolean mHighlight = new ObservableBoolean(false);
+
+    public DisplaySymptom (
+            @NonNull final Long symptomId,
+            @NonNull final String symptomName
+    ) {
+        mSymptomId = symptomId;
+        mSymptomName = symptomName;
     }
 
-    public void setLastLatitude (Double mLastLatitude) {
-        this.mLastLatitude = mLastLatitude;
+    @NonNull
+    Long getSymptomId () {
+        return mSymptomId;
     }
 
-    public void setLastLongitude (Double mLastLongitude) {
-        this.mLastLongitude = mLastLongitude;
+    @NonNull
+    public String getSymptomName () {
+        return mSymptomName;
     }
 
-    public final Long getLastTimestamp () {
-        return mLastTimestamp;
+    public final ObservableField<Date> getLastAdd () {
+        return mLastAdd;
     }
 
-    final void setLastTimestamp (Long mLastTimestamp) {
-        this.mLastTimestamp = mLastTimestamp;
-    }
-
-    public Double getLastLatitude () {
+    public ObservableDouble getLastLatitude () {
         return mLastLatitude;
     }
 
-    public Double getLastLongitude () {
+    public ObservableDouble getLastLongitude () {
         return mLastLongitude;
     }
 
-    public final String getLastTimestampLikeDateString () {
-        return mLastTimestamp != null ? SimpleDateFormat.getDateTimeInstance().format(new Date(mLastTimestamp)) : "";
+    public ObservableBoolean getInLoadProgress () {
+        return mInLoadProgress;
+    }
+
+    public ObservableBoolean getHighlight () {
+        return mHighlight;
+    }
+
+    public void highlight(){
+        mHighlight.set(true);
+        new Handler().postDelayed(() -> mHighlight.set(false), HIGHLIGHT_TIME);
     }
 
     @Override
@@ -64,19 +88,22 @@ public final class DisplaySymptom
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         DisplaySymptom that = (DisplaySymptom) o;
-        return mSymptom.equals(that.mSymptom);
+        return mSymptomId.equals(that.mSymptomId);
     }
 
     @Override
     public int hashCode () {
-        return Objects.hash(mSymptom);
+        return Objects.hash(mSymptomId);
     }
 
     @Override
     public String toString () {
         return "DisplaySymptom{" +
-                "mSymptom=" + mSymptom +
-                ", mLastTimestamp=" + mLastTimestamp +
+                "mSymptomId=" + mSymptomId +
+                ", mSymptomName='" + mSymptomName + '\'' +
+                ", mLastAdd=" + mLastAdd +
+                ", mLastLatitude=" + mLastLatitude +
+                ", mLastLongitude=" + mLastLongitude +
                 '}';
     }
 
@@ -86,11 +113,11 @@ public final class DisplaySymptom
         if (this == o) {
             result = 0;
         } else {
-            long thisTimestamp = this.mLastTimestamp == null ? 0 : this.mLastTimestamp;
-            long otherTimestamp = o.mLastTimestamp == null ? 0 : o.mLastTimestamp;
+            long thisTimestamp = this.mLastAdd.get() == null ? 0 : this.mLastAdd.get().getTime();
+            long otherTimestamp = o.mLastAdd.get() == null ? 0 : o.mLastAdd.get().getTime();
             result = -Long.compare(thisTimestamp, otherTimestamp);
             if (result == 0) {
-                result = this.mSymptom.getName().compareTo(o.mSymptom.getName());
+                result = this.mSymptomName.compareTo(o.mSymptomName);
             }
         }
         return result;

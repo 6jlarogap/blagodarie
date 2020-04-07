@@ -3,4 +3,5 @@
     <string name="account_type">org.blagodarie</string>
     <string name="txt_greeting">Здравствуйте!</string>
     <string name="btn_next">Далее</string>
+    <string name="loading_in_progress">Отправка</string>
 </resources>

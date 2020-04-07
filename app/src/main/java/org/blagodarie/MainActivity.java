@@ -39,10 +39,13 @@ import org.blagodarie.server.ServerDataSource;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Locale;
 
 import io.reactivex.Completable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.functions.Action;
 import io.reactivex.schedulers.Schedulers;
 
 /**
@@ -112,16 +115,21 @@ public final class MainActivity
      */
     private Location mCurrentLocation;
 
-    MainViewModel mViewModel;
+    private MainViewModel mViewModel;
+
+    private CompositeDisposable mDisposables = new CompositeDisposable();
 
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initUserId();
-        final MainActivityBinding mainActivityBinding = DataBindingUtil.setContentView(this, R.layout.main_activity);
+
         mViewModel = new ViewModelProvider(this).get(MainViewModel.class);
-        mainActivityBinding.setViewModel(mViewModel);
+
         final SymptomsAdapter symptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getSymptoms()), this::createUserSymptom);
+
+        final MainActivityBinding mainActivityBinding = DataBindingUtil.setContentView(this, R.layout.main_activity);
+        mainActivityBinding.setViewModel(mViewModel);
         mainActivityBinding.rvSymptoms.setAdapter(symptomsAdapter);
 
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
@@ -147,6 +155,12 @@ public final class MainActivity
         stopLocationUpdates();
     }
 
+    @Override
+    protected void onDestroy () {
+        super.onDestroy();
+        mDisposables.dispose();
+    }
+
     private void initUserId () {
         final Account[] accounts = AccountManager.get(this).getAccountsByType(getString(R.string.account_type));
 
@@ -160,31 +174,41 @@ public final class MainActivity
     public void createUserSymptom (
             @NonNull final DisplaySymptom displaySymptom
     ) {
-        Long timestamp = System.currentTimeMillis();
+        long timestamp = System.currentTimeMillis();
+        displaySymptom.getLastAdd().set(new Date(timestamp));
+
         Double latitude = null;
         Double longitude = null;
         if (mCurrentLocation != null) {
             latitude = mCurrentLocation.getLatitude();
             longitude = mCurrentLocation.getLongitude();
+
+            displaySymptom.getLastLatitude().set(latitude);
+            displaySymptom.getLastLongitude().set(longitude);
         }
         final UserSymptom userSymptom = new UserSymptom(
                 mUserId,
-                displaySymptom.getSymptom().getId(),
+                displaySymptom.getSymptomId(),
                 timestamp,
                 latitude,
                 longitude);
         final Collection<UserSymptom> userSymptoms = new ArrayList<>();
         userSymptoms.add(userSymptom);
         final ServerDataSource serverDataSource = new ServerDataSource(this);
-        Completable.
-                fromAction(() -> serverDataSource.addUserSymptom(createJsonContent(userSymptoms))).
-                subscribeOn(Schedulers.io()).
-                observeOn(AndroidSchedulers.mainThread()).
-                subscribe();
+        mDisposables.add(
+                Completable.
+                        fromAction(() -> {
+                            displaySymptom.getInLoadProgress().set(true);
+                            serverDataSource.addUserSymptom(createJsonContent(userSymptoms));
+                        }).
+                        subscribeOn(Schedulers.io()).
+                        observeOn(AndroidSchedulers.mainThread()).
+                        subscribe(() -> {
+                            displaySymptom.getInLoadProgress().set(false);
+                            displaySymptom.highlight();
+                        })
+        );
 
-        displaySymptom.setLastTimestamp(timestamp);
-        displaySymptom.setLastLatitude(latitude);
-        displaySymptom.setLastLongitude(longitude);
     }
 
     private String createJsonContent (@NonNull final Collection<UserSymptom> userSymptoms) {
