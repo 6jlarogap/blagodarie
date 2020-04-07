@@ -1,6 +1,5 @@
 package org.blagodarie;
 
-import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,14 +25,14 @@ final class SymptomsAdapter
     private List<DisplaySymptom> mDisplaySymptoms;
 
     @NonNull
-    private final UserSymptomCreator mUserSymptomCreator;
+    private final DisplaySymptomClickListener mDisplaySymptomClickListener;
 
     SymptomsAdapter (
             @NonNull final List<DisplaySymptom> displaySymptoms,
-            @NonNull final UserSymptomCreator userSymptomCreator
+            @NonNull final DisplaySymptomClickListener displaySymptomClickListener
     ) {
         mDisplaySymptoms = displaySymptoms;
-        mUserSymptomCreator = userSymptomCreator;
+        mDisplaySymptomClickListener = displaySymptomClickListener;
     }
 
     @NonNull
@@ -48,14 +47,7 @@ final class SymptomsAdapter
     public void onBindViewHolder (@NonNull SymptomViewHolder holder, int position) {
         final DisplaySymptom displaySymptom = mDisplaySymptoms.get(position);
         if (displaySymptom != null) {
-            holder.bind(displaySymptom, v -> {
-                //final long timestamp = System.currentTimeMillis();
-                //displaySymptom.setLastTimestamp(timestamp);
-                mUserSymptomCreator.create(displaySymptom);
-                notifyItemChanged(position);
-                order();
-                new Handler().postDelayed(() -> notifyItemChanged(position), 60000L);
-            });
+            holder.bind(displaySymptom, v -> mDisplaySymptomClickListener.onClick(displaySymptom));
         }
     }
 
@@ -91,7 +83,7 @@ final class SymptomsAdapter
             itemView.setOnClickListener(v -> {
                 long timestamp = System.currentTimeMillis();
                 displaySymptom.setLastTimestamp(timestamp);
-                userSymptomCreator.create(displaySymptom.getSymptom(), timestamp);
+                userSymptomCreator.onClick(displaySymptom.getSymptom(), timestamp);
                 order();
             });*/
             mBinding.setDisplaySymptom(displaySymptom);
@@ -124,15 +116,15 @@ final class SymptomsAdapter
 
         @Override
         public boolean areItemsTheSame (int oldItemPosition, int newItemPosition) {
-            return mNewList.get(newItemPosition).getSymptom().getId().equals(mOldList.get(oldItemPosition).getSymptom().getId());
+            return mNewList.get(newItemPosition).getSymptomId().equals(mOldList.get(oldItemPosition).getSymptomId());
         }
 
         @Override
         public boolean areContentsTheSame (int oldItemPosition, int newItemPosition) {
             final DisplaySymptom newItem = mNewList.get(newItemPosition);
             final DisplaySymptom oldItem = mOldList.get(newItemPosition);
-            return newItem.getSymptom().equals(oldItem.getSymptom()) &&
-                    (newItem.getLastTimestamp() == null ? oldItem.getLastTimestamp() == null : newItem.getLastTimestamp().equals(oldItem.getLastTimestamp()));
+            return newItem.getSymptomId().equals(oldItem.getSymptomId()) &&
+                    (newItem.getLastAdd() == null ? oldItem.getLastAdd() == null : newItem.getLastAdd().equals(oldItem.getLastAdd()));
         }
     }
 }

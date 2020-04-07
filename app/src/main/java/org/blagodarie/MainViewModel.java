@@ -28,7 +28,7 @@ public final class MainViewModel
 
     {
         for (Symptom symptom : Symptom.getSymptoms()) {
-            mSymptoms.add(new DisplaySymptom(symptom));
+            mSymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName()));
         }
     }
 

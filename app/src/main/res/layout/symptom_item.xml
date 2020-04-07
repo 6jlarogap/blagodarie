@@ -5,7 +5,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="5dp"
-        android:background="@{(System.currentTimeMillis() - DisplaySymptom.lastTimestamp) >= 60000L ? @android:color/white : @android:color/holo_green_light}">
+        android:background="@{DisplaySymptom.highlight ? @android:color/holo_green_light : @android:color/white}">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -18,27 +18,54 @@
                 android:layout_gravity="center"
                 android:layout_margin="5dp"
                 android:gravity="center"
-                android:text="@{DisplaySymptom.symptom.name}"
+                android:text="@{DisplaySymptom.symptomName}"
                 android:textAppearance="@style/TextAppearance.AppCompat.Large" />
 
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="start"
-                    android:layout_margin="5dp"
-                    android:text='@{DisplaySymptom.lastTimestampLikeDateString}'
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                    android:visibility="@{DisplaySymptom.lastTimestamp != null ? View.VISIBLE : View.GONE}" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_gravity="start"
                     android:layout_margin="5dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text='@{DisplaySymptom.lastAdd != null ? SimpleDateFormat.getDateTimeInstance().format(DisplaySymptom.lastAdd) : ""}'
+                        android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                        android:visibility="@{DisplaySymptom.lastAdd != null ? View.VISIBLE : View.GONE}" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:visibility="@{DisplaySymptom.inLoadProgress ? View.VISIBLE : View.GONE}">
+
+                        <ProgressBar
+                            style="?android:attr/progressBarStyleSmall"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center_horizontal" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/loading_in_progress" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_gravity="end"
+                    android:layout_margin="5dp"
                     android:orientation="vertical">
 
                     <TextView
@@ -46,14 +73,14 @@
                         android:layout_height="wrap_content"
                         android:text="@{String.format(@string/latitude, DisplaySymptom.lastLatitude)}"
                         android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                        android:visibility="@{DisplaySymptom.lastLatitude != null ? View.VISIBLE : View.GONE}" />
+                        android:visibility="@{DisplaySymptom.lastLatitude != 0 ? View.VISIBLE : View.GONE}" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@{String.format(@string/longitude, DisplaySymptom.lastLongitude)}"
                         android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                        android:visibility="@{DisplaySymptom.lastLongitude != null ? View.VISIBLE : View.GONE}" />
+                        android:visibility="@{DisplaySymptom.lastLongitude != 0 ? View.VISIBLE : View.GONE}" />
 
                 </LinearLayout>
 
@@ -66,6 +93,8 @@
     <data>
 
         <import type="android.view.View" />
+
+        <import type="java.text.SimpleDateFormat" />
 
         <variable
             name="DisplaySymptom"
