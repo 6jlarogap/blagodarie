@@ -3,7 +3,6 @@ package org.blagodarie;
 import android.Manifest;
 import android.accounts.Account;
 import android.accounts.AccountManager;
-import android.app.Activity;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
@@ -12,7 +11,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Looper;
 import android.provider.Settings;
-import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -31,6 +29,7 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.SettingsClient;
 import com.google.android.material.snackbar.Snackbar;
@@ -52,63 +51,67 @@ import io.reactivex.schedulers.Schedulers;
  */
 public final class MainActivity
         extends AppCompatActivity {
-    String TAG = "";
-    /**
-     * Constant used in the location settings dialog.
-     */
-    private static final int REQUEST_CHECK_SETTINGS = 0x1;
-    private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 1;
-    /**
-     * The desired interval for location updates. Inexact. Updates may be more or less frequent.
-     */
-    private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
 
     /**
-     * The fastest rate for active location updates. Exact. Updates will never be more frequent
-     * than this value.
+     * Идентификатор запуска диалога включения определения местоположения.
      */
-    private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS =
-            UPDATE_INTERVAL_IN_MILLISECONDS / 2;
+    private static final int REQUEST_CHECK_SETTINGS = 1;
+
+    /**
+     * Идентификатор запроса на разрешение использования определения местоположения.
+     */
+    private static final int PERM_REQ_ACCESS_FINE_LOCATION = 1;
+
+    /**
+     * Желаемый интервал для обновления местоположения. Неточный. Обновления могут быть более или
+     * менее частыми.
+     */
+    private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000L;
+
+    /**
+     * Самый быстрый показатель для активных обновлений местоположения. Обновления никогда не будут
+     * более частыми, чем это значение.
+     */
+    private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
 
     private Long mUserId;
 
     private boolean mPermissionDeniedExplanationShowed = false;
 
     /**
-     * Provides access to the Fused Location Provider API.
+     * Предоставляет доступ к Fused Location Provider API.
+     *
+     * @link https://developers.google.com/location-context/fused-location-provider
      */
     private FusedLocationProviderClient mFusedLocationClient;
 
     /**
-     * Provides access to the Location Settings API.
+     * Предоставляет доступ к локальным настройкам API.
      */
     private SettingsClient mSettingsClient;
 
     /**
-     * Stores parameters for requests to the FusedLocationProviderApi.
+     * Хранит параметры для запроса к FusedLocationProviderApi.
      */
     private LocationRequest mLocationRequest;
 
     /**
-     * Stores the types of location services the client is interested in using. Used for checking
-     * settings to determine if the device has optimal location settings.
+     * Хранит типы сервисов определения местоположения, которыми заинтересован клиент. Используется
+     * для проверки настроек, чтобы определить, имеет ли устройство оптимальные настройки
+     * местоположения.
      */
     private LocationSettingsRequest mLocationSettingsRequest;
 
     /**
-     * Callback for Location events.
+     * Колбэк для событий определения местоположения.
      */
     private LocationCallback mLocationCallback;
 
     /**
-     * Represents a geographical location.
+     * Текущее местоположение.
      */
     private Location mCurrentLocation;
 
-
-    private final static String KEY_REQUESTING_LOCATION_UPDATES = "requesting-location-updates";
-    private final static String KEY_LOCATION = "location";
-    private final static String KEY_LAST_UPDATED_TIME_STRING = "last-updated-time-string";
     MainViewModel mViewModel;
 
     @Override
@@ -202,9 +205,6 @@ public final class MainActivity
         return content.toString();
     }
 
-
-    ////////////////////////
-
     private void createLocationRequest () {
         mLocationRequest = new LocationRequest();
         mLocationRequest.setInterval(UPDATE_INTERVAL_IN_MILLISECONDS);
@@ -231,49 +231,20 @@ public final class MainActivity
         mLocationSettingsRequest = builder.build();
     }
 
-    @Override
-    protected void onActivityResult (int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        switch (requestCode) {
-            // Check for the integer request code originally supplied to startResolutionForResult().
-            case REQUEST_CHECK_SETTINGS:
-                switch (resultCode) {
-                    case Activity.RESULT_OK:
-                        Log.i(TAG, "User agreed to make required location settings changes.");
-                        // Nothing to do. startLocationupdates() gets called in onResume again.
-                        break;
-                    case Activity.RESULT_CANCELED:
-                        Log.i(TAG, "User chose not to make required location settings changes.");
-                        break;
-                }
-                break;
-        }
-    }
-
     private void startLocationUpdates () {
-        // Begin by checking if the device has the necessary location settings.
         mSettingsClient.checkLocationSettings(mLocationSettingsRequest)
-                .addOnSuccessListener(this, locationSettingsResponse -> {
-                    Log.i(TAG, "All location settings are satisfied.");
-
-                    mFusedLocationClient.requestLocationUpdates(mLocationRequest,
-                            mLocationCallback, Looper.myLooper());
-
-                })
+                .addOnSuccessListener(this, this::onSuccess)
                 .addOnFailureListener(this, e -> {
                     int statusCode = ((ApiException) e).getStatusCode();
                     switch (statusCode) {
 
                         case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                            Log.i(TAG, "Location settings are not satisfied. Attempting to upgrade " +
-                                    "location settings ");
-                            showSnackbar(R.string.location_disabled, R.string.location_enable, v->{
+                            showSnackbar(R.string.location_disabled, R.string.location_enable, v -> {
 
                                 try {
                                     ResolvableApiException rae = (ResolvableApiException) e;
                                     rae.startResolutionForResult(MainActivity.this, REQUEST_CHECK_SETTINGS);
                                 } catch (IntentSender.SendIntentException sie) {
-                                    Log.i(TAG, "PendingIntent unable to execute request.");
                                 }
                             });
                             break;
@@ -303,35 +274,27 @@ public final class MainActivity
 
     private void requestPermissions () {
         boolean shouldProvideRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
-
         if (shouldProvideRationale) {
-            Log.i(TAG, "Displaying permission rationale to provide additional context.");
             mPermissionDeniedExplanationShowed = false;
-            showSnackbar(R.string.permission_rationale,
-                    android.R.string.ok, view -> {
-                        ActivityCompat.requestPermissions(MainActivity.this,
-                                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                                REQUEST_PERMISSIONS_REQUEST_CODE);
-                    });
+            showSnackbar(
+                    R.string.permission_rationale,
+                    android.R.string.ok,
+                    view -> ActivityCompat.requestPermissions(MainActivity.this,
+                            new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                            PERM_REQ_ACCESS_FINE_LOCATION));
         } else {
-            Log.i(TAG, "Requesting permission");
             if (!mPermissionDeniedExplanationShowed) {
                 ActivityCompat.requestPermissions(MainActivity.this,
                         new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        REQUEST_PERMISSIONS_REQUEST_CODE);
+                        PERM_REQ_ACCESS_FINE_LOCATION);
             }
         }
     }
 
     @Override
-    public void onRequestPermissionsResult (int requestCode, @NonNull String[] permissions,
-                                            @NonNull int[] grantResults) {
-        Log.i(TAG, "onRequestPermissionResult");
-        if (requestCode == REQUEST_PERMISSIONS_REQUEST_CODE) {
-            if (grantResults.length <= 0) {
-                Log.i(TAG, "User interaction was cancelled.");
-            } else if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.i(TAG, "Permission granted, updates requested, starting location updates");
+    public void onRequestPermissionsResult (final int requestCode, @NonNull final String[] permissions, @NonNull final int[] grantResults) {
+        if (requestCode == PERM_REQ_ACCESS_FINE_LOCATION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startLocationUpdates();
             } else {
                 if (!mPermissionDeniedExplanationShowed) {
@@ -346,10 +309,16 @@ public final class MainActivity
                                 intent.setData(uri);
                                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                 startActivity(intent);
-                            });
+                            }
+                    );
                     mPermissionDeniedExplanationShowed = true;
                 }
             }
         }
+    }
+
+    private void onSuccess (LocationSettingsResponse locationSettingsResponse) {
+        mFusedLocationClient.requestLocationUpdates(mLocationRequest,
+                mLocationCallback, Looper.myLooper());
     }
 }
