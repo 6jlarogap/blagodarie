@@ -22,7 +22,7 @@ public final class DisplaySymptom
     /**
      * Время подсветки в миллисекундах.
      */
-    private static final long HIGHLIGHT_TIME = 6000;
+    private static final long HIGHLIGHT_TIME = 60000;
 
     @NonNull
     private final Long mSymptomId;
