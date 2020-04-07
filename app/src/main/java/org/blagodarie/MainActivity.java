@@ -32,6 +32,7 @@ import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.SettingsClient;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.snackbar.Snackbar;
 
 import org.blagodarie.databinding.MainActivityBinding;
@@ -63,7 +64,7 @@ public final class MainActivity
     /**
      * Идентификатор запроса на разрешение использования определения местоположения.
      */
-    private static final int PERM_REQ_ACCESS_FINE_LOCATION = 1;
+    private static final int PERM_REQ_ACCESS_COARSE_LOCATION = 1;
 
     /**
      * Желаемый интервал для обновления местоположения. Неточный. Обновления могут быть более или
@@ -143,6 +144,7 @@ public final class MainActivity
     public void onResume () {
         super.onResume();
         if (checkAccessFineLocationPermission()) {
+            startGetLastLocation();
             startLocationUpdates();
         } else {
             requestPermissions();
@@ -293,31 +295,31 @@ public final class MainActivity
     }
 
     private boolean checkAccessFineLocationPermission () {
-        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestPermissions () {
-        boolean shouldProvideRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
+        boolean shouldProvideRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION);
         if (shouldProvideRationale) {
             mPermissionDeniedExplanationShowed = false;
             showSnackbar(
                     R.string.permission_rationale,
                     android.R.string.ok,
                     view -> ActivityCompat.requestPermissions(MainActivity.this,
-                            new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                            PERM_REQ_ACCESS_FINE_LOCATION));
+                            new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                            PERM_REQ_ACCESS_COARSE_LOCATION));
         } else {
             if (!mPermissionDeniedExplanationShowed) {
                 ActivityCompat.requestPermissions(MainActivity.this,
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        PERM_REQ_ACCESS_FINE_LOCATION);
+                        new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                        PERM_REQ_ACCESS_COARSE_LOCATION);
             }
         }
     }
 
     @Override
     public void onRequestPermissionsResult (final int requestCode, @NonNull final String[] permissions, @NonNull final int[] grantResults) {
-        if (requestCode == PERM_REQ_ACCESS_FINE_LOCATION) {
+        if (requestCode == PERM_REQ_ACCESS_COARSE_LOCATION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startLocationUpdates();
             } else {
@@ -339,6 +341,16 @@ public final class MainActivity
                 }
             }
         }
+    }
+
+    private void startGetLastLocation () {
+        mFusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
+            if (mCurrentLocation == null && location != null) {
+                mCurrentLocation = location;
+                mViewModel.mCurrentLatitude.set(mCurrentLocation.getLatitude());
+                mViewModel.mCurrentLongitude.set(mCurrentLocation.getLongitude());
+            }
+        });
     }
 
     private void onSuccess (LocationSettingsResponse locationSettingsResponse) {
