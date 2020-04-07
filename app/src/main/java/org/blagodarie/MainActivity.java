@@ -70,13 +70,13 @@ public final class MainActivity
      * Желаемый интервал для обновления местоположения. Неточный. Обновления могут быть более или
      * менее частыми.
      */
-    private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000L;
+    private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 60000L;
 
     /**
      * Самый быстрый показатель для активных обновлений местоположения. Обновления никогда не будут
      * более частыми, чем это значение.
      */
-    private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
+    private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = 10000L;
 
     private Long mUserId;
 
