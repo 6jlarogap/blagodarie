@@ -30,14 +30,19 @@ public final class DisplaySymptom
     @NonNull
     private final String mSymptomName;
 
+    @NonNull
     private ObservableField<Date> mLastAdd = new ObservableField<>();
 
-    private ObservableDouble mLastLatitude = new ObservableDouble();
+    @NonNull
+    private ObservableField<Double> mLastLatitude = new ObservableField<>();
 
-    private ObservableDouble mLastLongitude = new ObservableDouble();
+    @NonNull
+    private ObservableField<Double> mLastLongitude = new ObservableField<>();
 
+    @NonNull
     private ObservableBoolean mInLoadProgress = new ObservableBoolean(false);
 
+    @NonNull
     private ObservableBoolean mHighlight = new ObservableBoolean(false);
 
     public DisplaySymptom (
@@ -58,27 +63,32 @@ public final class DisplaySymptom
         return mSymptomName;
     }
 
+    @NonNull
     public final ObservableField<Date> getLastAdd () {
         return mLastAdd;
     }
 
-    public ObservableDouble getLastLatitude () {
+    @NonNull
+    public ObservableField<Double> getLastLatitude () {
         return mLastLatitude;
     }
 
-    public ObservableDouble getLastLongitude () {
+    @NonNull
+    public ObservableField<Double> getLastLongitude () {
         return mLastLongitude;
     }
 
+    @NonNull
     public ObservableBoolean getInLoadProgress () {
         return mInLoadProgress;
     }
 
+    @NonNull
     public ObservableBoolean getHighlight () {
         return mHighlight;
     }
 
-    public void highlight(){
+    void highlight(){
         mHighlight.set(true);
         new Handler().postDelayed(() -> mHighlight.set(false), HIGHLIGHT_TIME);
     }

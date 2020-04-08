@@ -3,37 +3,24 @@ package org.blagodarie;
 import android.Manifest;
 import android.accounts.Account;
 import android.accounts.AccountManager;
+import android.annotation.SuppressLint;
 import android.content.Intent;
-import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Looper;
 import android.provider.Settings;
 import android.view.View;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
-
-import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.common.api.ResolvableApiException;
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResponse;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
-import com.google.android.gms.location.SettingsClient;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.material.snackbar.Snackbar;
 
 import org.blagodarie.databinding.MainActivityBinding;
 import org.blagodarie.server.ServerDataSource;
@@ -46,7 +33,6 @@ import java.util.Locale;
 import io.reactivex.Completable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
-import io.reactivex.functions.Action;
 import io.reactivex.schedulers.Schedulers;
 
 /**
@@ -54,7 +40,8 @@ import io.reactivex.schedulers.Schedulers;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class MainActivity
-        extends AppCompatActivity {
+        extends AppCompatActivity
+        implements LocationListener {
 
     /**
      * Идентификатор запуска диалога включения определения местоположения.
@@ -64,61 +51,15 @@ public final class MainActivity
     /**
      * Идентификатор запроса на разрешение использования определения местоположения.
      */
-    private static final int PERM_REQ_ACCESS_COARSE_LOCATION = 1;
-
-    /**
-     * Желаемый интервал для обновления местоположения. Неточный. Обновления могут быть более или
-     * менее частыми.
-     */
-    private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 60000L;
-
-    /**
-     * Самый быстрый показатель для активных обновлений местоположения. Обновления никогда не будут
-     * более частыми, чем это значение.
-     */
-    private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = 10000L;
+    private static final int PERM_REQ_ACCESS_FINE_LOCATION = 1;
 
     private Long mUserId;
-
-    private boolean mPermissionDeniedExplanationShowed = false;
-
-    /**
-     * Предоставляет доступ к Fused Location Provider API.
-     *
-     * @link https://developers.google.com/location-context/fused-location-provider
-     */
-    private FusedLocationProviderClient mFusedLocationClient;
-
-    /**
-     * Предоставляет доступ к локальным настройкам API.
-     */
-    private SettingsClient mSettingsClient;
-
-    /**
-     * Хранит параметры для запроса к FusedLocationProviderApi.
-     */
-    private LocationRequest mLocationRequest;
-
-    /**
-     * Хранит типы сервисов определения местоположения, которыми заинтересован клиент. Используется
-     * для проверки настроек, чтобы определить, имеет ли устройство оптимальные настройки
-     * местоположения.
-     */
-    private LocationSettingsRequest mLocationSettingsRequest;
-
-    /**
-     * Колбэк для событий определения местоположения.
-     */
-    private LocationCallback mLocationCallback;
-
-    /**
-     * Текущее местоположение.
-     */
-    private Location mCurrentLocation;
 
     private MainViewModel mViewModel;
 
     private CompositeDisposable mDisposables = new CompositeDisposable();
+
+    private LocationManager mLocationManager;
 
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
@@ -133,34 +74,41 @@ public final class MainActivity
         mainActivityBinding.setViewModel(mViewModel);
         mainActivityBinding.rvSymptoms.setAdapter(symptomsAdapter);
 
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        mSettingsClient = LocationServices.getSettingsClient(this);
-        createLocationCallback();
-        createLocationRequest();
-        buildLocationSettingsRequest();
+
+        mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
     }
 
     @Override
     public void onResume () {
         super.onResume();
-        if (checkAccessFineLocationPermission()) {
-            startGetLastLocation();
+        if (checkLocationPermission()) {
+            //startGetLastLocation();
             startLocationUpdates();
         } else {
-            requestPermissions();
+            attemptRequestLocationPermissions();
         }
     }
 
     @Override
     protected void onPause () {
         super.onPause();
-        stopLocationUpdates();
+        //stopLocationUpdates();
     }
 
     @Override
     protected void onDestroy () {
         super.onDestroy();
         mDisposables.dispose();
+    }
+
+    @SuppressLint ("MissingPermission")
+    private void startLocationUpdates () {
+        mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000 * 10, 10, this);
+        mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000 * 10, 10, this);
+    }
+
+    private void stopLocationUpdates () {
+        mLocationManager.removeUpdates(this);
     }
 
     private void initUserId () {
@@ -179,15 +127,12 @@ public final class MainActivity
         long timestamp = System.currentTimeMillis();
         displaySymptom.getLastAdd().set(new Date(timestamp));
 
-        Double latitude = null;
-        Double longitude = null;
-        if (mCurrentLocation != null) {
-            latitude = mCurrentLocation.getLatitude();
-            longitude = mCurrentLocation.getLongitude();
+        final Double latitude = mViewModel.getCurrentLatitude().get();
+        final Double longitude = mViewModel.getCurrentLongitude().get();
 
-            displaySymptom.getLastLatitude().set(latitude);
-            displaySymptom.getLastLongitude().set(longitude);
-        }
+        displaySymptom.getLastLatitude().set(latitude);
+        displaySymptom.getLastLongitude().set(longitude);
+
         final UserSymptom userSymptom = new UserSymptom(
                 mUserId,
                 displaySymptom.getSymptomId(),
@@ -231,130 +176,91 @@ public final class MainActivity
         return content.toString();
     }
 
-    private void createLocationRequest () {
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(UPDATE_INTERVAL_IN_MILLISECONDS);
-        mLocationRequest.setFastestInterval(FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+    private boolean checkLocationPermission () {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void createLocationCallback () {
-        mLocationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult (LocationResult locationResult) {
-                super.onLocationResult(locationResult);
-
-                mCurrentLocation = locationResult.getLastLocation();
-                mViewModel.mCurrentLatitude.set(mCurrentLocation.getLatitude());
-                mViewModel.mCurrentLongitude.set(mCurrentLocation.getLongitude());
-            }
-        };
-    }
-
-    private void buildLocationSettingsRequest () {
-        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder();
-        builder.addLocationRequest(mLocationRequest);
-        mLocationSettingsRequest = builder.build();
-    }
-
-    private void startLocationUpdates () {
-        mSettingsClient.checkLocationSettings(mLocationSettingsRequest)
-                .addOnSuccessListener(this, this::onSuccess)
-                .addOnFailureListener(this, e -> {
-                    int statusCode = ((ApiException) e).getStatusCode();
-                    switch (statusCode) {
-
-                        case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                            showSnackbar(R.string.location_disabled, R.string.location_enable, v -> {
-
-                                try {
-                                    ResolvableApiException rae = (ResolvableApiException) e;
-                                    rae.startResolutionForResult(MainActivity.this, REQUEST_CHECK_SETTINGS);
-                                } catch (IntentSender.SendIntentException sie) {
-                                }
-                            });
-                            break;
-                        case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                            String errorMessage = "Location settings are inadequate, and cannot be " +
-                                    "fixed here. Fix in Settings.";
-                            Toast.makeText(MainActivity.this, errorMessage, Toast.LENGTH_LONG).show();
-                    }
-                });
-    }
-
-    private void stopLocationUpdates () {
-        mFusedLocationClient.removeLocationUpdates(mLocationCallback);
-    }
-
-    private void showSnackbar (final int mainTextStringId, final int actionStringId, View.OnClickListener listener) {
-        Snackbar.make(
-                findViewById(android.R.id.content),
-                getString(mainTextStringId),
-                Snackbar.LENGTH_INDEFINITE)
-                .setAction(getString(actionStringId), listener).show();
-    }
-
-    private boolean checkAccessFineLocationPermission () {
-        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void requestPermissions () {
-        boolean shouldProvideRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION);
+    private void attemptRequestLocationPermissions () {
+        boolean shouldProvideRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
         if (shouldProvideRationale) {
-            mPermissionDeniedExplanationShowed = false;
-            showSnackbar(
-                    R.string.permission_rationale,
-                    android.R.string.ok,
-                    view -> ActivityCompat.requestPermissions(MainActivity.this,
-                            new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
-                            PERM_REQ_ACCESS_COARSE_LOCATION));
+            mViewModel.isShowLocationPermissionDeniedExplanation().set(false);
+            mViewModel.isShowLocationPermissionRationale().set(true);
         } else {
-            if (!mPermissionDeniedExplanationShowed) {
-                ActivityCompat.requestPermissions(MainActivity.this,
-                        new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
-                        PERM_REQ_ACCESS_COARSE_LOCATION);
+            if (!mViewModel.isShowLocationPermissionDeniedExplanation().get()) {
+                requestLocationPermission();
             }
         }
     }
 
     @Override
     public void onRequestPermissionsResult (final int requestCode, @NonNull final String[] permissions, @NonNull final int[] grantResults) {
-        if (requestCode == PERM_REQ_ACCESS_COARSE_LOCATION) {
+        if (requestCode == PERM_REQ_ACCESS_FINE_LOCATION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startLocationUpdates();
             } else {
-                if (!mPermissionDeniedExplanationShowed) {
-                    showSnackbar(
-                            R.string.permission_denied_explanation,
-                            R.string.settings,
-                            view -> {
-                                mPermissionDeniedExplanationShowed = false;
-                                Intent intent = new Intent();
-                                intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                                Uri uri = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null);
-                                intent.setData(uri);
-                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                startActivity(intent);
-                            }
-                    );
-                    mPermissionDeniedExplanationShowed = true;
+                if (!mViewModel.isShowLocationPermissionDeniedExplanation().get()) {
+                    mViewModel.isShowLocationPermissionRationale().set(false);
+                    mViewModel.isShowLocationPermissionDeniedExplanation().set(true);
                 }
             }
         }
     }
 
-    private void startGetLastLocation () {
-        mFusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
-            if (mCurrentLocation == null && location != null) {
-                mCurrentLocation = location;
-                mViewModel.mCurrentLatitude.set(mCurrentLocation.getLatitude());
-                mViewModel.mCurrentLongitude.set(mCurrentLocation.getLongitude());
-            }
-        });
+    public void onLocationPermissionRationaleClick (final View view) {
+        mViewModel.isShowLocationPermissionRationale().set(false);
+        requestLocationPermission();
     }
 
-    private void onSuccess (LocationSettingsResponse locationSettingsResponse) {
-        mFusedLocationClient.requestLocationUpdates(mLocationRequest,
-                mLocationCallback, Looper.myLooper());
+    public void onLocationPermissionDeniedExplanationClick (final View view) {
+        mViewModel.isShowLocationPermissionDeniedExplanation().set(false);
+        final Intent intent = new Intent();
+        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        final Uri uri = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null);
+        intent.setData(uri);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+    }
+
+    public void onLocationProvidersDisabledWarningClick (final View view) {
+        final Intent viewIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+        startActivity(viewIntent);
+    }
+
+    public void requestLocationPermission () {
+        ActivityCompat.requestPermissions(MainActivity.this,
+                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                PERM_REQ_ACCESS_FINE_LOCATION);
+    }
+
+    @Override
+    public void onLocationChanged (Location location) {
+        checkHaveEnabledLocationProvider();
+        if (location != null) {
+            mViewModel.getCurrentLatitude().set(location.getLatitude());
+            mViewModel.getCurrentLongitude().set(location.getLongitude());
+        }
+    }
+
+    @Override
+    public void onStatusChanged (String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled (String provider) {
+        checkHaveEnabledLocationProvider();
+    }
+
+    @Override
+    public void onProviderDisabled (String provider) {
+        checkHaveEnabledLocationProvider();
+    }
+
+    private void checkHaveEnabledLocationProvider () {
+        mViewModel.isShowLocationProvidersDisabledWarning().set(
+                !(mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                        mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+                )
+        );
     }
 }

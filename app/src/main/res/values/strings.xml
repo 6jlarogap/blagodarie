@@ -1,11 +1,12 @@
 <resources>
     <string name="app_name">Благодарие</string>
-    <string name="permission_denied_explanation">Доступ к определению местоположения запрещён.</string>
+    <string name="location_permission_denied_explanation">Доступ к определению местоположения запрещён.</string>
     <string name="settings">Настройки</string>
-    <string name="permission_rationale">Необходимо разрешение на определение местоположения.</string>
+    <string name="location_permission_rationale">Необходимо разрешение на определение местоположения.</string>
     <string name="latitude">Широта: %f</string>
     <string name="longitude">Долгота: %f</string>
 
     <string name="location_disabled">Для улучшения работы включите геолокацию.</string>
     <string name="location_enable">Включить</string>
+    <string name="location_providers_disabled_warning">Включите геолокацию.</string>
 </resources>
