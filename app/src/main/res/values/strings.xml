@@ -2,6 +2,7 @@
     <string name="app_name">Благодарие</string>
     <string name="location_permission_denied_explanation">Доступ к определению местоположения запрещён.</string>
     <string name="settings">Настройки</string>
+    <string name="allow">Разрешить</string>
     <string name="location_permission_rationale">Необходимо разрешение на определение местоположения.</string>
     <string name="latitude">Широта: %f</string>
     <string name="longitude">Долгота: %f</string>
