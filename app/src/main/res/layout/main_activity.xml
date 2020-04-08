@@ -7,6 +7,15 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <com.google.android.material.appbar.AppBarLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
+
+            <include layout="@layout/toolbar" />
+
+        </com.google.android.material.appbar.AppBarLayout>
+
         <include
             layout="@layout/location_permission_rationale"
             android:visibility="@{ViewModel.isShowLocationPermissionRationale() ? View.VISIBLE : View.GONE}" />

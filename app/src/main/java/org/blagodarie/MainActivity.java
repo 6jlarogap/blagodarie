@@ -16,6 +16,7 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
@@ -82,6 +83,7 @@ public final class MainActivity
         mainActivityBinding.setViewModel(mViewModel);
         mainActivityBinding.rvSymptoms.setAdapter(symptomsAdapter);
 
+        setupToolbar();
 
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
     }
@@ -106,6 +108,14 @@ public final class MainActivity
     protected void onDestroy () {
         super.onDestroy();
         mDisposables.dispose();
+    }
+
+    private void setupToolbar () {
+        setSupportActionBar(findViewById(R.id.toolbar));
+        final ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setTitle(getTitle() + " " + BuildConfig.VERSION_NAME + getString(R.string.build_type_label));
+        }
     }
 
     @SuppressLint ("MissingPermission")
