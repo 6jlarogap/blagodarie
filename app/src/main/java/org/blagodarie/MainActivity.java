@@ -17,7 +17,6 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
@@ -44,9 +43,18 @@ public final class MainActivity
         implements LocationListener {
 
     /**
-     * Идентификатор запуска диалога включения определения местоположения.
+     * Минимальное время между обновлениями местоположения (в миллисекундах).
+     *
+     * @see LocationManager#requestLocationUpdates
      */
-    private static final int REQUEST_CHECK_SETTINGS = 1;
+    private static final long MIN_TIME_LOCATION_UPDATE = 60000L;
+
+    /**
+     * Минимальная дистанция между обновлениями местоположения (в метрах).
+     *
+     * @see LocationManager#requestLocationUpdates
+     */
+    private static final float MIN_DISTANCE_LOCATION_UPDATE = 100.0F;
 
     /**
      * Идентификатор запроса на разрешение использования определения местоположения.
@@ -82,7 +90,6 @@ public final class MainActivity
     public void onResume () {
         super.onResume();
         if (checkLocationPermission()) {
-            //startGetLastLocation();
             startLocationUpdates();
         } else {
             attemptRequestLocationPermissions();
@@ -92,7 +99,7 @@ public final class MainActivity
     @Override
     protected void onPause () {
         super.onPause();
-        //stopLocationUpdates();
+        stopLocationUpdates();
     }
 
     @Override
@@ -103,8 +110,17 @@ public final class MainActivity
 
     @SuppressLint ("MissingPermission")
     private void startLocationUpdates () {
-        mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000 * 10, 10, this);
-        mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000 * 10, 10, this);
+        Location lastLocation = mLocationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        if (lastLocation == null) {
+            lastLocation = mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        }
+        if (lastLocation != null) {
+            mViewModel.getCurrentLatitude().set(lastLocation.getLatitude());
+            mViewModel.getCurrentLongitude().set(lastLocation.getLongitude());
+        }
+
+        mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, MIN_TIME_LOCATION_UPDATE, MIN_DISTANCE_LOCATION_UPDATE, this);
+        mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_TIME_LOCATION_UPDATE, MIN_DISTANCE_LOCATION_UPDATE, this);
     }
 
     private void stopLocationUpdates () {
