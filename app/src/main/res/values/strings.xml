@@ -10,5 +10,5 @@
     <string name="location_disabled">Для улучшения работы включите геолокацию.</string>
     <string name="location_enable">Включить</string>
     <string name="location_providers_disabled_warning">Включите геолокацию.</string>
-    <string name="build_type_label">rls</string>
+    <string name="build_type_label"/>
 </resources>
