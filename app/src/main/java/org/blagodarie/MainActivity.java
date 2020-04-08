@@ -48,7 +48,7 @@ public final class MainActivity
      *
      * @see LocationManager#requestLocationUpdates
      */
-    private static final long MIN_TIME_LOCATION_UPDATE = 60000L;
+    private static final long MIN_TIME_LOCATION_UPDATE = 180000L;
 
     /**
      * Минимальная дистанция между обновлениями местоположения (в метрах).
