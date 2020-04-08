@@ -7,6 +7,18 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <include
+            layout="@layout/location_permission_rationale"
+            android:visibility="@{ViewModel.isShowLocationPermissionRationale() ? View.VISIBLE : View.GONE}" />
+
+        <include
+            layout="@layout/location_permission_denied_explatanion"
+            android:visibility="@{ViewModel.isShowLocationPermissionDeniedExplanation() ? View.VISIBLE : View.GONE}" />
+
+        <include
+            layout="@layout/location_providers_disabled_warning"
+            android:visibility="@{ViewModel.isShowLocationProvidersDisabledWarning() ? View.VISIBLE : View.GONE}" />
+
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
@@ -16,7 +28,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="start"
-                android:text='@{ViewModel.mCurrentDataTime ?? ""}'
+                android:text='@{ViewModel.currentDatetime}'
                 android:textAppearance="@style/TextAppearance.AppCompat.Small" />
 
             <LinearLayout
@@ -29,15 +41,17 @@
                     android:id="@+id/tvLatitude"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@{String.format(@string/latitude, ViewModel.mCurrentLatitude)}"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+                    android:text="@{String.format(@string/latitude, ViewModel.currentLatitude)}"
+                    android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                    android:visibility="@{ViewModel.currentLatitude != null ? View.VISIBLE : View.GONE}" />
 
                 <TextView
                     android:id="@+id/tvLongitude"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@{String.format(@string/longitude, ViewModel.mCurrentLongitude)}"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+                    android:text="@{String.format(@string/longitude, ViewModel.currentLongitude)}"
+                    android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                    android:visibility="@{ViewModel.currentLongitude != null ? View.VISIBLE : View.GONE}" />
 
             </LinearLayout>
 
@@ -53,6 +67,8 @@
     </LinearLayout>
 
     <data>
+
+        <import type="android.view.View" />
 
         <variable
             name="ViewModel"

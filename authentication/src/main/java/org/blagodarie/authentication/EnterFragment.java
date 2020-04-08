@@ -99,6 +99,7 @@ public final class EnterFragment
         final GoogleSignInOptions gso = new GoogleSignInOptions.
                 Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).
                 requestEmail().
+                requestIdToken(getString(R.string.oauth2_client_id)).
                 build();
         final GoogleSignInClient mGoogleSignInClient = GoogleSignIn.getClient(requireActivity(), gso);
         final Intent signInIntent = mGoogleSignInClient.getSignInIntent();
