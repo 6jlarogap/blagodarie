@@ -40,6 +40,8 @@ public final class Symptom {
         SYMPTOMS.add(new Symptom(16L, "Сердечная боль"));
         SYMPTOMS.add(new Symptom(17L, "Гипертония"));
         SYMPTOMS.add(new Symptom(18L, "Гипотония"));
+        SYMPTOMS.add(new Symptom(19L, "Хорошее настроение"));
+        SYMPTOMS.add(new Symptom(20L, "Плохое настроение"));
     }
 
     private Symptom (
