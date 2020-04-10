@@ -142,6 +142,7 @@ public final class MainActivity
 
         if (accounts.length == 1) {
             mUserId = Long.valueOf(accounts[0].name);
+            AccountManager.get(this).getAuthToken(accounts[0], getString(R.string.token_type), null, this, null,null);
         } else {
             finish();
         }

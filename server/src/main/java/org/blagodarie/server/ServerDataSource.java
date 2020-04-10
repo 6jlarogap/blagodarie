@@ -114,14 +114,32 @@ public final class ServerDataSource {
         return userId;
     }
 
-    public void addUserSymptom(@NonNull final String jsonContent) throws IOException {
+    public String[] signUp (
+            @NonNull final String googleAccountId,
+            @NonNull final String googleTokenId
+    ) throws IOException, JSONException {
+        final String[] data = new String[2];
+        data[0] = "2";
+        data[1] = "token-akjoiwreut9834uu8934u9843u24c9m2r8934rm9284utmn92843";
+        return data;
+    }
+
+    public String signIn (
+            @NonNull final Long userId,
+            @NonNull final String googleAccountId,
+            @NonNull final String googleTokenId
+    ) throws IOException, JSONException {
+        return "token-akjoiwreut9834uu8934u9843u24c9m2r8934rm9284utmn92843";
+    }
+
+    public void addUserSymptom (@NonNull final String jsonContent) throws IOException {
         final RequestBody body = RequestBody.create(jsonContent, JSON_TYPE);
         final Request request = new Request.Builder()
                 .url(mApiBaseUrl + "addusersymptom")
                 .post(body)
                 .build();
         final Response response = sendRequestAndGetResponse(request);
-        if (response.body() != null){
+        if (response.body() != null) {
             final String responseBody = response.body().string();
             boolean a = responseBody.isEmpty();
         }

@@ -4,6 +4,7 @@ android {
 
     compileSdkVersion 28
 
+
     defaultConfig {
         applicationId "org.blagodarie"
         minSdkVersion 19

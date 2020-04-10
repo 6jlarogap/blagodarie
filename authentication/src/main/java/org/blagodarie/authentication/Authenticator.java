@@ -8,7 +8,6 @@ import android.accounts.NetworkErrorException;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 /**
@@ -65,6 +64,12 @@ public final class Authenticator
             final String authTokenType,
             final Bundle options
     ) throws NetworkErrorException {
+        if (!authTokenType.equals(mContext.getString(R.string.token_type))) {
+            final Bundle result = new Bundle();
+            result.putString(AccountManager.KEY_ERROR_MESSAGE, "invalid authTokenType");
+            return result;
+        }
+
         final Bundle result = new Bundle();
         result.putString(AccountManager.KEY_ACCOUNT_TYPE, account.type);
         result.putString(AccountManager.KEY_ACCOUNT_NAME, account.name);
@@ -74,7 +79,7 @@ public final class Authenticator
 
     @Override
     public String getAuthTokenLabel (final String authTokenType) {
-        throw new UnsupportedOperationException();
+        return authTokenType + "_label";
     }
 
     @Override

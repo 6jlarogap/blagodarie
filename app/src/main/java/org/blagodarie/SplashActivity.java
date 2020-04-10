@@ -30,7 +30,7 @@ public final class SplashActivity
         final Account[] accounts = mAccountManager.getAccountsByType(getString(R.string.account_type));
 
         if (accounts.length == 0) {
-            addNewAccount(getString(R.string.account_type), "");
+            addNewAccount(getString(R.string.account_type), getString(R.string.token_type));
         } else {
             toMainActivity();
         }
@@ -44,17 +44,23 @@ public final class SplashActivity
                 null,
                 null,
                 this,
+                future -> getAuthToken(),
+                null);
+    }
+
+    private void getAuthToken(){
+        mAccountManager.getAuthToken(
+                mAccountManager.getAccountsByType(getString(R.string.account_type))[0],
+                getString(R.string.token_type), null, this,
                 new AccountManagerCallback<Bundle>() {
                     @Override
                     public void run (AccountManagerFuture<Bundle> future) {
-                        //Bundle bnd = null;
-                        //try {
-                            //bnd = future.getResult();
-                            //final String authtoken = bnd.getString(AccountManager.KEY_AUTHTOKEN);
-                            toMainActivity();
-                        //} catch (Exception e) {
-                        //    e.printStackTrace();
-                        //}
+                        try {
+                            String token = future.getResult().getString((AccountManager.KEY_AUTHTOKEN));
+                            mAccountManager.invalidateAuthToken(getString(R.string.account_type), token);
+                        }catch(Exception e){
+
+                        }
                     }
                 }, null);
     }
