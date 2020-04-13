@@ -64,17 +64,13 @@ public final class Authenticator
             final String authTokenType,
             final Bundle options
     ) throws NetworkErrorException {
-        if (!authTokenType.equals(mContext.getString(R.string.token_type))) {
-            final Bundle result = new Bundle();
-            result.putString(AccountManager.KEY_ERROR_MESSAGE, "invalid authTokenType");
-            return result;
+        final Intent intent = AuthenticationActivity.createIntent(mContext, account.type, Long.valueOf(account.name), response);
+        final Bundle bundle = new Bundle();
+        if (options != null) {
+            bundle.putAll(options);
         }
-
-        final Bundle result = new Bundle();
-        result.putString(AccountManager.KEY_ACCOUNT_TYPE, account.type);
-        result.putString(AccountManager.KEY_ACCOUNT_NAME, account.name);
-        result.putString(AccountManager.KEY_AUTHTOKEN, "token");
-        return result;
+        bundle.putParcelable(AccountManager.KEY_INTENT, intent);
+        return bundle;
     }
 
     @Override

@@ -18,12 +18,22 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
 
-import org.blagodarie.server.ServerDataSource;
+import org.blagodarie.server.ServerApiExecutor;
+import org.blagodarie.server.ServerConnector;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.IOException;
+import java.util.Locale;
+import java.util.UUID;
 
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 import static android.app.Activity.RESULT_OK;
 
@@ -33,6 +43,72 @@ import static android.app.Activity.RESULT_OK;
  */
 public final class SignUpFragment
         extends Fragment {
+
+    private static final class SignUpExecutor
+            implements ServerApiExecutor<SignUpExecutor.ApiResult> {
+
+        private static final class ApiResult
+                extends ServerApiExecutor.ApiResult {
+
+            @NonNull
+            private final String mUserId;
+
+            @NonNull
+            private final String mToken;
+
+            ApiResult (
+                    @NonNull final String userId,
+                    @NonNull final String token
+            ) {
+                mUserId = userId;
+                mToken = token;
+            }
+
+            @NonNull
+            String getUserId () {
+                return mUserId;
+            }
+
+            @NonNull
+            String getToken () {
+                return mToken;
+            }
+        }
+
+        @NonNull
+        private final String mGoogleAccountId;
+
+        @NonNull
+        private final String mGoogleTokenId;
+
+        private SignUpExecutor (
+                @NonNull final String googleAccountId,
+                @NonNull final String googleTokenId
+        ) {
+            this.mGoogleAccountId = googleAccountId;
+            this.mGoogleTokenId = googleTokenId;
+        }
+
+        @Override
+        public SignUpExecutor.ApiResult execute (
+                @NonNull String apiBaseUrl,
+                @NonNull OkHttpClient okHttpClient
+        ) throws JSONException, IOException {
+            Long userId = null;
+            final Request request = new Request.Builder()
+                    .url(apiBaseUrl + "getorcreateuser" + String.format(Locale.ENGLISH, "?googleaccountid=%s", mGoogleAccountId))
+                    .build();
+            final Response response = okHttpClient.newCall(request).execute();
+            if (response.body() != null) {
+                final String responseBody = response.body().string();
+                if (response.code() == 200) {
+                    final JSONObject userJSON = new JSONObject(responseBody).getJSONObject("user");
+                    userId = userJSON.getLong("server_id");
+                }
+            }
+            return new ApiResult("2", "token-from-sign-up:" + UUID.randomUUID().toString());
+        }
+    }
 
     private static final int ACTIVITY_REQUEST_CODE_GOGGLE_SIGN_IN = 1;
 
@@ -87,19 +163,19 @@ public final class SignUpFragment
         }
     }
 
-
     private void startSignUp (
             @NonNull final String googleAccountId,
             @NonNull final String googleTokenId
     ) {
-        final ServerDataSource serverDataSource = new ServerDataSource(requireContext());
+        final ServerConnector serverConnector = new ServerConnector(requireContext());
+        final SignUpExecutor signUpExecutor = new SignUpExecutor(googleAccountId, googleTokenId);
         mDisposables.add(
                 Observable.
-                        fromCallable(() -> serverDataSource.signUp(googleAccountId, googleTokenId)).
+                        fromCallable(() -> serverConnector.execute(signUpExecutor)).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(
-                                data -> createAccount(data[0], data[1]),
+                                apiResult -> createAccount(apiResult.getUserId(), apiResult.getToken()),
                                 throwable -> Toast.makeText(requireActivity(), throwable.getMessage(), Toast.LENGTH_LONG).show()
                         )
         );
@@ -125,6 +201,5 @@ public final class SignUpFragment
         requireActivity().setResult(RESULT_OK, res);
         requireActivity().finish();
     }
-
 
 }

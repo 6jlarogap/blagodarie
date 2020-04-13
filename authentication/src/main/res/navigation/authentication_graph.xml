@@ -27,7 +27,11 @@
     <fragment
         android:id="@+id/signInFragment"
         android:name="org.blagodarie.authentication.SignInFragment"
-        android:label="SignInFragment" />
+        android:label="SignInFragment" >
+        <argument
+            android:name="user_id"
+            app:argType="long" />
+    </fragment>
     <fragment
         android:id="@+id/signUpFragment"
         android:name="org.blagodarie.authentication.SignUpFragment"

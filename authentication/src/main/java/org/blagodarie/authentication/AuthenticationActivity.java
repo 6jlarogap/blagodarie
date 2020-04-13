@@ -30,7 +30,7 @@ public final class AuthenticationActivity
         implements AuthenticationNavigator {
 
     private static final String EXTRA_ACCOUNT_TYPE = "org.blagodarie.authentication.ACCOUNT_TYPE";
-    private static final String EXTRA_USER_ID = "org.blagodarie.authentication.USER_ID";
+    static final String EXTRA_USER_ID = "org.blagodarie.authentication.USER_ID";
 
     static final int ACTIVITY_REQUEST_CODE_GOGGLE_SIGN_IN = 1;
 
@@ -88,7 +88,17 @@ public final class AuthenticationActivity
         final Intent intent = new Intent(context, AuthenticationActivity.class);
         intent.putExtra(AuthenticationActivity.EXTRA_ACCOUNT_TYPE, accountType);
         intent.putExtra(AccountManager.KEY_ACCOUNT_AUTHENTICATOR_RESPONSE, response);
-        //intent.putExtra(EXTRA_USER_ID, 2);
+        return intent;
+    }
+
+    public static Intent createIntent (
+            @NonNull final Context context,
+            @NonNull final String accountType,
+            @NonNull final Long userId,
+            final AccountAuthenticatorResponse response
+    ) {
+        final Intent intent = createIntent(context, accountType, response);
+        intent.putExtra(EXTRA_USER_ID, userId);
         return intent;
     }
 
@@ -121,7 +131,7 @@ public final class AuthenticationActivity
     }
 
     void toSignIn () {
-        final NavDirections action = StartFragmentDirections.actionStartFragmentToSignInFragment();
+        final NavDirections action = StartFragmentDirections.actionStartFragmentToSignInFragment(getIntent().getLongExtra(EXTRA_USER_ID, -1));
         mNavController.navigate(action);
     }
 }

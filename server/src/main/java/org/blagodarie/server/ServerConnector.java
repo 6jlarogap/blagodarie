@@ -5,12 +5,7 @@ import android.content.Context;
 
 import androidx.annotation.NonNull;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.io.IOException;
 import java.security.cert.CertificateException;
-import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.HostnameVerifier;
@@ -22,29 +17,20 @@ import javax.net.ssl.X509TrustManager;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-public final class ServerDataSource {
+public final class ServerConnector {
 
-    private static final MediaType JSON_TYPE = MediaType.parse("application/json; charset=utf-8");
+    public static final MediaType JSON_TYPE = MediaType.parse("application/json; charset=utf-8");
 
     @NonNull
     private final String mApiBaseUrl;
 
-    public ServerDataSource (@NonNull final Context context) {
+    public ServerConnector (@NonNull final Context context) {
         mApiBaseUrl = context.getString(R.string.base_api_url);
-    }
-
-    private static Response sendRequestAndGetResponse (
-            @NonNull final Request request
-    ) throws IOException {
-        return generateDefaultOkHttp().newCall(request).execute();
     }
 
     @NonNull
@@ -96,52 +82,9 @@ public final class ServerDataSource {
         return builder.build();
     }
 
-    public Long getUserId (
-            @NonNull final String googleAccountId
-    ) throws IOException, JSONException {
-        Long userId = null;
-        final Request request = new Request.Builder()
-                .url(mApiBaseUrl + "getorcreateuser" + String.format(Locale.ENGLISH, "?googleaccountid=%s", googleAccountId))
-                .build();
-        final Response response = sendRequestAndGetResponse(request);
-        if (response.body() != null) {
-            final String responseBody = response.body().string();
-            if (response.code() == 200) {
-                final JSONObject userJSON = new JSONObject(responseBody).getJSONObject("user");
-                userId = userJSON.getLong("server_id");
-            }
-        }
-        return userId;
-    }
-
-    public String[] signUp (
-            @NonNull final String googleAccountId,
-            @NonNull final String googleTokenId
-    ) throws IOException, JSONException {
-        final String[] data = new String[2];
-        data[0] = "2";
-        data[1] = "token-akjoiwreut9834uu8934u9843u24c9m2r8934rm9284utmn92843";
-        return data;
-    }
-
-    public String signIn (
-            @NonNull final Long userId,
-            @NonNull final String googleAccountId,
-            @NonNull final String googleTokenId
-    ) throws IOException, JSONException {
-        return "token-akjoiwreut9834uu8934u9843u24c9m2r8934rm9284utmn92843";
-    }
-
-    public void addUserSymptom (@NonNull final String jsonContent) throws IOException {
-        final RequestBody body = RequestBody.create(jsonContent, JSON_TYPE);
-        final Request request = new Request.Builder()
-                .url(mApiBaseUrl + "addusersymptom")
-                .post(body)
-                .build();
-        final Response response = sendRequestAndGetResponse(request);
-        if (response.body() != null) {
-            final String responseBody = response.body().string();
-            boolean a = responseBody.isEmpty();
-        }
+    public <T extends ServerApiExecutor.ApiResult> T execute (
+            @NonNull final ServerApiExecutor<T> serverApiExecutor
+    ) throws Exception {
+        return serverApiExecutor.execute(mApiBaseUrl, generateDefaultOkHttp());
     }
 }
