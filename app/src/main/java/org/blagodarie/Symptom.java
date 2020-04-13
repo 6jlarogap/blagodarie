@@ -42,6 +42,8 @@ public final class Symptom {
         SYMPTOMS.add(new Symptom(18L, "Гипотония"));
         SYMPTOMS.add(new Symptom(19L, "Хорошее настроение"));
         SYMPTOMS.add(new Symptom(20L, "Плохое настроение"));
+        SYMPTOMS.add(new Symptom(21L, "Зубная боль"));
+        SYMPTOMS.add(new Symptom(22L, "Боль в ушах"));
     }
 
     private Symptom (
