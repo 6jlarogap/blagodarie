@@ -47,7 +47,12 @@ final class SymptomsAdapter
     public void onBindViewHolder (@NonNull SymptomViewHolder holder, int position) {
         final DisplaySymptom displaySymptom = mDisplaySymptoms.get(position);
         if (displaySymptom != null) {
-            holder.bind(displaySymptom, v -> mDisplaySymptomClickListener.onClick(displaySymptom));
+            holder.bind(displaySymptom, v -> {
+                if (!displaySymptom.getInLoadProgress().get() &&
+                        !displaySymptom.getHighlight().get()) {
+                    mDisplaySymptomClickListener.onClick(displaySymptom);
+                }
+            });
         }
     }
 

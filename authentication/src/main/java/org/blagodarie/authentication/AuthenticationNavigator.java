@@ -5,5 +5,5 @@ package org.blagodarie.authentication;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public interface AuthenticationNavigator {
-    void fromGreetingToEnter();
+    void fromGreetingToSignUp();
 }
