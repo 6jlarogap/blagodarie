@@ -106,7 +106,7 @@ public final class SignUpFragment
                     userId = userJSON.getLong("server_id");
                 }
             }
-            return new ApiResult("2", "token-from-sign-up:" + UUID.randomUUID().toString());
+            return new ApiResult(userId.toString(), "token-from-sign-up:" + UUID.randomUUID().toString());
         }
     }
 
