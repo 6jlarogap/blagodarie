@@ -8,7 +8,7 @@ import java.util.Objects;
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-final class UserSymptom {
+public final class UserSymptom {
 
     @NonNull
     private final Long mUserId;
@@ -23,7 +23,7 @@ final class UserSymptom {
 
     private final Double mLongitude;
 
-    UserSymptom (
+    public UserSymptom (
             @NonNull final Long userId,
             @NonNull final Long symptomId,
             @NonNull final Long timestamp,

@@ -8,6 +8,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.blagodarie.ui.symptoms.SymptomsActivity;
+
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
@@ -64,7 +66,7 @@ public final class SplashActivity
     private void toMainActivity (
             @NonNull final Account account
     ) {
-        startActivity(MainActivity.createIntent(this, account));
+        startActivity(SymptomsActivity.createIntent(this, account));
         finish();
     }
 }

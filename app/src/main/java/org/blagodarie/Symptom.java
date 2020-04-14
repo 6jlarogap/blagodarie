@@ -85,7 +85,7 @@ public final class Symptom {
                 '}';
     }
 
-    static Set<Symptom> getSymptoms () {
+    public static Set<Symptom> getSymptoms () {
         return SYMPTOMS;
     }
 }

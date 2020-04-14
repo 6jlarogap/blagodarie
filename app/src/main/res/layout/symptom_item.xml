@@ -98,7 +98,7 @@
 
         <variable
             name="DisplaySymptom"
-            type="org.blagodarie.DisplaySymptom" />
+            type="org.blagodarie.ui.symptoms.DisplaySymptom" />
 
     </data>
 
