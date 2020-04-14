@@ -18,6 +18,7 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
@@ -27,14 +28,16 @@ import org.blagodarie.BuildConfig;
 import org.blagodarie.ForbiddenException;
 import org.blagodarie.R;
 import org.blagodarie.UserSymptom;
-import org.blagodarie.databinding.MainActivityBinding;
+import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
+import org.blagodarie.ui.update.UpdateActivity;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 
 import io.reactivex.Completable;
+import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
@@ -48,7 +51,7 @@ public final class SymptomsActivity
         implements LocationListener {
 
 
-    private static final String EXTRA_ACCOUNT = "org.blagodarie.ACCOUNT";
+    private static final String EXTRA_ACCOUNT = "org.blagodarie.ui.symptoms.ACCOUNT";
 
     /**
      * Минимальное время между обновлениями местоположения (в миллисекундах).
@@ -91,7 +94,7 @@ public final class SymptomsActivity
 
         final SymptomsAdapter symptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getSymptoms()), this::createUserSymptom);
 
-        final MainActivityBinding mainActivityBinding = DataBindingUtil.setContentView(this, R.layout.main_activity);
+        final SymptomsActivityBinding mainActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
         mainActivityBinding.setViewModel(mViewModel);
         mainActivityBinding.rvSymptoms.setAdapter(symptomsAdapter);
 
@@ -103,6 +106,7 @@ public final class SymptomsActivity
     @Override
     public void onResume () {
         super.onResume();
+        checkLatestVersion();
         if (checkLocationPermission()) {
             startLocationUpdates();
         } else {
@@ -315,6 +319,44 @@ public final class SymptomsActivity
                         e.printStackTrace();
                     }
                 }, null);
+    }
+
+    private void checkLatestVersion () {
+        final ServerConnector serverConnector = new ServerConnector(this);
+        final GetLatestVersionExecutor getLatestVersionExecutor = new GetLatestVersionExecutor();
+        mDisposables.add(
+                Observable.
+                        fromCallable(() -> serverConnector.execute(getLatestVersionExecutor)).
+                        subscribeOn(Schedulers.io()).
+                        observeOn(AndroidSchedulers.mainThread()).
+                        subscribe(apiResult -> {
+                            if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
+                                showUpdateVersionDialog(apiResult.getVersionName(), apiResult.getUri());
+                            }
+                        })
+        );
+    }
+
+    private void showUpdateVersionDialog (
+            @NonNull final String versionName,
+            @NonNull final Uri latestVersionUri
+    ) {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.txt_update_available);
+        builder.setMessage(String.format(getString(R.string.txt_want_load_new_version), versionName));
+        builder.setPositiveButton(R.string.action_update, (dialog, which) -> toUpdate(versionName, latestVersionUri));
+        builder.setNegativeButton(R.string.action_finish, (dialog, which) -> finish());
+        builder.setCancelable(false);
+        builder.create();
+        builder.show();
+    }
+
+    private void toUpdate (
+            @NonNull final String versionName,
+            @NonNull final Uri latestVersionUri
+    ) {
+        startActivity(UpdateActivity.createIntent(this, versionName, latestVersionUri));
+        finish();
     }
 
     public static Intent createIntent (

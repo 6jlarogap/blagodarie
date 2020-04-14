@@ -11,4 +11,15 @@
     <string name="location_enable">Включить</string>
     <string name="location_providers_disabled_warning">Включите геолокацию.</string>
     <string name="build_type_label"/>
+    <string name="action_repeat">Повторить</string>
+    <string name="action_update">Обновить</string>
+    <string name="action_finish">Завершить</string>
+    <string name="txt_update_available">Доступна новая версия</string>
+    <string name="txt_download_failed">Не удалось загрузить файл</string>
+    <string name="txt_want_load_new_version">Желаете загрузить новую версию %s?</string>
+    <string name="txt_want_repeat">Желаете повторить?</string>
+    <string name="txt_new_version_download">Идет загрузка новой версии приложения: %s</string>
+    <string name="update_progress_percent">%d %%</string>
+    <string name="downloaded_mb">Загружено %.2f mb</string>
+    <string name="total_mb">%.2f mb</string>
 </resources>
