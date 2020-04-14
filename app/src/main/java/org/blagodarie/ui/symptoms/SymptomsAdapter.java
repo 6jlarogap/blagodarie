@@ -1,4 +1,4 @@
-package org.blagodarie;
+package org.blagodarie.ui.symptoms;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -6,12 +6,11 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.databinding.DataBindingUtil;
-import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.blagodarie.R;
 import org.blagodarie.databinding.SymptomItemBinding;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -60,7 +59,7 @@ final class SymptomsAdapter
     public int getItemCount () {
         return mDisplaySymptoms.size();
     }
-
+/*
     private void order () {
         final List<DisplaySymptom> newDisplaySymptoms = new ArrayList<>(mDisplaySymptoms);
         //Collections.sort(newDisplaySymptoms);
@@ -68,7 +67,7 @@ final class SymptomsAdapter
         diffResult.dispatchUpdatesTo(this);
         mDisplaySymptoms = newDisplaySymptoms;
     }
-
+*/
     static final class SymptomViewHolder
             extends RecyclerView.ViewHolder {
 
@@ -94,7 +93,7 @@ final class SymptomsAdapter
             mBinding.setDisplaySymptom(displaySymptom);
         }
     }
-
+/*
     private static final class DisplaySymptomDiffUtilCallBack
             extends DiffUtil.Callback {
 
@@ -131,5 +130,5 @@ final class SymptomsAdapter
             return newItem.getSymptomId().equals(oldItem.getSymptomId()) &&
                     (newItem.getLastAdd() == null ? oldItem.getLastAdd() == null : newItem.getLastAdd().equals(oldItem.getLastAdd()));
         }
-    }
+    }*/
 }

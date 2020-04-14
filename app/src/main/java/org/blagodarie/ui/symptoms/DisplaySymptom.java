@@ -1,14 +1,11 @@
-package org.blagodarie;
+package org.blagodarie.ui.symptoms;
 
 import android.os.Handler;
 
 import androidx.annotation.NonNull;
 import androidx.databinding.ObservableBoolean;
-import androidx.databinding.ObservableDouble;
 import androidx.databinding.ObservableField;
-import androidx.databinding.ObservableLong;
 
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Objects;
 

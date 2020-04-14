@@ -1,6 +1,8 @@
-package org.blagodarie;
+package org.blagodarie.ui.symptoms;
 
 import androidx.annotation.NonNull;
+
+import org.blagodarie.ui.symptoms.DisplaySymptom;
 
 /**
  * @author sergeGabrus

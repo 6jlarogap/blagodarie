@@ -83,6 +83,6 @@
 
         <variable
             name="ViewModel"
-            type="org.blagodarie.MainViewModel" />
+            type="org.blagodarie.ui.symptoms.SymptomsViewModel" />
     </data>
 </layout>

@@ -1,4 +1,4 @@
-package org.blagodarie;
+package org.blagodarie.ui.symptoms;
 
 import android.Manifest;
 import android.accounts.Account;
@@ -23,101 +23,30 @@ import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
 
+import org.blagodarie.BuildConfig;
+import org.blagodarie.ForbiddenException;
+import org.blagodarie.R;
+import org.blagodarie.UserSymptom;
 import org.blagodarie.databinding.MainActivityBinding;
-import org.blagodarie.server.ServerApiExecutor;
 import org.blagodarie.server.ServerConnector;
-import org.json.JSONException;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Locale;
-import java.util.Random;
 
 import io.reactivex.Completable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-
-import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-public final class MainActivity
+public final class SymptomsActivity
         extends AppCompatActivity
         implements LocationListener {
 
-    private static final class AddUserSymptomExecutor
-            implements ServerApiExecutor<AddUserSymptomExecutor.ApiResult> {
-
-        private static final class ApiResult
-                extends ServerApiExecutor.ApiResult {
-
-        }
-
-        @NonNull
-        private final Long mUserId;
-
-        @NonNull
-        private final Collection<UserSymptom> mUserSymptoms = new ArrayList<>();
-
-        private AddUserSymptomExecutor (
-                @NonNull final Long userId,
-                @NonNull final Collection<UserSymptom> userSymptoms
-        ) {
-            mUserId = userId;
-            mUserSymptoms.addAll(userSymptoms);
-        }
-
-        private String createJsonContent () {
-            final StringBuilder content = new StringBuilder();
-            content.append(String.format(Locale.ENGLISH, "{\"user_id\":%d,\"user_symptoms\":[", mUserId));
-
-            boolean isFirst = true;
-            for (UserSymptom userSymptom : mUserSymptoms) {
-                if (!isFirst) {
-                    content.append(',');
-                } else {
-                    isFirst = false;
-                }
-                content.append(String.format(Locale.ENGLISH, "{\"symptom_id\":%d,\"timestamp\":%d,\"latitude\":%f,\"longitude\":%f}",
-                        userSymptom.getSymptomId(), (userSymptom.getTimestamp() / 1000), userSymptom.getLatitude(), userSymptom.getLongitude()));
-            }
-            content.append("]}");
-            return content.toString();
-        }
-
-        @Override
-        public ApiResult execute (
-                @NonNull final String apiBaseUrl,
-                @NonNull final OkHttpClient okHttpClient
-        ) throws JSONException, IOException, ForbiddenException {
-            final RequestBody body = RequestBody.create(createJsonContent(), JSON_TYPE);
-            final Request request = new Request.Builder()
-                    .url(apiBaseUrl + "addusersymptom")
-                    .post(body)
-                    .build();
-            final Response response = okHttpClient.newCall(request).execute();
-            if (response.code() == 200) {
-                if (response.body() != null) {
-                    final String responseBody = response.body().string();
-                    boolean a = responseBody.isEmpty();
-                }
-            } else if (response.code() == 403) {
-                throw new ForbiddenException();
-            }
-            return new ApiResult();
-        }
-
-
-    }
 
     private static final String EXTRA_ACCOUNT = "org.blagodarie.ACCOUNT";
 
@@ -142,7 +71,7 @@ public final class MainActivity
 
     private Account mAccount;
 
-    private MainViewModel mViewModel;
+    private SymptomsViewModel mViewModel;
 
     private CompositeDisposable mDisposables = new CompositeDisposable();
 
@@ -158,7 +87,7 @@ public final class MainActivity
 
         initAccount();
 
-        mViewModel = new ViewModelProvider(this).get(MainViewModel.class);
+        mViewModel = new ViewModelProvider(this).get(SymptomsViewModel.class);
 
         final SymptomsAdapter symptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getSymptoms()), this::createUserSymptom);
 
@@ -328,7 +257,7 @@ public final class MainActivity
     }
 
     public void requestLocationPermission () {
-        ActivityCompat.requestPermissions(MainActivity.this,
+        ActivityCompat.requestPermissions(SymptomsActivity.this,
                 new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                 PERM_REQ_ACCESS_FINE_LOCATION);
     }
@@ -377,7 +306,10 @@ public final class MainActivity
                 this,
                 future -> {
                     try {
-                        final String authToken = future.getResult().getString((AccountManager.KEY_AUTHTOKEN));
+                        String authToken = future.getResult().getString((AccountManager.KEY_AUTHTOKEN));
+                        if (authToken == null) {
+                            authToken = "";
+                        }
                         sendUserSymptomOnServer(authToken, displaySymptom, userSymptom);
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -389,7 +321,7 @@ public final class MainActivity
             @NonNull final Context context,
             @NonNull final Account account
     ) {
-        final Intent intent = new Intent(context, MainActivity.class);
+        final Intent intent = new Intent(context, SymptomsActivity.class);
         intent.putExtra(EXTRA_ACCOUNT, account);
         return intent;
     }

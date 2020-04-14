@@ -36,7 +36,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".MainActivity" />
+        <activity android:name=".ui.symptoms.SymptomsActivity" />
 
         <service android:name="org.blagodarie.authentication.AuthenticatorService">
             <intent-filter>

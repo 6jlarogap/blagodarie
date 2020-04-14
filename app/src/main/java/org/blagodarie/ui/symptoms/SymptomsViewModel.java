@@ -1,9 +1,11 @@
-package org.blagodarie;
+package org.blagodarie.ui.symptoms;
 
 import androidx.annotation.NonNull;
 import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
 import androidx.lifecycle.ViewModel;
+
+import org.blagodarie.Symptom;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -16,7 +18,7 @@ import java.util.TimerTask;
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-public final class MainViewModel
+public final class SymptomsViewModel
         extends ViewModel {
 
     private static final long CURRENT_DATE_TIME_UPDATE_PERIOD = 1000L;
@@ -60,7 +62,7 @@ public final class MainViewModel
         }
     }
 
-    public MainViewModel () {
+    public SymptomsViewModel () {
         super();
     }
 
