@@ -25,37 +25,35 @@ public final class SplashActivity
 
         mAccountManager = AccountManager.get(this);
 
-        final Account account = getAccount();
+        final String accountType = getString(R.string.account_type);
+        final Account account = getAccount(accountType);
 
         if (account != null) {
             toMainActivity(account);
         } else {
-            addNewAccount(getString(R.string.account_type), getString(R.string.token_type));
+            addNewAccount(accountType);
         }
     }
 
     @Nullable
-    private Account getAccount () {
+    private Account getAccount (@NonNull final String accountType) {
         Account account = null;
-        final Account[] accounts = mAccountManager.getAccountsByType(getString(R.string.account_type));
+        final Account[] accounts = mAccountManager.getAccountsByType(accountType);
         if (accounts.length > 0) {
             account = accounts[0];
         }
         return account;
     }
 
-    private void addNewAccount (
-            @NonNull final String accountType,
-            @NonNull final String authTokenType
-    ) {
+    private void addNewAccount (@NonNull final String accountType) {
         mAccountManager.addAccount(
                 accountType,
-                authTokenType,
+                getString(R.string.token_type),
                 null,
                 null,
                 this,
                 future -> {
-                    final Account account = getAccount();
+                    final Account account = getAccount(accountType);
                     if (account != null) {
                         toMainActivity(account);
                     }
