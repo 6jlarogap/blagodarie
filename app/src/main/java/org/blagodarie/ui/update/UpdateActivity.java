@@ -33,7 +33,6 @@ public final class UpdateActivity
 
     private static final String FILE_BASE_PATH = "file://";
     private static final String PROVIDER_PATH = ".provider";
-    private static final String APP_INSTALL_PATH = "\"application/vnd.android.package-archive\"";
 
     private static final String EXTRA_LATEST_VERSION_NAME = "org.blagodarie.ui.update.LATEST_VERSION_NAME";
     private static final String EXTRA_LATEST_VERSION_URI = "org.blagodarie.ui.update.LATEST_VERSION_URI";
@@ -110,7 +109,7 @@ public final class UpdateActivity
             install.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             install.setDataAndType(
                     uri,
-                    APP_INSTALL_PATH
+                    UpdateManager.MIME_TYPE
             );
             startActivity(install);
         }
