@@ -1,18 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/authentication_graph"
-    app:startDestination="@id/greetingFragment">
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/authentication_graph"
+    app:startDestination="@+id/startFragment">
 
     <fragment
         android:id="@+id/greetingFragment"
         android:name="org.blagodarie.authentication.GreetingFragment"
-        android:label="GreetingFragment" >
+        android:label="GreetingFragment">
         <action
-            android:id="@+id/action_greetingFragment_to_enterFragment"
-            app:destination="@id/enterFragment" />
+            android:id="@+id/action_greetingFragment_to_signUpFragment"
+            app:destination="@id/signUpFragment" />
     </fragment>
     <fragment
-        android:id="@+id/enterFragment"
-        android:name="org.blagodarie.authentication.EnterFragment"
-        android:label="EnterFragment" />
+        android:id="@+id/startFragment"
+        android:name="org.blagodarie.authentication.StartFragment"
+        android:label="StartFragment">
+        <action
+            android:id="@+id/action_startFragment_to_greetingFragment"
+            app:destination="@id/greetingFragment" />
+        <action
+            android:id="@+id/action_startFragment_to_signInFragment"
+            app:destination="@id/signInFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/signInFragment"
+        android:name="org.blagodarie.authentication.SignInFragment"
+        android:label="SignInFragment" >
+        <argument
+            android:name="user_id"
+            app:argType="long" />
+    </fragment>
+    <fragment
+        android:id="@+id/signUpFragment"
+        android:name="org.blagodarie.authentication.SignUpFragment"
+        android:label="SignUpFragment" />
 </navigation>

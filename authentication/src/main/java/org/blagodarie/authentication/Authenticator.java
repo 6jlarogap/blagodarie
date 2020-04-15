@@ -8,7 +8,6 @@ import android.accounts.NetworkErrorException;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 /**
@@ -65,16 +64,18 @@ public final class Authenticator
             final String authTokenType,
             final Bundle options
     ) throws NetworkErrorException {
-        final Bundle result = new Bundle();
-        result.putString(AccountManager.KEY_ACCOUNT_TYPE, account.type);
-        result.putString(AccountManager.KEY_ACCOUNT_NAME, account.name);
-        result.putString(AccountManager.KEY_AUTHTOKEN, "token");
-        return result;
+        final Intent intent = AuthenticationActivity.createIntent(mContext, account.type, Long.valueOf(account.name), response);
+        final Bundle bundle = new Bundle();
+        if (options != null) {
+            bundle.putAll(options);
+        }
+        bundle.putParcelable(AccountManager.KEY_INTENT, intent);
+        return bundle;
     }
 
     @Override
     public String getAuthTokenLabel (final String authTokenType) {
-        throw new UnsupportedOperationException();
+        return authTokenType + "_label";
     }
 
     @Override

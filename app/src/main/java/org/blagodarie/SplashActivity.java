@@ -2,15 +2,13 @@ package org.blagodarie;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
-import android.accounts.AccountManagerCallback;
-import android.accounts.AccountManagerFuture;
-import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+
+import org.blagodarie.ui.symptoms.SymptomsActivity;
 
 /**
  * @author sergeGabrus
@@ -27,41 +25,48 @@ public final class SplashActivity
 
         mAccountManager = AccountManager.get(this);
 
-        final Account[] accounts = mAccountManager.getAccountsByType(getString(R.string.account_type));
+        final Account account = getAccount();
 
-        if (accounts.length == 0) {
-            addNewAccount(getString(R.string.account_type), "");
+        if (account != null) {
+            toMainActivity(account);
         } else {
-            toMainActivity();
+            addNewAccount(getString(R.string.account_type), getString(R.string.token_type));
         }
     }
 
-    private void addNewAccount (String accountType, String authTokenType) {
+    @Nullable
+    private Account getAccount () {
+        Account account = null;
+        final Account[] accounts = mAccountManager.getAccountsByType(getString(R.string.account_type));
+        if (accounts.length > 0) {
+            account = accounts[0];
+        }
+        return account;
+    }
 
+    private void addNewAccount (
+            @NonNull final String accountType,
+            @NonNull final String authTokenType
+    ) {
         mAccountManager.addAccount(
                 accountType,
                 authTokenType,
                 null,
                 null,
                 this,
-                new AccountManagerCallback<Bundle>() {
-                    @Override
-                    public void run (AccountManagerFuture<Bundle> future) {
-                        //Bundle bnd = null;
-                        //try {
-                            //bnd = future.getResult();
-                            //final String authtoken = bnd.getString(AccountManager.KEY_AUTHTOKEN);
-                            toMainActivity();
-                        //} catch (Exception e) {
-                        //    e.printStackTrace();
-                        //}
+                future -> {
+                    final Account account = getAccount();
+                    if (account != null) {
+                        toMainActivity(account);
                     }
-                }, null);
+                },
+                null);
     }
 
-    private void toMainActivity () {
-        Intent intent = new Intent(this, MainActivity.class);
-        startActivity(intent);
+    private void toMainActivity (
+            @NonNull final Account account
+    ) {
+        startActivity(SymptomsActivity.createIntent(this, account));
         finish();
     }
 }
