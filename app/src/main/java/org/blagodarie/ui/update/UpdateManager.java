@@ -84,7 +84,7 @@ final class UpdateManager {
     /**
      * Тип загружаемого файла.
      */
-    private static final String MIME_TYPE = "application/vnd.android.package-archive";
+    static final String MIME_TYPE = "application/vnd.android.package-archive";
 
     /**
      * Идентификатор загрузки.
