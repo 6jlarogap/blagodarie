@@ -66,7 +66,7 @@ public final class SplashActivity
     private void toMainActivity (
             @NonNull final Account account
     ) {
-        startActivity(SymptomsActivity.createIntent(this, account));
+        startActivity(SymptomsActivity.createSelfIntent(this, account));
         finish();
     }
 }

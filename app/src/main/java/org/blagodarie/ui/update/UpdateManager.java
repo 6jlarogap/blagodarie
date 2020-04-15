@@ -1,14 +1,13 @@
 package org.blagodarie.ui.update;
 
 import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.database.Cursor;
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
+
+import org.blagodarie.R;
 
 import java.io.File;
 import java.util.Timer;
@@ -16,31 +15,103 @@ import java.util.TimerTask;
 
 import static android.content.Context.DOWNLOAD_SERVICE;
 
+/**
+ * @author sergeGabrus
+ * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
+ */
 class UpdateManager {
 
+    /**
+     * Интерфейс для получения прогресса загрузки.
+     */
     interface ProgressListener {
+        /**
+         * Следующий шаг.
+         *
+         * @param total      Всего байт.
+         * @param downloaded Загружено байт.
+         */
         void onNext (final long total, final long downloaded);
-        void onSuccess();
-        void onFail();
+
+        /**
+         * Загрузка завершена успешна.
+         */
+        void onSuccess ();
+
+        /**
+         * Загрузка не удалась.
+         */
+        void onFail ();
     }
 
+    /**
+     * Возможные состояния загрузки.
+     */
     enum DownloadStatus {
-        WAIT, RUN, SUCCESS, FAIL
+        /**
+         * Ожидание загрузки.
+         */
+        WAIT,
+        /**
+         * Загрузка в процессе.
+         */
+        RUN,
+        /**
+         * Загрузка завершена успешно.
+         */
+        SUCCESS,
+        /**
+         * Загрузка не удалась.
+         */
+        FAIL
     }
 
+    /**
+     * Задержка перед перед первым обновлением прогресса загрузки.
+     */
+    private static final long UPDATE_PROGRESS_DELAY = 0L;
+
+    /**
+     * Период обновления прогресса загрузки.
+     */
+    private static final long UPDATE_PROGRESS_PERIOD = 1000L;
+
+    /**
+     * Синглтон. Единственный экземпляр.
+     */
     private static volatile UpdateManager INSTANCE;
 
+    /**
+     * Тип загружаемого файла.
+     */
     private static final String MIME_TYPE = "application/vnd.android.package-archive";
 
+    /**
+     * Идентификатор загрузки.
+     */
     private long mDownloadId;
 
+    /**
+     * Слушатель прогресса загрузки.
+     */
     private ProgressListener mProgressListener;
 
+    /**
+     * Состояние загрузки.
+     */
     private DownloadStatus mDownloadStatus = DownloadStatus.WAIT;
 
+    /**
+     * Закрытый коструктор для реализации синглтона.
+     */
     private UpdateManager () {
     }
 
+    /**
+     * Возвращает единственный экземпляр.
+     *
+     * @return Синглтон UpdateManager.
+     */
     static UpdateManager getInstance (
     ) {
         synchronized (UpdateManager.class) {
@@ -51,14 +122,31 @@ class UpdateManager {
         return INSTANCE;
     }
 
-    void setProgressListener(@NonNull final ProgressListener progressListener){
+    /**
+     * Устанавливает слушателя прогресса загрузки.
+     *
+     * @param progressListener Слушатель прогресса загрузки.
+     */
+    void setProgressListener (@NonNull final ProgressListener progressListener) {
         mProgressListener = progressListener;
     }
 
+    /**
+     * Возвращает статус загрузки.
+     *
+     * @return Статус загрузки.
+     */
     DownloadStatus getDownloadStatus () {
         return mDownloadStatus;
     }
 
+    /**
+     * Запускает загрузку файла новой версии.
+     *
+     * @param context          Контест.
+     * @param apkFile          Целевой файл.
+     * @param latestVersionUri URI файла для загрузки.
+     */
     void startDownload (
             @NonNull final Context context,
             @NonNull final File apkFile,
@@ -68,84 +156,90 @@ class UpdateManager {
             mDownloadStatus = DownloadStatus.RUN;
 
             DownloadManager.Request request = new DownloadManager.Request(latestVersionUri)
-                    .setTitle(apkFile.getName())// Title of the Download Notification
+                    .setTitle(apkFile.getName())
                     .setMimeType(MIME_TYPE)
-                    .setDescription("Загрузка")// Description of the Download Notification
-                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)// Visibility of the download Notification
-                    .setDestinationUri(Uri.fromFile(apkFile))// Uri of the destination file
-                    .setAllowedOverMetered(true)// Set if download is allowed on Mobile network
-                    .setAllowedOverRoaming(true);// Set if download is allowed on roaming network
+                    .setDescription(context.getString(R.string.download_notification))
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setDestinationUri(Uri.fromFile(apkFile))
+                    .setAllowedOverMetered(true)
+                    .setAllowedOverRoaming(true);
 
-            DownloadManager downloadManager = (DownloadManager) context.getSystemService(DOWNLOAD_SERVICE);
-            mDownloadId = downloadManager.enqueue(request);// enqueue puts the download request in the queue.
-            Timer timer = new Timer();
-            timer.schedule(new TimerTask() {
-                @Override
-                public void run () {
-                    Cursor cursor = downloadManager.query(new DownloadManager.Query().setFilterById(mDownloadId));
-                    if (cursor != null) {
-                        if (cursor.moveToFirst()) {
-                            if (cursor.moveToFirst()) {
-                                int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
-                                switch (status) {
-                                    case DownloadManager.STATUS_RUNNING: {
-                                        final long total = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
-                                        if (total >= 0) {
-                                            final long downloaded = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
-                                            mProgressListener.onNext(total, downloaded);
-                                        }
-                                        break;
-                                    }
-                                    case DownloadManager.STATUS_SUCCESSFUL: {
-                                        mDownloadStatus = DownloadStatus.SUCCESS;
-                                        mProgressListener.onSuccess();
-                                        timer.cancel();
-                                        break;
-                                    }
-                                    case DownloadManager.STATUS_FAILED: {
-                                        mDownloadStatus = DownloadStatus.FAIL;
-                                        mProgressListener.onFail();
-                                        timer.cancel();
-                                        break;
-                                    }
-                                }
-                            }
-                            cursor.close();
-                        }
-                    }
-                }
-            }, 0, 1000);
+            final DownloadManager downloadManager = (DownloadManager) context.getSystemService(DOWNLOAD_SERVICE);
+            mDownloadId = downloadManager.enqueue(request);
+            startUpdateProgress(downloadManager);
         }
     }
-/*
-    private void startInstall (
-            @NonNull final Context context,
-            @NonNull final File apkFile
-    ) {
-        String destination = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS).toString() + "/";
-        destination += apkFile.getName();
-        Uri uri = Uri.parse(FILE_BASE_PATH + destination);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            Uri contentUri = FileProvider.getUriForFile(
-                    context,
-                    BuildConfig.APPLICATION_ID + PROVIDER_PATH,
-                    new File(destination)
-            );
-            Intent install = new Intent(Intent.ACTION_VIEW);
-            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            install.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            install.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
-            install.setData(contentUri);
-            context.startActivity(install);
-        } else {
-            Intent install = new Intent(Intent.ACTION_VIEW);
-            install.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            install.setDataAndType(
-                    uri,
-                    APP_INSTALL_PATH
-            );
-            context.startActivity(install);
+    /**
+     * Запускает обновление прогресса по таймеру.
+     *
+     * @param downloadManager DownloadManager.
+     */
+    private void startUpdateProgress (@NonNull final DownloadManager downloadManager) {
+        final Timer timer = new Timer();
+        timer.schedule(
+                getUpdateProgressTask(downloadManager, timer),
+                UPDATE_PROGRESS_DELAY,
+                UPDATE_PROGRESS_PERIOD);
+    }
+
+    /**
+     * Создает и возвращает TimerTask для обновления прогресса.
+     *
+     * @param downloadManager DownloadManager.
+     * @param timer           Таймер. Необходим чтобы отключить его после завершения загрузки.
+     * @return TimerTask для обновления прогресса.
+     */
+    private TimerTask getUpdateProgressTask (
+            @NonNull final DownloadManager downloadManager,
+            @NonNull final Timer timer
+    ) {
+        return new TimerTask() {
+            @Override
+            public void run () {
+                updateProgress(downloadManager, timer);
+            }
+        };
+    }
+
+    /**
+     * Обновляет прогресс загрузки.
+     *
+     * @param downloadManager DownloadManager.
+     * @param timer           Таймер. Необходим чтобы отключить его после завершения загрузки.
+     */
+    private void updateProgress (
+            @NonNull final DownloadManager downloadManager,
+            @NonNull final Timer timer
+    ) {
+        final Cursor cursor = downloadManager.query(new DownloadManager.Query().setFilterById(mDownloadId));
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                switch (status) {
+                    case DownloadManager.STATUS_RUNNING: {
+                        final long total = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                        if (total >= 0) {
+                            final long downloaded = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                            mProgressListener.onNext(total, downloaded);
+                        }
+                        break;
+                    }
+                    case DownloadManager.STATUS_SUCCESSFUL: {
+                        mDownloadStatus = DownloadStatus.SUCCESS;
+                        mProgressListener.onSuccess();
+                        timer.cancel();
+                        break;
+                    }
+                    case DownloadManager.STATUS_FAILED: {
+                        mDownloadStatus = DownloadStatus.FAIL;
+                        mProgressListener.onFail();
+                        timer.cancel();
+                        break;
+                    }
+                }
+            }
+            cursor.close();
         }
-    }*/
+    }
 }
