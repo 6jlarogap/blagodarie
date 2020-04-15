@@ -64,7 +64,7 @@ final class AddUserSymptomExecutor
             @NonNull final String apiBaseUrl,
             @NonNull final OkHttpClient okHttpClient
     ) throws JSONException, IOException, ForbiddenException {
-        final RequestBody body = RequestBody.create(createJsonContent(), JSON_TYPE);
+        final RequestBody body = RequestBody.create(JSON_TYPE, createJsonContent());
         final Request request = new Request.Builder()
                 .url(apiBaseUrl + "addusersymptom")
                 .post(body)

@@ -22,4 +22,5 @@
     <string name="update_progress_percent">%d %%</string>
     <string name="downloaded_mb">Загружено %.2f mb</string>
     <string name="total_mb">%.2f mb</string>
+    <string name="download_notification">Загрузка</string>
 </resources>

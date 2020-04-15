@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
+
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
@@ -42,7 +43,7 @@ public final class Authenticator
             final String[] requiredFeatures,
             final Bundle options
     ) throws NetworkErrorException {
-        final Intent intent = AuthenticationActivity.createIntent(mContext, accountType, response);
+        final Intent intent = AuthenticationActivity.createSelfIntent(mContext, accountType, response);
         final Bundle bundle = new Bundle();
         if (options != null) {
             bundle.putAll(options);
@@ -64,7 +65,7 @@ public final class Authenticator
             final String authTokenType,
             final Bundle options
     ) throws NetworkErrorException {
-        final Intent intent = AuthenticationActivity.createIntent(mContext, account.type, Long.valueOf(account.name), response);
+        final Intent intent = AuthenticationActivity.createSelfIntent(mContext, account.type, Long.valueOf(account.name), response);
         final Bundle bundle = new Bundle();
         if (options != null) {
             bundle.putAll(options);

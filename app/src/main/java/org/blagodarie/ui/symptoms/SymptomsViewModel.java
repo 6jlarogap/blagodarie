@@ -8,8 +8,10 @@ import androidx.lifecycle.ViewModel;
 import org.blagodarie.Symptom;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -54,7 +56,7 @@ public final class SymptomsViewModel
     }
 
     @NonNull
-    private final Set<DisplaySymptom> mSymptoms = new HashSet<>();
+    private final List<DisplaySymptom> mSymptoms = new ArrayList<>();
 
     {
         for (Symptom symptom : Symptom.getSymptoms()) {
@@ -73,7 +75,7 @@ public final class SymptomsViewModel
     }
 
     @NonNull
-    final Set<DisplaySymptom> getSymptoms () {
+    final List<DisplaySymptom> getSymptoms () {
         return mSymptoms;
     }
 

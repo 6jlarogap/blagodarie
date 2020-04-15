@@ -80,7 +80,7 @@ public final class AuthenticationActivity
         fragment.startActivityForResult(signInIntent, ACTIVITY_REQUEST_CODE_GOGGLE_SIGN_IN);
     }
 
-    public static Intent createIntent (
+    public static Intent createSelfIntent (
             @NonNull final Context context,
             @NonNull final String accountType,
             final AccountAuthenticatorResponse response
@@ -91,13 +91,13 @@ public final class AuthenticationActivity
         return intent;
     }
 
-    public static Intent createIntent (
+    public static Intent createSelfIntent (
             @NonNull final Context context,
             @NonNull final String accountType,
             @NonNull final Long userId,
             final AccountAuthenticatorResponse response
     ) {
-        final Intent intent = createIntent(context, accountType, response);
+        final Intent intent = createSelfIntent(context, accountType, response);
         intent.putExtra(EXTRA_USER_ID, userId);
         return intent;
     }

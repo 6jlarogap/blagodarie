@@ -40,9 +40,6 @@ public final class UpdateActivity
 
     private UpdateViewModel mViewModel;
 
-
-    boolean mDownloadInProgress = false;
-
     private String mLatestVersionName;
 
     private Uri mLatestVersionUri;
@@ -59,9 +56,6 @@ public final class UpdateActivity
         mLatestVersionUri = getIntent().getParcelableExtra(EXTRA_LATEST_VERSION_URI);
         mFileName = String.format("%s %s.apk", getString(R.string.app_name), mLatestVersionName);
         mFile = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), mFileName);
-
-        restoreFromBundle(savedInstanceState);
-
 
         initViewModel();
 
@@ -83,23 +77,6 @@ public final class UpdateActivity
         }
     }
 
-    private void restoreFromBundle (@Nullable final Bundle savedInstanceState) {
-        if (savedInstanceState != null) {
-            mDownloadInProgress = savedInstanceState.getBoolean("mDownloadInProgress");
-        }
-    }
-
-    @Override
-    protected void onDestroy () {
-        super.onDestroy();
-    }
-
-    @Override
-    protected void onSaveInstanceState (@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putBoolean("mDownloadInProgress", mDownloadInProgress);
-    }
-
     private void initViewModel () {
         //создаем фабрику
         final UpdateViewModel.Factory factory = new UpdateViewModel.Factory(mLatestVersionName);
@@ -109,9 +86,11 @@ public final class UpdateActivity
     }
 
     private void startInstall () {
-        String destination = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS).toString() + "/";
-        destination += mFileName;
-        Uri uri = Uri.parse(FILE_BASE_PATH + destination);
+        final File externalFilesDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        String destination = null;
+        if (externalFilesDir != null) {
+            destination = externalFilesDir.toString() + "/" + mFileName;
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             Uri contentUri = FileProvider.getUriForFile(
@@ -119,14 +98,15 @@ public final class UpdateActivity
                     BuildConfig.APPLICATION_ID + PROVIDER_PATH,
                     new File(destination)
             );
-            Intent install = new Intent(Intent.ACTION_VIEW);
+            final Intent install = new Intent(Intent.ACTION_VIEW);
             install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             install.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             install.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
             install.setData(contentUri);
             startActivity(install);
         } else {
-            Intent install = new Intent(Intent.ACTION_VIEW);
+            final Uri uri = Uri.parse(FILE_BASE_PATH + destination);
+            final Intent install = new Intent(Intent.ACTION_VIEW);
             install.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             install.setDataAndType(
                     uri,
@@ -151,7 +131,7 @@ public final class UpdateActivity
         builder.show();
     }
 
-    public static Intent createIntent (
+    public static Intent createSelfIntent (
             @NonNull final Context context,
             @NonNull final String versionName,
             @NonNull final Uri latestVersionUri
@@ -165,10 +145,8 @@ public final class UpdateActivity
     @Override
     public void onNext (long total, long downloaded) {
         mViewModel.getTotalBytes().set((float) total / 1000000F);
-        if (total >= 0) {
-            mViewModel.getDownloadedBytes().set((float) downloaded / 1000000F);
-            mViewModel.getProgress().set((int) ((downloaded * 100L) / total));
-        }
+        mViewModel.getDownloadedBytes().set((float) downloaded / 1000000F);
+        mViewModel.getProgress().set((int) ((downloaded * 100L) / total));
     }
 
     @Override

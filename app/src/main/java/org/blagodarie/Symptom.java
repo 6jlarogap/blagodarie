@@ -2,9 +2,9 @@ package org.blagodarie;
 
 import androidx.annotation.NonNull;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * @author sergeGabrus
@@ -19,29 +19,30 @@ public final class Symptom {
     private final String mName;
 
     @NonNull
-    private static final Set<Symptom> SYMPTOMS = new HashSet<>();
+    private static final List<Symptom> SYMPTOMS = new ArrayList<>();
 
     static {
-        SYMPTOMS.add(new Symptom(1L, "Жажда"));
-        SYMPTOMS.add(new Symptom(2L, "Голод"));
+        SYMPTOMS.add(new Symptom(19L, "Хорошее настроение"));
+        SYMPTOMS.add(new Symptom(15L, "Хорошее самочувтсвие"));
+        SYMPTOMS.add(new Symptom(20L, "Плохое настроение"));
         SYMPTOMS.add(new Symptom(3L, "Нехватка лекарств"));
-        SYMPTOMS.add(new Symptom(4L, "Слабость"));
+        SYMPTOMS.add(new Symptom(16L, "Сердечная боль"));
+        SYMPTOMS.add(new Symptom(11L, "Головная боль"));
+        SYMPTOMS.add(new Symptom(10L, "Заложенность носа или насморк"));
         SYMPTOMS.add(new Symptom(5L, "Температура"));
         SYMPTOMS.add(new Symptom(6L, "Кашель"));
+
+        SYMPTOMS.add(new Symptom(2L, "Голод"));
+        SYMPTOMS.add(new Symptom(1L, "Жажда"));
+        SYMPTOMS.add(new Symptom(4L, "Слабость"));
         SYMPTOMS.add(new Symptom(7L, "Боль в груди при дыхании"));
         SYMPTOMS.add(new Symptom(8L, "Затруднённое дыхание"));
         SYMPTOMS.add(new Symptom(9L, "Одышка"));
-        SYMPTOMS.add(new Symptom(10L, "Заложенность носа или насморк"));
-        SYMPTOMS.add(new Symptom(11L, "Головная боль"));
         SYMPTOMS.add(new Symptom(12L, "Боль и ломота в мышцах и суставах"));
         SYMPTOMS.add(new Symptom(13L, "Рвота"));
         SYMPTOMS.add(new Symptom(14L, "Понос"));
-        SYMPTOMS.add(new Symptom(15L, "Хорошее самочувтсвие"));
-        SYMPTOMS.add(new Symptom(16L, "Сердечная боль"));
         SYMPTOMS.add(new Symptom(17L, "Гипертония"));
         SYMPTOMS.add(new Symptom(18L, "Гипотония"));
-        SYMPTOMS.add(new Symptom(19L, "Хорошее настроение"));
-        SYMPTOMS.add(new Symptom(20L, "Плохое настроение"));
         SYMPTOMS.add(new Symptom(21L, "Зубная боль"));
         SYMPTOMS.add(new Symptom(22L, "Боль в ушах"));
     }
@@ -85,7 +86,7 @@ public final class Symptom {
                 '}';
     }
 
-    public static Set<Symptom> getSymptoms () {
+    public static List<Symptom> getSymptoms () {
         return SYMPTOMS;
     }
 }
