@@ -355,11 +355,11 @@ public final class SymptomsActivity
             @NonNull final String versionName,
             @NonNull final Uri latestVersionUri
     ) {
-        startActivity(UpdateActivity.createIntent(this, versionName, latestVersionUri));
+        startActivity(UpdateActivity.createSelfIntent(this, versionName, latestVersionUri));
         finish();
     }
 
-    public static Intent createIntent (
+    public static Intent createSelfIntent (
             @NonNull final Context context,
             @NonNull final Account account
     ) {

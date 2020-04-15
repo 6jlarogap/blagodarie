@@ -15,15 +15,27 @@ import java.lang.reflect.InvocationTargetException;
 public final class UpdateViewModel
         extends ViewModel{
 
+    /**
+     * Имя последней версии приложения.
+     */
     @NonNull
     private final String mVersionName;
 
+    /**
+     * Прогресс загрузки в процентах.
+     */
     @NonNull
     private final ObservableInt mProgress = new ObservableInt(0);
 
+    /**
+     * Всего нужно загрузить МБайт.
+     */
     @NonNull
     private final ObservableFloat mTotalBytes = new ObservableFloat(0);
 
+    /**
+     * Загружено МБайт.
+     */
     @NonNull
     private final ObservableFloat mDownloadedBytes = new ObservableFloat(0);
 
