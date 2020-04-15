@@ -19,7 +19,7 @@ import static android.content.Context.DOWNLOAD_SERVICE;
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-class UpdateManager {
+final class UpdateManager {
 
     /**
      * Интерфейс для получения прогресса загрузки.
