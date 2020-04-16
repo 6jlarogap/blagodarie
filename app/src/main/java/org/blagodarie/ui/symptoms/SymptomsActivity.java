@@ -27,7 +27,8 @@ import androidx.lifecycle.ViewModelProvider;
 import org.blagodarie.BuildConfig;
 import org.blagodarie.ForbiddenException;
 import org.blagodarie.R;
-import org.blagodarie.UserSymptom;
+import org.blagodarie.db.BlagodarieDatabase;
+import org.blagodarie.db.UserSymptom;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.ui.update.UpdateActivity;
@@ -176,6 +177,11 @@ public final class SymptomsActivity
                 latitude,
                 longitude);
 
+        Completable.
+                fromAction(() -> BlagodarieDatabase.getInstance(this).userSymptomDao().insert(userSymptom)).
+                subscribeOn(Schedulers.io()).
+                subscribe();
+
         getAuthTokenAndSendUserSymptomOnServer(displaySymptom, userSymptom);
     }
 
@@ -187,12 +193,12 @@ public final class SymptomsActivity
         final Collection<UserSymptom> userSymptoms = new ArrayList<>();
         userSymptoms.add(userSymptom);
         final ServerConnector serverConnector = new ServerConnector(this);
-        final AddUserSymptomExecutor addUserSymptomExecutor = new AddUserSymptomExecutor(Long.valueOf(mAccount.name), userSymptoms);
+        final AddUserSymptomsExecutor addUserSymptomsExecutor = new AddUserSymptomsExecutor(Long.valueOf(mAccount.name), userSymptoms);
         mDisposables.add(
                 Completable.
                         fromAction(() -> {
                             displaySymptom.getInLoadProgress().set(true);
-                            serverConnector.execute(addUserSymptomExecutor);
+                            serverConnector.execute(addUserSymptomsExecutor);
                         }).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).

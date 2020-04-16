@@ -3,7 +3,7 @@ package org.blagodarie.ui.symptoms;
 import androidx.annotation.NonNull;
 
 import org.blagodarie.ForbiddenException;
-import org.blagodarie.UserSymptom;
+import org.blagodarie.db.UserSymptom;
 import org.blagodarie.server.ServerApiExecutor;
 import org.json.JSONException;
 
@@ -19,8 +19,8 @@ import okhttp3.Response;
 
 import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
-final class AddUserSymptomExecutor
-        implements ServerApiExecutor<AddUserSymptomExecutor.ApiResult> {
+final class AddUserSymptomsExecutor
+        implements ServerApiExecutor<AddUserSymptomsExecutor.ApiResult> {
 
     static final class ApiResult
             extends ServerApiExecutor.ApiResult {
@@ -33,7 +33,7 @@ final class AddUserSymptomExecutor
     @NonNull
     private final Collection<UserSymptom> mUserSymptoms = new ArrayList<>();
 
-    AddUserSymptomExecutor (
+    AddUserSymptomsExecutor (
             @NonNull final Long userId,
             @NonNull final Collection<UserSymptom> userSymptoms
     ) {
