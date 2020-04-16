@@ -24,7 +24,7 @@ public final class Symptom {
     static {
         SYMPTOMS.add(new Symptom(25L, "Пробуждение"));
         SYMPTOMS.add(new Symptom(19L, "Хорошее настроение"));
-        SYMPTOMS.add(new Symptom(15L, "Хорошее самочувтсвие"));
+        SYMPTOMS.add(new Symptom(15L, "Хорошее самочувтсвие"));/////////////
         SYMPTOMS.add(new Symptom(20L, "Плохое настроение"));
         SYMPTOMS.add(new Symptom(1L, "Нехватка питьевой воды"));
         SYMPTOMS.add(new Symptom(2L, "Нехватка еды"));

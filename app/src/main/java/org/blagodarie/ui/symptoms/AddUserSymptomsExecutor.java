@@ -1,11 +1,14 @@
 package org.blagodarie.ui.symptoms;
 
 import androidx.annotation.NonNull;
+import androidx.collection.LongSparseArray;
 
 import org.blagodarie.ForbiddenException;
 import org.blagodarie.db.UserSymptom;
 import org.blagodarie.server.ServerApiExecutor;
+import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -19,13 +22,15 @@ import okhttp3.Response;
 
 import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
-final class AddUserSymptomsExecutor
+public final class AddUserSymptomsExecutor
         implements ServerApiExecutor<AddUserSymptomsExecutor.ApiResult> {
 
-    static final class ApiResult
+    public static final class ApiResult
             extends ServerApiExecutor.ApiResult {
 
     }
+
+    private static final String USER_SYMPTOM_JSON_PATTERN = "{\"user_symptom_id\":%d,\"symptom_id\":%d,\"timestamp\":%d,\"latitude\":%f,\"longitude\":%f}";
 
     @NonNull
     private final Long mUserId;
@@ -33,12 +38,18 @@ final class AddUserSymptomsExecutor
     @NonNull
     private final Collection<UserSymptom> mUserSymptoms = new ArrayList<>();
 
-    AddUserSymptomsExecutor (
+    @NonNull
+    private final LongSparseArray<UserSymptom> mUserSymptomsById = new LongSparseArray<>();
+
+    public AddUserSymptomsExecutor (
             @NonNull final Long userId,
             @NonNull final Collection<UserSymptom> userSymptoms
     ) {
         mUserId = userId;
         mUserSymptoms.addAll(userSymptoms);
+        for (UserSymptom userSymptom : userSymptoms) {
+            mUserSymptomsById.put(userSymptom.getId(), userSymptom);
+        }
     }
 
     private String createJsonContent () {
@@ -52,8 +63,15 @@ final class AddUserSymptomsExecutor
             } else {
                 isFirst = false;
             }
-            content.append(String.format(Locale.ENGLISH, "{\"symptom_id\":%d,\"timestamp\":%d,\"latitude\":%f,\"longitude\":%f}",
-                    userSymptom.getSymptomId(), (userSymptom.getTimestamp() / 1000), userSymptom.getLatitude(), userSymptom.getLongitude()));
+            content.append(
+                    String.format(
+                            Locale.ENGLISH,
+                            USER_SYMPTOM_JSON_PATTERN,
+                            userSymptom.getId(),
+                            userSymptom.getSymptomId(),
+                            (userSymptom.getTimestamp() / 1000),
+                            userSymptom.getLatitude(),
+                            userSymptom.getLongitude()));
         }
         content.append("]}");
         return content.toString();
@@ -73,7 +91,17 @@ final class AddUserSymptomsExecutor
         if (response.code() == 200) {
             if (response.body() != null) {
                 final String responseBody = response.body().string();
-                boolean a = responseBody.isEmpty();
+                final JSONObject responseJson = new JSONObject(responseBody);
+                final JSONArray userSymptomsJson = responseJson.getJSONArray("user_symptoms");
+                for (int i = 0; i < userSymptomsJson.length(); i++) {
+                    final JSONObject element = userSymptomsJson.getJSONObject(i);
+                    final long userSymptomId = element.getLong("user_symptom_id");
+                    final long userSymptomServerId = element.getLong("user_symptom_server_id");
+                    final UserSymptom userSymptom = mUserSymptomsById.get(userSymptomId);
+                    if (userSymptom != null) {
+                        userSymptom.setServerId(userSymptomServerId);
+                    }
+                }
             }
         } else if (response.code() == 403) {
             throw new ForbiddenException();

@@ -3,6 +3,7 @@ package org.blagodarie.db;
 import androidx.annotation.NonNull;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
@@ -12,7 +13,8 @@ import java.util.Objects;
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-@Entity(
+@Entity (
+        tableName = "tbl_user_symptom",
         indices = {
                 @Index (value = {"server_id"}, unique = true)
         }
@@ -24,7 +26,7 @@ public final class UserSymptom {
     private final Long Id;
 
     @ColumnInfo (name = "server_id")
-    private final Long ServerId;
+    private Long ServerId;
 
     @NonNull
     @ColumnInfo (name = "user_id")
@@ -62,6 +64,7 @@ public final class UserSymptom {
         this.Longitude = Longitude;
     }
 
+    @Ignore
     public UserSymptom (
             @NonNull final Long UserId,
             @NonNull final Long SymptomId,
@@ -82,12 +85,14 @@ public final class UserSymptom {
         return Id;
     }
 
-    public final Long getServerId () {
+    final Long getServerId () {
         return ServerId;
     }
-
+    public final void setServerId(@NonNull final Long serverId){
+        ServerId = serverId;
+    }
     @NonNull
-    public final Long getUserId () {
+    final Long getUserId () {
         return UserId;
     }
 

@@ -28,7 +28,7 @@ public final class DisplaySymptom
     private final String mSymptomName;
 
     @NonNull
-    private ObservableField<Date> mLastAdd = new ObservableField<>();
+    private ObservableField<Date> mLastDate = new ObservableField<>();
 
     @NonNull
     private ObservableField<Double> mLastLatitude = new ObservableField<>();
@@ -61,8 +61,8 @@ public final class DisplaySymptom
     }
 
     @NonNull
-    public final ObservableField<Date> getLastAdd () {
-        return mLastAdd;
+    public final ObservableField<Date> getLastDate () {
+        return mLastDate;
     }
 
     @NonNull
@@ -85,7 +85,7 @@ public final class DisplaySymptom
         return mHighlight;
     }
 
-    void highlight(){
+    void highlight () {
         mHighlight.set(true);
         new Handler().postDelayed(() -> mHighlight.set(false), HIGHLIGHT_TIME);
     }
@@ -108,7 +108,7 @@ public final class DisplaySymptom
         return "DisplaySymptom{" +
                 "mSymptomId=" + mSymptomId +
                 ", mSymptomName='" + mSymptomName + '\'' +
-                ", mLastAdd=" + mLastAdd +
+                ", mLastDate=" + mLastDate +
                 ", mLastLatitude=" + mLastLatitude +
                 ", mLastLongitude=" + mLastLongitude +
                 '}';
@@ -120,8 +120,8 @@ public final class DisplaySymptom
         if (this == o) {
             result = 0;
         } else {
-            long thisTimestamp = this.mLastAdd.get() == null ? 0 : this.mLastAdd.get().getTime();
-            long otherTimestamp = o.mLastAdd.get() == null ? 0 : o.mLastAdd.get().getTime();
+            long thisTimestamp = this.mLastDate.get() == null ? 0 : this.mLastDate.get().getTime();
+            long otherTimestamp = o.mLastDate.get() == null ? 0 : o.mLastDate.get().getTime();
             result = -Long.compare(thisTimestamp, otherTimestamp);
             if (result == 0) {
                 result = this.mSymptomName.compareTo(o.mSymptomName);

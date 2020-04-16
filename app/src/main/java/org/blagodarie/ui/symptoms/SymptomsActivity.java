@@ -2,7 +2,6 @@ package org.blagodarie.ui.symptoms;
 
 import android.Manifest;
 import android.accounts.Account;
-import android.accounts.AccountManager;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
@@ -24,17 +23,16 @@ import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
 
+import org.blagodarie.BlagodarieApp;
 import org.blagodarie.BuildConfig;
-import org.blagodarie.ForbiddenException;
 import org.blagodarie.R;
+import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.db.BlagodarieDatabase;
 import org.blagodarie.db.UserSymptom;
-import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.ui.update.UpdateActivity;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 
 import io.reactivex.Completable;
@@ -79,21 +77,17 @@ public final class SymptomsActivity
 
     private CompositeDisposable mDisposables = new CompositeDisposable();
 
-    private AccountManager mAccountManager;
-
     private LocationManager mLocationManager;
 
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        mAccountManager = AccountManager.get(this);
-
         initAccount();
 
-        mViewModel = new ViewModelProvider(this).get(SymptomsViewModel.class);
+        initViewModel();
 
-        final SymptomsAdapter symptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getSymptoms()), this::createUserSymptom);
+        final SymptomsAdapter symptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getDisplaySymptoms()), this::createUserSymptom);
 
         final SymptomsActivityBinding mainActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
         mainActivityBinding.setViewModel(mViewModel);
@@ -102,6 +96,14 @@ public final class SymptomsActivity
         setupToolbar();
 
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+    }
+
+    private void initViewModel () {
+        //создаем фабрику
+        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(BlagodarieDatabase.getInstance(this).userSymptomDao());
+
+        //создаем UpdateViewModel
+        mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
     }
 
     @Override
@@ -162,7 +164,7 @@ public final class SymptomsActivity
             @NonNull final DisplaySymptom displaySymptom
     ) {
         long timestamp = System.currentTimeMillis();
-        displaySymptom.getLastAdd().set(new Date(timestamp));
+        displaySymptom.getLastDate().set(new Date(timestamp));
 
         final Double latitude = mViewModel.getCurrentLatitude().get();
         final Double longitude = mViewModel.getCurrentLongitude().get();
@@ -177,44 +179,18 @@ public final class SymptomsActivity
                 latitude,
                 longitude);
 
-        Completable.
-                fromAction(() -> BlagodarieDatabase.getInstance(this).userSymptomDao().insert(userSymptom)).
-                subscribeOn(Schedulers.io()).
-                subscribe();
-
-        getAuthTokenAndSendUserSymptomOnServer(displaySymptom, userSymptom);
-    }
-
-    private void sendUserSymptomOnServer (
-            @NonNull final String authToken,
-            @NonNull final DisplaySymptom displaySymptom,
-            @NonNull final UserSymptom userSymptom
-    ) {
-        final Collection<UserSymptom> userSymptoms = new ArrayList<>();
-        userSymptoms.add(userSymptom);
-        final ServerConnector serverConnector = new ServerConnector(this);
-        final AddUserSymptomsExecutor addUserSymptomsExecutor = new AddUserSymptomsExecutor(Long.valueOf(mAccount.name), userSymptoms);
         mDisposables.add(
                 Completable.
-                        fromAction(() -> {
-                            displaySymptom.getInLoadProgress().set(true);
-                            serverConnector.execute(addUserSymptomsExecutor);
-                        }).
+                        fromAction(() -> BlagodarieDatabase.getInstance(this).userSymptomDao().insert(userSymptom)).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(() -> {
-                                    displaySymptom.getInLoadProgress().set(false);
-                                    displaySymptom.highlight();
-                                },
-                                throwable -> {
-                                    if (throwable instanceof ForbiddenException) {
-                                        final AccountManager accountManager = AccountManager.get(this);
-                                        accountManager.invalidateAuthToken(getString(R.string.account_type), authToken);
-                                        getAuthTokenAndSendUserSymptomOnServer(displaySymptom, userSymptom);
-                                    }
-                                })
+                            displaySymptom.highlight();
+                            BlagodarieApp.requestSync(mAccount);
+                        })
         );
     }
+
 
     private boolean checkLocationPermission () {
         return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
@@ -304,28 +280,6 @@ public final class SymptomsActivity
         );
     }
 
-
-    private void getAuthTokenAndSendUserSymptomOnServer (
-            @NonNull final DisplaySymptom displaySymptom,
-            @NonNull final UserSymptom userSymptom
-    ) {
-        mAccountManager.getAuthToken(
-                mAccount,
-                getString(R.string.token_type),
-                null,
-                this,
-                future -> {
-                    try {
-                        String authToken = future.getResult().getString((AccountManager.KEY_AUTHTOKEN));
-                        if (authToken == null) {
-                            authToken = "";
-                        }
-                        sendUserSymptomOnServer(authToken, displaySymptom, userSymptom);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }, null);
-    }
 
     private void checkLatestVersion () {
         final ServerConnector serverConnector = new ServerConnector(this);

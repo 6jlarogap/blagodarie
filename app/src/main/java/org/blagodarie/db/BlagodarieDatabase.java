@@ -30,8 +30,9 @@ public abstract class BlagodarieDatabase
     }
 
     private static BlagodarieDatabase buildDatabase (final Context applicationContext) {
-        return Room.databaseBuilder(applicationContext, BlagodarieDatabase.class, DATABASE_NAME)
-                .build();
+        return Room.
+                databaseBuilder(applicationContext, BlagodarieDatabase.class, DATABASE_NAME).
+                build();
     }
 
     public abstract UserSymptomDao userSymptomDao ();

@@ -128,7 +128,7 @@ final class SymptomsAdapter
             final DisplaySymptom newItem = mNewList.get(newItemPosition);
             final DisplaySymptom oldItem = mOldList.get(newItemPosition);
             return newItem.getSymptomId().equals(oldItem.getSymptomId()) &&
-                    (newItem.getLastAdd() == null ? oldItem.getLastAdd() == null : newItem.getLastAdd().equals(oldItem.getLastAdd()));
+                    (newItem.getLastDate() == null ? oldItem.getLastDate() == null : newItem.getLastDate().equals(oldItem.getLastDate()));
         }
     }*/
 }
