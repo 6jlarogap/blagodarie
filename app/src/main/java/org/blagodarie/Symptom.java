@@ -22,29 +22,32 @@ public final class Symptom {
     private static final List<Symptom> SYMPTOMS = new ArrayList<>();
 
     static {
+        SYMPTOMS.add(new Symptom(25L, "Пробуждение"));
         SYMPTOMS.add(new Symptom(19L, "Хорошее настроение"));
         SYMPTOMS.add(new Symptom(15L, "Хорошее самочувтсвие"));
         SYMPTOMS.add(new Symptom(20L, "Плохое настроение"));
+        SYMPTOMS.add(new Symptom(1L, "Нехватка питьевой воды"));
+        SYMPTOMS.add(new Symptom(2L, "Нехватка еды"));
         SYMPTOMS.add(new Symptom(3L, "Нехватка лекарств"));
+        SYMPTOMS.add(new Symptom(17L, "Повышенное давление"));
+        SYMPTOMS.add(new Symptom(18L, "Пониженное давление"));
         SYMPTOMS.add(new Symptom(16L, "Сердечная боль"));
         SYMPTOMS.add(new Symptom(11L, "Головная боль"));
         SYMPTOMS.add(new Symptom(10L, "Заложенность носа или насморк"));
         SYMPTOMS.add(new Symptom(5L, "Температура"));
+        SYMPTOMS.add(new Symptom(24L, "Аллергия"));
         SYMPTOMS.add(new Symptom(6L, "Кашель"));
 
-        SYMPTOMS.add(new Symptom(2L, "Голод"));
-        SYMPTOMS.add(new Symptom(1L, "Жажда"));
         SYMPTOMS.add(new Symptom(4L, "Слабость"));
         SYMPTOMS.add(new Symptom(7L, "Боль в груди при дыхании"));
         SYMPTOMS.add(new Symptom(8L, "Затруднённое дыхание"));
         SYMPTOMS.add(new Symptom(9L, "Одышка"));
         SYMPTOMS.add(new Symptom(12L, "Боль и ломота в мышцах и суставах"));
         SYMPTOMS.add(new Symptom(13L, "Рвота"));
-        SYMPTOMS.add(new Symptom(14L, "Понос"));
-        SYMPTOMS.add(new Symptom(17L, "Гипертония"));
-        SYMPTOMS.add(new Symptom(18L, "Гипотония"));
+        SYMPTOMS.add(new Symptom(14L, "Диарея"));
         SYMPTOMS.add(new Symptom(21L, "Зубная боль"));
         SYMPTOMS.add(new Symptom(22L, "Боль в ушах"));
+        SYMPTOMS.add(new Symptom(23L, "Головокружение"));
     }
 
     private Symptom (
