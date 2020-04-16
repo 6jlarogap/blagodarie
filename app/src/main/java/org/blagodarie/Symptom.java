@@ -24,8 +24,9 @@ public final class Symptom {
     static {
         SYMPTOMS.add(new Symptom(25L, "Пробуждение"));
         SYMPTOMS.add(new Symptom(19L, "Хорошее настроение"));
-        SYMPTOMS.add(new Symptom(15L, "Хорошее самочувтсвие"));
+        SYMPTOMS.add(new Symptom(15L, "Хорошее самочувствие"));
         SYMPTOMS.add(new Symptom(20L, "Плохое настроение"));
+        SYMPTOMS.add(new Symptom(29L, "Плохое самочувствие"));
         SYMPTOMS.add(new Symptom(1L, "Нехватка питьевой воды"));
         SYMPTOMS.add(new Symptom(2L, "Нехватка еды"));
         SYMPTOMS.add(new Symptom(3L, "Нехватка лекарств"));
@@ -33,8 +34,11 @@ public final class Symptom {
         SYMPTOMS.add(new Symptom(18L, "Пониженное давление"));
         SYMPTOMS.add(new Symptom(16L, "Сердечная боль"));
         SYMPTOMS.add(new Symptom(11L, "Головная боль"));
-        SYMPTOMS.add(new Symptom(10L, "Заложенность носа или насморк"));
+        SYMPTOMS.add(new Symptom(10L, "Сухость носа"));
+        SYMPTOMS.add(new Symptom(26L, "Заложенность носа"));
+        SYMPTOMS.add(new Symptom(27L, "Насморк"));
         SYMPTOMS.add(new Symptom(5L, "Температура"));
+        SYMPTOMS.add(new Symptom(28L, "Озноб"));
         SYMPTOMS.add(new Symptom(24L, "Аллергия"));
         SYMPTOMS.add(new Symptom(6L, "Кашель"));
 
@@ -48,6 +52,8 @@ public final class Symptom {
         SYMPTOMS.add(new Symptom(21L, "Зубная боль"));
         SYMPTOMS.add(new Symptom(22L, "Боль в ушах"));
         SYMPTOMS.add(new Symptom(23L, "Головокружение"));
+        SYMPTOMS.add(new Symptom(30L, "Чувство тревоги"));
+
     }
 
     private Symptom (
