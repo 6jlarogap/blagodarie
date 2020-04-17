@@ -53,6 +53,11 @@ public final class Symptom {
         SYMPTOMS.add(new Symptom(22L, "Боль в ушах"));
         SYMPTOMS.add(new Symptom(23L, "Головокружение"));
         SYMPTOMS.add(new Symptom(30L, "Чувство тревоги"));
+        SYMPTOMS.add(new Symptom(31L, "Похолодало"));
+        SYMPTOMS.add(new Symptom(32L, "Потеплело"));
+        SYMPTOMS.add(new Symptom(33L, "Дождь"));
+        SYMPTOMS.add(new Symptom(34L, "Ветер"));
+        SYMPTOMS.add(new Symptom(35L, "Жара"));
 
     }
 
