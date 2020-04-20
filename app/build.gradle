@@ -9,9 +9,16 @@ android {
         applicationId "org.blagodarie"
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 16
-        versionName "0.2.16"
+        versionCode 17
+        versionName "0.2.17"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        multiDexEnabled true
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments = ["room.schemaLocation":
+                                     "$projectDir/schemas".toString()]
+            }
+        }
     }
 
     buildTypes {
@@ -19,7 +26,7 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
-        latest{
+        latest {
             initWith release
         }
         debug {
@@ -56,12 +63,19 @@ dependencies {
     implementation "androidx.cardview:cardview:1.0.0"
     implementation "androidx.constraintlayout:constraintlayout:2.0.0-beta4"
     implementation 'androidx.recyclerview:recyclerview:1.1.0'
+    implementation "androidx.navigation:navigation-dynamic-features-fragment:2.3.0-alpha05"
+    implementation "androidx.navigation:navigation-fragment:2.3.0-alpha05"
+    implementation "androidx.room:room-runtime:2.2.5"
+
+    implementation 'com.android.support:multidex:1.0.3'
+
+    //Не увеличивать! Уменьшено для поддержки Android < 5.0
+    implementation 'com.squareup.okhttp3:okhttp:3.12.1'
+
     implementation "io.reactivex.rxjava2:rxjava:2.2.9"
     implementation "io.reactivex.rxjava2:rxandroid:2.1.0"
-    implementation 'com.squareup.okhttp3:okhttp:3.12.1'
-    implementation "androidx.navigation:navigation-dynamic-features-fragment:2.3.0-alpha04"
-    implementation "androidx.navigation:navigation-fragment:2.3.0-alpha04"
 
+    annotationProcessor 'androidx.room:room-compiler:2.2.5'
     testImplementation 'junit:junit:4.13'
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'

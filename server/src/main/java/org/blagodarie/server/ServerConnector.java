@@ -5,6 +5,7 @@ import android.content.Context;
 
 import androidx.annotation.NonNull;
 
+import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.util.concurrent.TimeUnit;
 
@@ -17,6 +18,8 @@ import javax.net.ssl.X509TrustManager;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 /**
  * @author sergeGabrus
@@ -80,6 +83,12 @@ public final class ServerConnector {
                 .writeTimeout(60, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true);
         return builder.build();
+    }
+
+    public static Response sendRequestAndGetRespone(
+            @NonNull final Request request
+    ) throws IOException {
+        return generateDefaultOkHttp().newCall(request).execute();
     }
 
     public <T extends ServerApiExecutor.ApiResult> T execute (

@@ -4,17 +4,22 @@ import androidx.annotation.NonNull;
 import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
 import androidx.lifecycle.ViewModel;
+import androidx.lifecycle.ViewModelProvider;
 
 import org.blagodarie.Symptom;
+import org.blagodarie.db.UserSymptom;
+import org.blagodarie.db.UserSymptomDao;
 
+import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import io.reactivex.Completable;
+import io.reactivex.schedulers.Schedulers;
 
 /**
  * @author sergeGabrus
@@ -56,16 +61,41 @@ public final class SymptomsViewModel
     }
 
     @NonNull
-    private final List<DisplaySymptom> mSymptoms = new ArrayList<>();
+    private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
 
     {
         for (Symptom symptom : Symptom.getSymptoms()) {
-            mSymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName()));
+            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName()));
         }
     }
 
-    public SymptomsViewModel () {
+    public SymptomsViewModel (
+            @NonNull final UserSymptomDao userSymptomDao
+    ) {
         super();
+        loadLastValues(userSymptomDao);
+    }
+
+    private void loadLastValues (
+            @NonNull final UserSymptomDao userSymptomDao
+    ) {
+        Completable.
+                fromAction(() -> {
+                    for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
+                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(displaySymptom.getSymptomId());
+                        if (lastUserSymptom != null) {
+                            displaySymptom.getLastDate().set(new Date(lastUserSymptom.getTimestamp()));
+                            if (lastUserSymptom.getLatitude() != null) {
+                                displaySymptom.getLastLatitude().set(lastUserSymptom.getLatitude());
+                            }
+                            if (lastUserSymptom.getLongitude() != null) {
+                                displaySymptom.getLastLongitude().set(lastUserSymptom.getLongitude());
+                            }
+                        }
+                    }
+                }).
+                subscribeOn(Schedulers.io()).
+                subscribe();
     }
 
     @Override
@@ -75,8 +105,8 @@ public final class SymptomsViewModel
     }
 
     @NonNull
-    final List<DisplaySymptom> getSymptoms () {
-        return mSymptoms;
+    final List<DisplaySymptom> getDisplaySymptoms () {
+        return mDisplaySymptoms;
     }
 
     @NonNull
@@ -112,5 +142,31 @@ public final class SymptomsViewModel
     @NonNull
     private static String getCurrentDateTimeString () {
         return SimpleDateFormat.getDateTimeInstance().format(new Date());
+    }
+
+    static final class Factory
+            implements ViewModelProvider.Factory {
+
+        @NonNull
+        private final UserSymptomDao mUserSymptomDao;
+
+        Factory (
+                @NonNull final UserSymptomDao userSymptomDao
+        ) {
+            mUserSymptomDao = userSymptomDao;
+        }
+
+        @NonNull
+        @Override
+        public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
+            if (modelClass.isAssignableFrom(SymptomsViewModel.class)) {
+                try {
+                    return modelClass.getConstructor(UserSymptomDao.class).newInstance(mUserSymptomDao);
+                } catch (IllegalAccessException | InstantiationException | InvocationTargetException | NoSuchMethodException e) {
+                    e.printStackTrace();
+                }
+            }
+            throw new IllegalArgumentException("Unknown ViewModel class");
+        }
     }
 }

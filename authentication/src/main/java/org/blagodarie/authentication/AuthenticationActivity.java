@@ -65,6 +65,18 @@ public final class AuthenticationActivity
 
     }
 
+    @Override
+    public void onBackPressed () {
+        if (mNavController.getCurrentDestination() != null) {
+            if (mNavController.getCurrentDestination().getId() == R.id.greetingFragment ||
+                    mNavController.getCurrentDestination().getId() == R.id.signInFragment) {
+                finish();
+            } else {
+                super.onBackPressed();
+            }
+        }
+    }
+
     static void googleSignIn (
             @NonNull final Activity activity,
             @NonNull final Fragment fragment,
