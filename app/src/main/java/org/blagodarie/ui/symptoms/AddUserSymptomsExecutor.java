@@ -1,6 +1,7 @@
 package org.blagodarie.ui.symptoms;
 
 import androidx.annotation.NonNull;
+import androidx.core.util.Pair;
 import androidx.collection.LongSparseArray;
 
 import org.blagodarie.ForbiddenException;
@@ -14,6 +15,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Locale;
+import java.util.Random;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -63,15 +65,19 @@ public final class AddUserSymptomsExecutor
             } else {
                 isFirst = false;
             }
-            content.append(
-                    String.format(
-                            Locale.ENGLISH,
-                            USER_SYMPTOM_JSON_PATTERN,
-                            userSymptom.getId(),
-                            userSymptom.getSymptomId(),
-                            (userSymptom.getTimestamp() / 1000),
-                            userSymptom.getLatitude(),
-                            userSymptom.getLongitude()));
+            Double latitude = userSymptom.getLatitude();
+            Double longitude = userSymptom.getLongitude();
+
+            if (latitude != null && longitude != null) {
+                Pair<Double, Double> obfuscatedLocation = GpsObfuscator.obfuscate(
+                        userSymptom.getLatitude(),
+                        userSymptom.getLongitude(),
+                        2);
+                latitude = obfuscatedLocation.first;
+                longitude = obfuscatedLocation.second;
+            }
+            content.append(String.format(Locale.ENGLISH, "{\"symptom_id\":%d,\"timestamp\":%d,\"latitude\":%f,\"longitude\":%f}",
+                    userSymptom.getSymptomId(), (userSymptom.getTimestamp() / 1000), latitude, longitude));
         }
         content.append("]}");
         return content.toString();
@@ -110,4 +116,60 @@ public final class AddUserSymptomsExecutor
     }
 
 
+    private static final class GpsObfuscator {
+        private static final double MERIDIAN_LENGTH = 40008550D;
+        private static final double EQUATOR_LENGTH = 40075696D;
+        private static final double LATITUDE_DEGREE_LENGTH = 360D / MERIDIAN_LENGTH;
+        private static final double LONGITUDE_EQUATOR_DEGREE_LENGTH = 360D / EQUATOR_LENGTH;
+
+        private static final int MAX_DEVIATION = 300;
+
+        private GpsObfuscator () {
+        }
+
+        @NonNull
+        static Pair<Double, Double> obfuscate (
+                @NonNull final Double latitude,
+                @NonNull final Double longitude,
+                final int count
+        ) {
+            Pair<Double, Double> obfLocation = new Pair<>(latitude, longitude);
+            for (int i = 0; i < count; i++) {
+                if (obfLocation.first != null && obfLocation.second != null) {
+                    obfLocation = obfuscate(obfLocation.first, obfLocation.second);
+                }
+            }
+            return obfLocation;
+        }
+
+        @NonNull
+        static Pair<Double, Double> obfuscate (
+                @NonNull final Double latitude,
+                @NonNull final Double longitude
+        ) {
+            final Random random = new Random();
+            double obfuscatedLatitude = latitude;
+            double latitudeDeviationInMeters = random.nextInt(MAX_DEVIATION + 1);
+            double latitudeDeviationInDegrees = latitudeDeviationInMeters * LATITUDE_DEGREE_LENGTH;
+            if (random.nextBoolean()) {
+                obfuscatedLatitude += latitudeDeviationInDegrees;
+            } else {
+                obfuscatedLatitude -= latitudeDeviationInDegrees;
+            }
+
+            double LONGITUDE_LOCAL_DEGREE_LENGTH = LONGITUDE_EQUATOR_DEGREE_LENGTH * Math.cos(obfuscatedLatitude);
+
+            int maxDev = (int) Math.sqrt((MAX_DEVIATION * MAX_DEVIATION) - (latitudeDeviationInMeters * latitudeDeviationInMeters));
+            double obfuscatedLongitude = longitude;
+            int longitudeDeviationInMeters = random.nextInt(maxDev + 1);
+            double longitudeDeviationInDegrees = longitudeDeviationInMeters * LONGITUDE_LOCAL_DEGREE_LENGTH;
+            if (random.nextBoolean()) {
+                obfuscatedLongitude += longitudeDeviationInDegrees;
+            } else {
+                obfuscatedLongitude -= longitudeDeviationInDegrees;
+            }
+
+            return new Pair<>(obfuscatedLatitude, obfuscatedLongitude);
+        }
+    }
 }
