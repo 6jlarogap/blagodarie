@@ -133,7 +133,7 @@ public final class SymptomsActivity
         setSupportActionBar(findViewById(R.id.toolbar));
         final ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setTitle(getTitle() + " " + BuildConfig.VERSION_NAME + getString(R.string.build_type_label));
+            actionBar.setTitle(R.string.toolbar_title);
         }
     }
 
@@ -235,6 +235,12 @@ public final class SymptomsActivity
         intent.setData(uri);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
+    }
+
+    public void onLinkClick (final View view) {
+        final Intent i = new Intent(Intent.ACTION_VIEW);
+        i.setData(Uri.parse(getString(R.string.website_url)));
+        startActivity(i);
     }
 
     public void onLocationProvidersDisabledWarningClick (final View view) {
