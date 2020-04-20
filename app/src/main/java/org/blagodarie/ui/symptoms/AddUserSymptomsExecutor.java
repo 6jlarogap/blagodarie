@@ -1,8 +1,8 @@
 package org.blagodarie.ui.symptoms;
 
 import androidx.annotation.NonNull;
-import androidx.core.util.Pair;
 import androidx.collection.LongSparseArray;
+import androidx.core.util.Pair;
 
 import org.blagodarie.ForbiddenException;
 import org.blagodarie.db.UserSymptom;
@@ -69,15 +69,20 @@ public final class AddUserSymptomsExecutor
             Double longitude = userSymptom.getLongitude();
 
             if (latitude != null && longitude != null) {
-                Pair<Double, Double> obfuscatedLocation = GpsObfuscator.obfuscate(
+                Pair<Double, Double> obfuscatedLocation = LocationObfuscator.obfuscate(
                         userSymptom.getLatitude(),
                         userSymptom.getLongitude(),
                         2);
                 latitude = obfuscatedLocation.first;
                 longitude = obfuscatedLocation.second;
             }
-            content.append(String.format(Locale.ENGLISH, "{\"symptom_id\":%d,\"timestamp\":%d,\"latitude\":%f,\"longitude\":%f}",
-                    userSymptom.getSymptomId(), (userSymptom.getTimestamp() / 1000), latitude, longitude));
+            content.append(String.format(Locale.ENGLISH,
+                    USER_SYMPTOM_JSON_PATTERN,
+                    userSymptom.getId(),
+                    userSymptom.getSymptomId(),
+                    (userSymptom.getTimestamp() / 1000),
+                    latitude,
+                    longitude));
         }
         content.append("]}");
         return content.toString();
@@ -116,15 +121,35 @@ public final class AddUserSymptomsExecutor
     }
 
 
-    private static final class GpsObfuscator {
-        private static final double MERIDIAN_LENGTH = 40008550D;
+    private static final class LocationObfuscator {
+        /**
+         * Длина меридиана в метрах.
+         *
+         * @link https://ru.wikipedia.org/wiki/%D0%9C%D0%B5%D1%80%D0%B8%D0%B4%D0%B8%D0%B0%D0%BD#%D0%93%D0%B5%D0%BE%D0%B3%D1%80%D0%B0%D1%84%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B9_%D0%BC%D0%B5%D1%80%D0%B8%D0%B4%D0%B8%D0%B0%D0%BD
+         */
+        private static final double MERIDIAN_LENGTH = 20004274D;
+
+        /**
+         * Длина экватора в метрах.
+         */
         private static final double EQUATOR_LENGTH = 40075696D;
-        private static final double LATITUDE_DEGREE_LENGTH = 360D / MERIDIAN_LENGTH;
+
+        /**
+         * Количество градусов в одном метре широты.
+         */
+        private static final double LATITUDE_DEGREE_LENGTH = 180D / MERIDIAN_LENGTH;
+
+        /**
+         * Количество градусов в одном метре долготы на экваторе.
+         */
         private static final double LONGITUDE_EQUATOR_DEGREE_LENGTH = 360D / EQUATOR_LENGTH;
 
+        /**
+         * Максимальное отклонение в метрах.
+         */
         private static final int MAX_DEVIATION = 300;
 
-        private GpsObfuscator () {
+        private LocationObfuscator () {
         }
 
         @NonNull
@@ -157,7 +182,7 @@ public final class AddUserSymptomsExecutor
                 obfuscatedLatitude -= latitudeDeviationInDegrees;
             }
 
-            double LONGITUDE_LOCAL_DEGREE_LENGTH = LONGITUDE_EQUATOR_DEGREE_LENGTH * Math.cos(obfuscatedLatitude);
+            final double LONGITUDE_LOCAL_DEGREE_LENGTH = LONGITUDE_EQUATOR_DEGREE_LENGTH * Math.cos(obfuscatedLatitude);
 
             int maxDev = (int) Math.sqrt((MAX_DEVIATION * MAX_DEVIATION) - (latitudeDeviationInMeters * latitudeDeviationInMeters));
             double obfuscatedLongitude = longitude;
