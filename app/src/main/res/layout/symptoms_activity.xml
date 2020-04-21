@@ -49,10 +49,11 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:onClick="showLog"
                     android:text="@string/action_log"
                     android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                    android:onClick="showLog"
-                    android:textColor="@color/colorAccent" />
+                    android:textColor="@color/colorAccent"
+                    android:visibility="@{BuildConfig.DEBUG ? View.VISIBLE : View.GONE}"/>
 
             </LinearLayout>
 
@@ -93,6 +94,8 @@
     </LinearLayout>
 
     <data>
+
+        <import type="org.blagodarie.BuildConfig" />
 
         <import type="android.view.View" />
 
