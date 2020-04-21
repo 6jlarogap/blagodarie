@@ -16,6 +16,9 @@ import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.Spannable;
+import android.text.SpannableString;
+import android.text.style.UnderlineSpan;
 import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
@@ -152,7 +155,10 @@ public final class SymptomsActivity
         setSupportActionBar(findViewById(R.id.toolbar));
         final ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setTitle(getString(R.string.toolbar_title) + " " + BuildConfig.VERSION_NAME + getString(R.string.build_type_label));
+            final String title = getString(R.string.toolbar_title);
+            final SpannableString spannableTitle = new SpannableString(title + " " + BuildConfig.VERSION_NAME + getString(R.string.build_type_label));
+            spannableTitle.setSpan(new UnderlineSpan(), 0, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            actionBar.setTitle(spannableTitle);
         }
     }
 
@@ -211,7 +217,7 @@ public final class SymptomsActivity
                             displaySymptom.isHaveNotSynced().set(true);
                             displaySymptom.highlight();
                             //BlagodarieApp.requestSync(mAccount);
-                            syncUserSymptoms(mAccount,"");
+                            syncUserSymptoms(mAccount, "");
                         })
         );
     }
