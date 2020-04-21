@@ -58,6 +58,13 @@ public final class Symptom {
         SYMPTOMS.add(new Symptom(33L, "Дождь"));
         SYMPTOMS.add(new Symptom(34L, "Ветер"));
         SYMPTOMS.add(new Symptom(35L, "Жара"));
+        SYMPTOMS.add(new Symptom(36L, "Астма"));
+        SYMPTOMS.add(new Symptom(37L, "Хорошая погода"));
+        SYMPTOMS.add(new Symptom(40L, "Влажно"));
+        SYMPTOMS.add(new Symptom(41L, "Сухо"));
+        SYMPTOMS.add(new Symptom(42L, "Свежо"));
+        SYMPTOMS.add(new Symptom(44L, "Прием пищи"));
+        SYMPTOMS.add(new Symptom(45L, "Запор"));
 
     }
 

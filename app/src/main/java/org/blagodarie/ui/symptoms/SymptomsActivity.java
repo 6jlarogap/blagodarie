@@ -5,6 +5,7 @@ import android.accounts.Account;
 import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -15,8 +16,12 @@ import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.Spannable;
+import android.text.SpannableString;
+import android.text.style.UnderlineSpan;
 import android.util.Log;
 import android.view.View;
+import android.widget.ScrollView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -31,6 +36,7 @@ import androidx.lifecycle.ViewModelProvider;
 import org.blagodarie.BlagodarieApp;
 import org.blagodarie.BuildConfig;
 import org.blagodarie.R;
+import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.db.BlagodarieDatabase;
 import org.blagodarie.db.UserSymptom;
@@ -151,7 +157,10 @@ public final class SymptomsActivity
         setSupportActionBar(findViewById(R.id.toolbar));
         final ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setTitle(getString(R.string.toolbar_title) + " " + BuildConfig.VERSION_NAME + getString(R.string.build_type_label));
+            final String title = getString(R.string.toolbar_title);
+            final SpannableString spannableTitle = new SpannableString(title + " " + BuildConfig.VERSION_NAME + getString(R.string.build_type_label));
+            spannableTitle.setSpan(new UnderlineSpan(), 0, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            actionBar.setTitle(spannableTitle);
         }
     }
 
@@ -210,7 +219,7 @@ public final class SymptomsActivity
                             displaySymptom.isHaveNotSynced().set(true);
                             displaySymptom.highlight();
                             //BlagodarieApp.requestSync(mAccount);
-                            syncUserSymptoms(mAccount,"");
+                            syncUserSymptoms(mAccount, "");
                         })
         );
     }
@@ -323,16 +332,19 @@ public final class SymptomsActivity
             e.printStackTrace();
         }
 
+        final LogDialogBinding logDialogBinding = LogDialogBinding.inflate(getLayoutInflater(), null, false);
+        logDialogBinding.setLog(log.toString());
+        //перемотать в конец
+        logDialogBinding.svLog.post(() -> logDialogBinding.svLog.fullScroll(ScrollView.FOCUS_DOWN));
 
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.txt_log);
-        builder.setMessage(log);
+        builder.setView(logDialogBinding.getRoot());
         builder.setPositiveButton(
                 R.string.action_to_clipboard,
                 (dialog, which) -> {
-                    ClipboardManager clipboard = (ClipboardManager)
-                            getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData clip = ClipData.newPlainText("", log);
+                    final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                    final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), log);
                     clipboard.setPrimaryClip(clip);
                     Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
                 });
