@@ -47,8 +47,7 @@ final class SymptomsAdapter
         final DisplaySymptom displaySymptom = mDisplaySymptoms.get(position);
         if (displaySymptom != null) {
             holder.bind(displaySymptom, v -> {
-                if (!displaySymptom.getInLoadProgress().get() &&
-                        !displaySymptom.getHighlight().get()) {
+                if (!displaySymptom.getHighlight().get()) {
                     mDisplaySymptomClickListener.onClick(displaySymptom);
                 }
             });

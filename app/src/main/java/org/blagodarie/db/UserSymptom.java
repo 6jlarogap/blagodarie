@@ -85,7 +85,7 @@ public final class UserSymptom {
         return Id;
     }
 
-    final Long getServerId () {
+    public final Long getServerId () {
         return ServerId;
     }
     public final void setServerId(@NonNull final Long serverId){

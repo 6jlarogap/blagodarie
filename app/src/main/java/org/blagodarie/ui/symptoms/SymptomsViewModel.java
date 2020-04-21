@@ -51,7 +51,14 @@ public final class SymptomsViewModel
     @NonNull
     private final Timer mCurrentDateTimeUpdateTimer = new Timer();
 
+    @NonNull
+    private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
+
     {
+        for (Symptom symptom : Symptom.getSymptoms()) {
+            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName()));
+        }
+
         mCurrentDateTimeUpdateTimer.schedule(new TimerTask() {
             @Override
             public void run () {
@@ -60,20 +67,13 @@ public final class SymptomsViewModel
         }, 0, CURRENT_DATE_TIME_UPDATE_PERIOD);
     }
 
-    @NonNull
-    private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
-
-    {
-        for (Symptom symptom : Symptom.getSymptoms()) {
-            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName()));
-        }
-    }
 
     public SymptomsViewModel (
             @NonNull final UserSymptomDao userSymptomDao
     ) {
         super();
         loadLastValues(userSymptomDao);
+        updateIsHaveNotSynced(userSymptomDao);
     }
 
     private void loadLastValues (
@@ -97,6 +97,21 @@ public final class SymptomsViewModel
                 subscribeOn(Schedulers.io()).
                 subscribe();
     }
+
+    void updateIsHaveNotSynced(
+            @NonNull final UserSymptomDao userSymptomDao
+    ){
+        Completable.
+                fromAction(() -> {
+                    for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
+                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(displaySymptom.getSymptomId());
+                        if (lastUserSymptom != null) {
+                            displaySymptom.isHaveNotSynced().set(lastUserSymptom.getServerId() == null);
+                        }
+                    }
+                }).
+                subscribeOn(Schedulers.io()).
+                subscribe();}
 
     @Override
     protected void onCleared () {
