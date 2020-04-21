@@ -37,7 +37,7 @@ public final class DisplaySymptom
     private ObservableField<Double> mLastLongitude = new ObservableField<>();
 
     @NonNull
-    private ObservableBoolean mInLoadProgress = new ObservableBoolean(false);
+    private ObservableBoolean mHaveNotSynced = new ObservableBoolean(false);
 
     @NonNull
     private ObservableBoolean mHighlight = new ObservableBoolean(false);
@@ -76,8 +76,8 @@ public final class DisplaySymptom
     }
 
     @NonNull
-    public ObservableBoolean getInLoadProgress () {
-        return mInLoadProgress;
+    public ObservableBoolean isHaveNotSynced () {
+        return mHaveNotSynced;
     }
 
     @NonNull

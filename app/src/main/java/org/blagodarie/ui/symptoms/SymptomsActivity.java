@@ -44,6 +44,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import io.reactivex.Completable;
 import io.reactivex.Observable;
@@ -206,12 +207,36 @@ public final class SymptomsActivity
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(() -> {
+                            displaySymptom.isHaveNotSynced().set(true);
                             displaySymptom.highlight();
-                            BlagodarieApp.requestSync(mAccount);
+                            //BlagodarieApp.requestSync(mAccount);
+                            syncUserSymptoms(mAccount,"");
                         })
         );
     }
 
+    private void syncUserSymptoms (
+            @NonNull final Account account,
+            @NonNull final String authToken
+    ) {
+        Log.d(TAG, "syncUserSymptoms account=" + account + "; authToken=" + authToken);
+        final Long userId = Long.valueOf(account.name);
+        Completable.
+                fromAction(() -> {
+                    final List<UserSymptom> notSyncedUserSymtpoms = BlagodarieDatabase.getInstance(this).userSymptomDao().getNotSynced(userId);
+                    final AddUserSymptomsExecutor addUserSymptomsExecutor = new AddUserSymptomsExecutor(Long.valueOf(account.name), notSyncedUserSymtpoms);
+                    new ServerConnector(this).execute(addUserSymptomsExecutor);
+                    BlagodarieDatabase.getInstance(this).userSymptomDao().update(notSyncedUserSymtpoms);
+                }).
+                subscribeOn(Schedulers.io()).
+                subscribe(
+                        () -> {
+                            Log.d(TAG, "syncUserSymptoms complete");
+                            mViewModel.updateIsHaveNotSynced(BlagodarieDatabase.getInstance(this).userSymptomDao());
+                        },
+                        throwable -> Log.e(TAG, "syncUserSymptoms error=" + throwable)
+                );
+    }
 
     private boolean checkLocationPermission () {
         Log.d(TAG, "checkLocationPermission");
