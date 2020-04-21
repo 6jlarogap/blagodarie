@@ -133,7 +133,7 @@ public final class SymptomsActivity
         setSupportActionBar(findViewById(R.id.toolbar));
         final ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setTitle(R.string.toolbar_title);
+            actionBar.setTitle(getString(R.string.toolbar_title) + " " + BuildConfig.VERSION_NAME + getString(R.string.build_type_label));
         }
     }
 
