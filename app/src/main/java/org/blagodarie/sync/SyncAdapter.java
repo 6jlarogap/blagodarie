@@ -7,6 +7,7 @@ import android.content.ContentProviderClient;
 import android.content.Context;
 import android.content.SyncResult;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -23,6 +24,8 @@ import io.reactivex.schedulers.Schedulers;
 
 public final class SyncAdapter
         extends AbstractThreadedSyncAdapter {
+
+    private static final String TAG = SyncAdapter.class.getSimpleName();
 
     @NonNull
     private final BlagodarieDatabase mBlagodarieDatabase;
@@ -52,12 +55,14 @@ public final class SyncAdapter
             ContentProviderClient provider,
             SyncResult syncResult
     ) {
+        Log.d(TAG, "onPerformSync");
         getAuthTokenAndSyncAll(account);
     }
 
     private void getAuthTokenAndSyncAll (
             @NonNull final Account account
     ) {
+        Log.d(TAG, "getAuthTokenAndSyncAll account=" + account);
         mAccountManager.getAuthToken(
                 account,
                 mTokenType,
@@ -81,6 +86,7 @@ public final class SyncAdapter
             @NonNull final Account account,
             @NonNull final String authToken
     ) {
+        Log.d(TAG, "syncUserSymptoms account=" + account + "; authToken=" + authToken);
         final Long userId = Long.valueOf(account.name);
         Completable.
                 fromAction(() -> {
@@ -90,6 +96,9 @@ public final class SyncAdapter
                     mBlagodarieDatabase.userSymptomDao().update(notSyncedUserSymtpoms);
                 }).
                 subscribeOn(Schedulers.io()).
-                subscribe();
+                subscribe(
+                        () -> Log.d(TAG, "syncUserSymptoms complete"),
+                        throwable -> Log.e(TAG, "syncUserSymptoms error=" + throwable)
+                );
     }
 }

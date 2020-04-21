@@ -32,14 +32,29 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
-            <TextView
-                android:id="@+id/tvDateTime"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="start"
                 android:layout_margin="5dp"
-                android:text='@{ViewModel.currentDatetime}'
-                android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvDateTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text='@{ViewModel.currentDatetime}'
+                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/action_log"
+                    android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                    android:onClick="showLog"
+                    android:textColor="@color/colorAccent" />
+
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="wrap_content"
