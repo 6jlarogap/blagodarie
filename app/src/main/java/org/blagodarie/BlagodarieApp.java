@@ -24,6 +24,7 @@ public final class BlagodarieApp
     }
 
     public static void requestSync(@NonNull final Account account){
+        Log.d(TAG, "requestSync account=" + account);
         final Bundle settingsBundle = new Bundle();
         settingsBundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
         settingsBundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
