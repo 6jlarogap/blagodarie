@@ -3,6 +3,7 @@ package org.blagodarie;
 import android.accounts.Account;
 import android.content.ContentResolver;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.multidex.MultiDexApplication;
@@ -13,6 +14,14 @@ import androidx.multidex.MultiDexApplication;
  */
 public final class BlagodarieApp
         extends MultiDexApplication {
+
+    private static final String TAG = BlagodarieApp.class.getSimpleName();
+
+    @Override
+    public void onCreate () {
+        super.onCreate();
+        Log.d(TAG, "start application");
+    }
 
     public static void requestSync(@NonNull final Account account){
         final Bundle settingsBundle = new Bundle();

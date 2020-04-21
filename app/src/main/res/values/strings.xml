@@ -26,4 +26,9 @@
     <string name="total_mb">%.2f mb</string>
     <string name="download_notification">Загрузка</string>
     <string name="choose_account">Выберите аккаунт</string>
+    <string name="action_log"><u>Журнал</u></string>
+    <string name="txt_log">Журнал</string>
+    <string name="action_to_clipboard">Скопировать</string>
+    <string name="copied_to_clipboard">Скопировано в буффер обмена</string>
+    <string name="action_share">Поделится</string>
 </resources>

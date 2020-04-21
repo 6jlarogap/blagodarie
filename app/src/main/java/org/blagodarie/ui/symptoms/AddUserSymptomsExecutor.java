@@ -1,5 +1,7 @@
 package org.blagodarie.ui.symptoms;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.collection.LongSparseArray;
 import androidx.core.util.Pair;
@@ -27,6 +29,8 @@ import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 public final class AddUserSymptomsExecutor
         implements ServerApiExecutor<AddUserSymptomsExecutor.ApiResult> {
 
+    private static final String TAG = AddUserSymptomsExecutor.class.getSimpleName();
+
     public static final class ApiResult
             extends ServerApiExecutor.ApiResult {
 
@@ -47,6 +51,7 @@ public final class AddUserSymptomsExecutor
             @NonNull final Long userId,
             @NonNull final Collection<UserSymptom> userSymptoms
     ) {
+        Log.d(TAG, "AddUserSymptomsExecutor userId=" + userId + "; userSymptoms=" + userSymptoms);
         mUserId = userId;
         mUserSymptoms.addAll(userSymptoms);
         for (UserSymptom userSymptom : userSymptoms) {
@@ -93,15 +98,20 @@ public final class AddUserSymptomsExecutor
             @NonNull final String apiBaseUrl,
             @NonNull final OkHttpClient okHttpClient
     ) throws JSONException, IOException, ForbiddenException {
-        final RequestBody body = RequestBody.create(JSON_TYPE, createJsonContent());
+        Log.d(TAG, "execute apiBaseUrl=" + apiBaseUrl);
+        final String content = createJsonContent();
+        Log.d(TAG, "content=" + content);
+        final RequestBody body = RequestBody.create(JSON_TYPE, content);
         final Request request = new Request.Builder()
                 .url(apiBaseUrl + "addusersymptom")
                 .post(body)
                 .build();
         final Response response = okHttpClient.newCall(request).execute();
+        Log.d(TAG, "response.code=" + response.code());
         if (response.code() == 200) {
             if (response.body() != null) {
                 final String responseBody = response.body().string();
+                Log.d(TAG, "responseBody=" + responseBody);
                 final JSONObject responseJson = new JSONObject(responseBody);
                 final JSONArray userSymptomsJson = responseJson.getJSONArray("user_symptoms");
                 for (int i = 0; i < userSymptomsJson.length(); i++) {
