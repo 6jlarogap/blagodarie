@@ -9,8 +9,8 @@ android {
         applicationId "org.blagodarie"
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 20
-        versionName "0.2.20"
+        versionCode 21
+        versionName "0.2.21"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
         javaCompileOptions {
