@@ -5,9 +5,7 @@ import android.accounts.Account;
 import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipboardManager;
-import android.content.ContentResolver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -312,14 +310,14 @@ public final class SymptomsActivity
             logcat = Runtime.getRuntime().exec(new String[]{
                     "logcat",
                     "-d",
+                    "-s",
                     "-v long",
                     BlagodarieApp.class.getSimpleName() + ":D",
                     SplashActivity.class.getSimpleName() + ":D",
                     SymptomsActivity.class.getSimpleName() + ":D",
                     AddUserSymptomsExecutor.class.getSimpleName() + ":D",
                     SyncService.class.getSimpleName() + ":D",
-                    SyncAdapter.class.getSimpleName() + ":D",
-                    "*:S"
+                    SyncAdapter.class.getSimpleName() + ":D"
             });
             BufferedReader br = new BufferedReader(new InputStreamReader(logcat.getInputStream()), 4 * 1024);
             String line;
