@@ -7,9 +7,6 @@ import androidx.room.Entity;
 import androidx.room.ForeignKey;
 import androidx.room.Ignore;
 import androidx.room.Index;
-import androidx.room.PrimaryKey;
-
-import java.util.Objects;
 
 /**
  * @author sergeGabrus
@@ -17,8 +14,9 @@ import java.util.Objects;
  */
 @Entity (
         tableName = "tbl_user_symptom",
+        inheritSuperIndices = true,
         indices = {
-                @Index (value = {"server_id"}, unique = true)
+                @Index (value = {"symptom_id"})
         },
         foreignKeys = {
                 @ForeignKey (
@@ -28,15 +26,8 @@ import java.util.Objects;
                 )
         }
 )
-public final class UserSymptom {
-
-    @PrimaryKey (autoGenerate = true)
-    @ColumnInfo (name = "id")
-    private final Long Id;
-
-    @Nullable
-    @ColumnInfo (name = "server_id")
-    private Long ServerId;
+public final class UserSymptom
+        extends SynchronizableEntity {
 
     @NonNull
     @ColumnInfo (name = "user_id")
@@ -59,7 +50,7 @@ public final class UserSymptom {
     private final Double Longitude;
 
     UserSymptom (
-            @NonNull final Long Id,
+            @Nullable final Long Id,
             @Nullable final Long ServerId,
             @NonNull final Long UserId,
             @NonNull final Long SymptomId,
@@ -67,8 +58,7 @@ public final class UserSymptom {
             @Nullable final Double Latitude,
             @Nullable final Double Longitude
     ) {
-        this.Id = Id;
-        this.ServerId = ServerId;
+        super(Id, ServerId);
         this.UserId = UserId;
         this.SymptomId = SymptomId;
         this.Timestamp = Timestamp;
@@ -84,8 +74,7 @@ public final class UserSymptom {
             @Nullable final Double Latitude,
             @Nullable final Double Longitude
     ) {
-        this.Id = null;
-        this.ServerId = null;
+        super(null, null);
         this.UserId = UserId;
         this.SymptomId = SymptomId;
         this.Timestamp = Timestamp;
@@ -93,21 +82,8 @@ public final class UserSymptom {
         this.Longitude = Longitude;
     }
 
-    public final Long getId () {
-        return Id;
-    }
-
-    @Nullable
-    public final Long getServerId () {
-        return ServerId;
-    }
-
-    public final void setServerId (@NonNull final Long serverId) {
-        ServerId = serverId;
-    }
-
     @NonNull
-    final Long getUserId () {
+    public final Long getUserId () {
         return UserId;
     }
 
@@ -131,27 +107,12 @@ public final class UserSymptom {
         return Longitude;
     }
 
-    @Override
-    public boolean equals (Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        UserSymptom that = (UserSymptom) o;
-        return UserId.equals(that.UserId) &&
-                SymptomId.equals(that.SymptomId) &&
-                Timestamp.equals(that.Timestamp);
-    }
-
-    @Override
-    public int hashCode () {
-        return Objects.hash(UserId, SymptomId, Timestamp);
-    }
-
     @NonNull
     @Override
     public String toString () {
         return "UserSymptom{" +
-                "Id=" + Id +
-                ", ServerId=" + ServerId +
+                "Id=" + getId() +
+                ", ServerId=" + getServerId() +
                 ", UserId=" + UserId +
                 ", SymptomId=" + SymptomId +
                 ", Timestamp=" + Timestamp +

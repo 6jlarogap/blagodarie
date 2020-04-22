@@ -24,12 +24,17 @@ public class MigrationTest {
     public void migrate1To2() throws IOException {
         SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1);
 
-        // Prepare for the next version.
         db.close();
 
-        db = helper.runMigrationsAndValidate(TEST_DB, 2, true, MigrationKeeper.getMigrations());
+        db = helper.runMigrationsAndValidate(TEST_DB, 2, true, MigrationKeeper.getMigrations()[0]);
+    }
 
-        // MigrationTestHelper automatically verifies the schema changes,
-        // but you need to validate that the data was migrated properly.
+    @Test
+    public void migrate2To3() throws IOException {
+        SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 2);
+
+        db.close();
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 3, true, MigrationKeeper.getMigrations()[1]);
     }
 }

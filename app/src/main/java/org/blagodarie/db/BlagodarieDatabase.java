@@ -14,10 +14,13 @@ import io.reactivex.schedulers.Schedulers;
 
 @Database (
         entities = {
+                KeyType.class,
+                Key.class,
                 Symptom.class,
-                UserSymptom.class
+                UserSymptom.class,
+                UserSymptomKeyJoin.class
         },
-        version = 2)
+        version = 3)
 public abstract class BlagodarieDatabase
         extends RoomDatabase {
 
@@ -41,7 +44,10 @@ public abstract class BlagodarieDatabase
                     @Override
                     public void onCreate (@NonNull final SupportSQLiteDatabase db) {
                         Completable.
-                                fromAction(() -> BlagodarieDatabase.getInstance(applicationContext).symptomDao().insert(Symptom.getSymptoms())).
+                                fromAction(() -> {
+                                    BlagodarieDatabase.getInstance(applicationContext).symptomDao().insert(Symptom.getSymptoms());
+                                    //BlagodarieDatabase.getInstance(applicationContext).
+                                }).
                                 subscribeOn(Schedulers.io()).
                                 subscribe();
 

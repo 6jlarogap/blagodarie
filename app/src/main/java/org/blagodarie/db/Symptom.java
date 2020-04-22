@@ -1,48 +1,47 @@
 package org.blagodarie.db;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.Index;
-import androidx.room.PrimaryKey;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity (
         tableName = "tbl_symptom",
+        inheritSuperIndices = true,
         indices = {
                 @Index (value = {"name"}, unique = true)
         }
 )
-public final class Symptom {
-
-    @NonNull
-    @PrimaryKey (autoGenerate = true)
-    @ColumnInfo (name = "id")
-    private final Long Id;
-
+public final class Symptom
+        extends BaseEntity {
 
     @NonNull
     @ColumnInfo (name = "name")
     private final String Name;
 
     Symptom (
-            @NonNull final Long Id,
+            @Nullable final Long Id,
             @NonNull final String Name
     ) {
-        this.Id = Id;
+        super(Id);
         this.Name = Name;
-    }
-
-    @NonNull
-    public Long getId () {
-        return Id;
     }
 
     @NonNull
     public String getName () {
         return Name;
+    }
+
+    @Override
+    public String toString () {
+        return "Symptom{" +
+                "Id=" + getId() +
+                ", Name='" + Name + '\'' +
+                '}';
     }
 
     static List<Symptom> getSymptoms () {
