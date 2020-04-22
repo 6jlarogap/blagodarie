@@ -1,8 +1,10 @@
 package org.blagodarie.db;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
+import androidx.room.ForeignKey;
 import androidx.room.Ignore;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
@@ -17,6 +19,13 @@ import java.util.Objects;
         tableName = "tbl_user_symptom",
         indices = {
                 @Index (value = {"server_id"}, unique = true)
+        },
+        foreignKeys = {
+                @ForeignKey (
+                        entity = Symptom.class,
+                        parentColumns = "id",
+                        childColumns = "symptom_id"
+                )
         }
 )
 public final class UserSymptom {
@@ -25,6 +34,7 @@ public final class UserSymptom {
     @ColumnInfo (name = "id")
     private final Long Id;
 
+    @Nullable
     @ColumnInfo (name = "server_id")
     private Long ServerId;
 
@@ -40,20 +50,22 @@ public final class UserSymptom {
     @ColumnInfo (name = "timestamp")
     private final Long Timestamp;
 
+    @Nullable
     @ColumnInfo (name = "latitude")
     private final Double Latitude;
 
+    @Nullable
     @ColumnInfo (name = "longitude")
     private final Double Longitude;
 
     UserSymptom (
             @NonNull final Long Id,
-            @NonNull final Long ServerId,
+            @Nullable final Long ServerId,
             @NonNull final Long UserId,
             @NonNull final Long SymptomId,
             @NonNull final Long Timestamp,
-            final Double Latitude,
-            final Double Longitude
+            @Nullable final Double Latitude,
+            @Nullable final Double Longitude
     ) {
         this.Id = Id;
         this.ServerId = ServerId;
@@ -69,8 +81,8 @@ public final class UserSymptom {
             @NonNull final Long UserId,
             @NonNull final Long SymptomId,
             @NonNull final Long Timestamp,
-            final Double Latitude,
-            final Double Longitude
+            @Nullable final Double Latitude,
+            @Nullable final Double Longitude
     ) {
         this.Id = null;
         this.ServerId = null;
@@ -85,12 +97,15 @@ public final class UserSymptom {
         return Id;
     }
 
+    @Nullable
     public final Long getServerId () {
         return ServerId;
     }
-    public final void setServerId(@NonNull final Long serverId){
+
+    public final void setServerId (@NonNull final Long serverId) {
         ServerId = serverId;
     }
+
     @NonNull
     final Long getUserId () {
         return UserId;
@@ -106,10 +121,12 @@ public final class UserSymptom {
         return Timestamp;
     }
 
+    @Nullable
     public final Double getLatitude () {
         return Latitude;
     }
 
+    @Nullable
     public final Double getLongitude () {
         return Longitude;
     }

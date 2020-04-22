@@ -9,8 +9,8 @@ android {
         applicationId "org.blagodarie"
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 21
-        versionName "0.2.21"
+        versionCode 22
+        versionName "0.2.22"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
         javaCompileOptions {
@@ -42,6 +42,10 @@ android {
                 outputFileName = "blagodarie-" + versionName + "-" + buildType.name + ".apk"
             }
         }
+    }
+
+    sourceSets {
+        androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
     }
 
     dataBinding {
@@ -77,6 +81,7 @@ dependencies {
 
     annotationProcessor 'androidx.room:room-compiler:2.2.5'
     testImplementation 'junit:junit:4.13'
+    androidTestImplementation "androidx.room:room-testing:2.2.5"
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
     implementation 'com.google.android.material:material:1.1.0'

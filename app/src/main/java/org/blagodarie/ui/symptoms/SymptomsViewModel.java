@@ -19,6 +19,8 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import io.reactivex.Completable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.functions.Action;
 import io.reactivex.schedulers.Schedulers;
 
 /**
@@ -69,20 +71,22 @@ public final class SymptomsViewModel
 
 
     public SymptomsViewModel (
+            @NonNull final Long userId,
             @NonNull final UserSymptomDao userSymptomDao
     ) {
         super();
-        loadLastValues(userSymptomDao);
-        updateIsHaveNotSynced(userSymptomDao);
+        loadLastValues(userId, userSymptomDao);
+        updateIsHaveNotSynced(userId, userSymptomDao);
     }
 
     private void loadLastValues (
+            @NonNull final Long userId,
             @NonNull final UserSymptomDao userSymptomDao
     ) {
         Completable.
                 fromAction(() -> {
                     for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(displaySymptom.getSymptomId());
+                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(userId, displaySymptom.getSymptomId());
                         if (lastUserSymptom != null) {
                             displaySymptom.getLastDate().set(new Date(lastUserSymptom.getTimestamp()));
                             if (lastUserSymptom.getLatitude() != null) {
@@ -98,20 +102,39 @@ public final class SymptomsViewModel
                 subscribe();
     }
 
-    void updateIsHaveNotSynced(
-            @NonNull final UserSymptomDao userSymptomDao
-    ){
+    void updateUserSymptomCount (
+            @NonNull final Long userId,
+            @NonNull final UserSymptomDao userSymptomDao,
+            @NonNull final Action action
+    ) {
         Completable.
                 fromAction(() -> {
                     for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(displaySymptom.getSymptomId());
+                        final int userSymptomCount = userSymptomDao.getCountBySymptomId(userId, displaySymptom.getSymptomId());
+                        displaySymptom.setUserSymptomCount(userSymptomCount);
+                    }
+                }).
+                subscribeOn(Schedulers.io()).
+                observeOn(AndroidSchedulers.mainThread()).
+                subscribe(action);
+    }
+
+    void updateIsHaveNotSynced (
+            @NonNull final Long userId,
+            @NonNull final UserSymptomDao userSymptomDao
+    ) {
+        Completable.
+                fromAction(() -> {
+                    for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
+                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(userId, displaySymptom.getSymptomId());
                         if (lastUserSymptom != null) {
                             displaySymptom.isHaveNotSynced().set(lastUserSymptom.getServerId() == null);
                         }
                     }
                 }).
                 subscribeOn(Schedulers.io()).
-                subscribe();}
+                subscribe();
+    }
 
     @Override
     protected void onCleared () {
@@ -163,11 +186,16 @@ public final class SymptomsViewModel
             implements ViewModelProvider.Factory {
 
         @NonNull
+        private final Long mUserId;
+
+        @NonNull
         private final UserSymptomDao mUserSymptomDao;
 
         Factory (
+                @NonNull final Long userId,
                 @NonNull final UserSymptomDao userSymptomDao
         ) {
+            mUserId = userId;
             mUserSymptomDao = userSymptomDao;
         }
 
@@ -176,7 +204,7 @@ public final class SymptomsViewModel
         public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
             if (modelClass.isAssignableFrom(SymptomsViewModel.class)) {
                 try {
-                    return modelClass.getConstructor(UserSymptomDao.class).newInstance(mUserSymptomDao);
+                    return modelClass.getConstructor(Long.class, UserSymptomDao.class).newInstance(mUserId, mUserSymptomDao);
                 } catch (IllegalAccessException | InstantiationException | InvocationTargetException | NoSuchMethodException e) {
                     e.printStackTrace();
                 }
