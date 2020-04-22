@@ -51,7 +51,7 @@ public abstract class BlagodarieDatabase
                 build();
     }
 
-    abstract SymptomDao symptomDao ();
+    public abstract SymptomDao symptomDao ();
 
     public abstract UserSymptomDao userSymptomDao ();
 }

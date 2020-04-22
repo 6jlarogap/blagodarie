@@ -39,6 +39,8 @@ public final class DisplaySymptom
     @NonNull
     private ObservableBoolean mHaveNotSynced = new ObservableBoolean(false);
 
+    private volatile int mUserSymptomCount = 0;
+
     @NonNull
     private ObservableBoolean mHighlight = new ObservableBoolean(false);
 
@@ -78,6 +80,14 @@ public final class DisplaySymptom
     @NonNull
     public ObservableBoolean isHaveNotSynced () {
         return mHaveNotSynced;
+    }
+
+    int getUserSymptomCount () {
+        return mUserSymptomCount;
+    }
+
+    void setUserSymptomCount (final int userSymptomCount) {
+        this.mUserSymptomCount = userSymptomCount;
     }
 
     @NonNull

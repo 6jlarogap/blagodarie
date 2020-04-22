@@ -6,11 +6,15 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.databinding.DataBindingUtil;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.blagodarie.R;
 import org.blagodarie.databinding.SymptomItemBinding;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -58,15 +62,15 @@ final class SymptomsAdapter
     public int getItemCount () {
         return mDisplaySymptoms.size();
     }
-/*
-    private void order () {
+
+    void order () {
         final List<DisplaySymptom> newDisplaySymptoms = new ArrayList<>(mDisplaySymptoms);
-        //Collections.sort(newDisplaySymptoms);
+        Collections.sort(newDisplaySymptoms, (o1, o2) -> o2.getUserSymptomCount() - o1.getUserSymptomCount());
         final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomDiffUtilCallBack(newDisplaySymptoms, mDisplaySymptoms));
         diffResult.dispatchUpdatesTo(this);
         mDisplaySymptoms = newDisplaySymptoms;
     }
-*/
+
     static final class SymptomViewHolder
             extends RecyclerView.ViewHolder {
 
@@ -92,7 +96,7 @@ final class SymptomsAdapter
             mBinding.setDisplaySymptom(displaySymptom);
         }
     }
-/*
+
     private static final class DisplaySymptomDiffUtilCallBack
             extends DiffUtil.Callback {
 
@@ -127,7 +131,11 @@ final class SymptomsAdapter
             final DisplaySymptom newItem = mNewList.get(newItemPosition);
             final DisplaySymptom oldItem = mOldList.get(newItemPosition);
             return newItem.getSymptomId().equals(oldItem.getSymptomId()) &&
-                    (newItem.getLastDate() == null ? oldItem.getLastDate() == null : newItem.getLastDate().equals(oldItem.getLastDate()));
+                    newItem.getSymptomName().equals(oldItem.getSymptomName()) &&
+                    newItem.getUserSymptomCount() == oldItem.getUserSymptomCount() &&
+                    (newItem.getLastDate().get() == null ? oldItem.getLastDate().get() == null : newItem.getLastDate().get().equals(oldItem.getLastDate().get())) &&
+                    (newItem.getLastLatitude().get() == null ? oldItem.getLastLatitude().get() == null : newItem.getLastLatitude().get().equals(oldItem.getLastLatitude().get())) &&
+                    (newItem.getLastLongitude().get() == null ? oldItem.getLastLongitude().get() == null : newItem.getLastLongitude().get().equals(oldItem.getLastLongitude().get()));
         }
-    }*/
+    }
 }

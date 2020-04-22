@@ -95,6 +95,10 @@ public final class SymptomsActivity
 
     private LocationManager mLocationManager;
 
+    private SymptomsAdapter mSymptomsAdapter;
+
+    private SymptomsActivityBinding mActivityBinding;
+
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -104,11 +108,11 @@ public final class SymptomsActivity
 
         initViewModel();
 
-        final SymptomsAdapter symptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getDisplaySymptoms()), this::createUserSymptom);
+        mSymptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getDisplaySymptoms()), this::createUserSymptom);
 
-        final SymptomsActivityBinding mainActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
-        mainActivityBinding.setViewModel(mViewModel);
-        mainActivityBinding.rvSymptoms.setAdapter(symptomsAdapter);
+        mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
+        mActivityBinding.setViewModel(mViewModel);
+        mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
 
         setupToolbar();
 
@@ -118,7 +122,7 @@ public final class SymptomsActivity
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
         //создаем фабрику
-        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(BlagodarieDatabase.getInstance(this).userSymptomDao());
+        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(Long.valueOf(mAccount.name), BlagodarieDatabase.getInstance(this).userSymptomDao());
 
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
@@ -134,6 +138,15 @@ public final class SymptomsActivity
         } else {
             attemptRequestLocationPermissions();
         }
+        mViewModel.updateUserSymptomCount(
+                Long.valueOf(mAccount.name),
+                BlagodarieDatabase.getInstance(this).userSymptomDao(),
+                () -> {
+                    mSymptomsAdapter.order();
+                    if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
+                        mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
+                    }
+                });
     }
 
     @Override
@@ -239,7 +252,7 @@ public final class SymptomsActivity
                 subscribe(
                         () -> {
                             Log.d(TAG, "syncUserSymptoms complete");
-                            mViewModel.updateIsHaveNotSynced(BlagodarieDatabase.getInstance(this).userSymptomDao());
+                            mViewModel.updateIsHaveNotSynced(Long.valueOf(mAccount.name), BlagodarieDatabase.getInstance(this).userSymptomDao());
                         },
                         throwable -> Log.e(TAG, "syncUserSymptoms error=" + throwable)
                 );
