@@ -104,7 +104,7 @@ final class MigrationKeeper {
                 //создать новую таблицу tbl_symptom
                 database.execSQL("CREATE TABLE IF NOT EXISTS `tbl_symptom_new` (`name` TEXT NOT NULL, `id` INTEGER PRIMARY KEY AUTOINCREMENT)");
                 //перенести данные из старой таблицы в новую
-                database.execSQL("INSERT INTO tbl_symptom_new SELECT * FROM tbl_symptom");
+                database.execSQL("INSERT INTO tbl_symptom_new(`id`, `name`) SELECT id, name FROM tbl_symptom");
                 //удалить старую таблицу
                 database.execSQL("DROP TABLE IF EXISTS `tbl_symptom`");
                 //переименовать новую таблицу
