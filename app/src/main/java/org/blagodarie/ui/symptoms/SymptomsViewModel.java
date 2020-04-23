@@ -6,7 +6,7 @@ import androidx.databinding.ObservableField;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
-import org.blagodarie.Symptom;
+import org.blagodarie.db.Symptom;
 import org.blagodarie.db.UserSymptom;
 import org.blagodarie.db.UserSymptomDao;
 

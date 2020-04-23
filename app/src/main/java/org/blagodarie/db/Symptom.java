@@ -44,7 +44,7 @@ public final class Symptom
                 '}';
     }
 
-    static List<Symptom> getSymptoms () {
+    public static List<Symptom> getSymptoms () {
         final List<Symptom> symptoms = new ArrayList<>();
         symptoms.add(new Symptom(25L, "Пробуждение"));
         symptoms.add(new Symptom(19L, "Хорошее настроение"));
