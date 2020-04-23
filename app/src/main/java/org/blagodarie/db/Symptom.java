@@ -1,7 +1,6 @@
 package org.blagodarie.db;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.Index;
@@ -24,7 +23,7 @@ public final class Symptom
     private final String Name;
 
     Symptom (
-            @Nullable final Long Id,
+            @NonNull final Long Id,
             @NonNull final String Name
     ) {
         super(Id);

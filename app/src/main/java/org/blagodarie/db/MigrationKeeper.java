@@ -132,8 +132,9 @@ final class MigrationKeeper {
 
             //создать таблицу tbl_user_symptom_key_join
             database.execSQL("CREATE TABLE IF NOT EXISTS `tbl_user_symptom_key_join` (`user_symptom_id` INTEGER NOT NULL, `key_id` INTEGER NOT NULL, `server_id` INTEGER, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`user_symptom_id`) REFERENCES `tbl_user_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`key_id`) REFERENCES `tbl_key`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )");
-            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id` ON `tbl_user_symptom_key_join` (`user_symptom_id`)");
-            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_key_id` ON `tbl_user_symptom_key_join` (`key_id`)");
+            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id_key_id` ON `tbl_user_symptom_key_join` (`user_symptom_id`, `key_id`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id` ON `tbl_user_symptom_key_join` (`user_symptom_id`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_key_id` ON `tbl_user_symptom_key_join` (`key_id`)");
             database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_server_id` ON `tbl_user_symptom_key_join` (`server_id`)");
 
             //создать индекс для таблицы tbl_user_symptom к столбцу symptom_id

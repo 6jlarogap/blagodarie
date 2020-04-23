@@ -1,4 +1,4 @@
-package org.blagodarie.ui.symptoms;
+package org.blagodarie.sync;
 
 import android.util.Log;
 
@@ -8,63 +8,108 @@ import androidx.core.util.Pair;
 
 import org.blagodarie.UnauthorizedException;
 import org.blagodarie.db.UserSymptom;
-import org.blagodarie.server.ServerApiExecutor;
+import org.blagodarie.db.UserSymptomDao;
+import org.blagodarie.server.ServerConnector;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
-import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
-public final class AddUserSymptomsExecutor
-        implements ServerApiExecutor<AddUserSymptomsExecutor.ApiResult> {
+final class UserSymptomSyncer {
 
-    private static final String TAG = AddUserSymptomsExecutor.class.getSimpleName();
-
-    public static final class ApiResult
-            extends ServerApiExecutor.ApiResult {
-
-    }
+    private static final String TAG = UserSymptomSyncer.class.getSimpleName();
 
     private static final String USER_SYMPTOM_JSON_PATTERN = "{\"user_symptom_id\":%d,\"symptom_id\":%d,\"timestamp\":%d,\"latitude\":%f,\"longitude\":%f}";
 
-    @NonNull
-    private final Long mUserId;
+    private static volatile UserSymptomSyncer INSTANCE;
+
+    private UserSymptomSyncer () {
+    }
 
     @NonNull
-    private final Collection<UserSymptom> mUserSymptoms = new ArrayList<>();
+    static UserSymptomSyncer getInstance () {
+        synchronized (UserSymptomSyncer.class) {
+            if (INSTANCE == null) {
+                INSTANCE = new UserSymptomSyncer();
+            }
+        }
+        return INSTANCE;
+    }
 
-    @NonNull
-    private final LongSparseArray<UserSymptom> mUserSymptomsById = new LongSparseArray<>();
-
-    public AddUserSymptomsExecutor (
+    final synchronized void sync (
             @NonNull final Long userId,
-            @NonNull final Collection<UserSymptom> userSymptoms
-    ) {
-        Log.d(TAG, "AddUserSymptomsExecutor userId=" + userId + "; userSymptoms=" + userSymptoms);
-        mUserId = userId;
-        mUserSymptoms.addAll(userSymptoms);
-        for (UserSymptom userSymptom : userSymptoms) {
-            mUserSymptomsById.put(userSymptom.getId(), userSymptom);
+            @NonNull final String authToken,
+            @NonNull final String apiBaseUrl,
+            @NonNull final UserSymptomDao userSymptomDao
+    ) throws IOException, JSONException, UnauthorizedException {
+        final List<UserSymptom> notSyncedUserSymtpoms = userSymptomDao.getNotSynced(userId);
+        if (notSyncedUserSymtpoms.size() > 0) {
+            final LongSparseArray<UserSymptom> mUserSymptomsById = new LongSparseArray<>();
+            for (UserSymptom userSymptom : notSyncedUserSymtpoms) {
+                assert userSymptom.getId() != null;
+                mUserSymptomsById.put(userSymptom.getId(), userSymptom);
+            }
+            final String content = createJsonContent(userId, notSyncedUserSymtpoms);
+            final Request request = createRequest(apiBaseUrl, authToken, content);
+            final Response response = ServerConnector.sendRequestAndGetRespone(request);
+
+            Log.d(TAG, "response.code=" + response.code());
+            if (response.code() == 200) {
+                if (response.body() != null) {
+                    final String responseBody = response.body().string();
+                    Log.d(TAG, "responseBody=" + responseBody);
+                    final JSONObject responseJson = new JSONObject(responseBody);
+                    final JSONArray userSymptomsJson = responseJson.getJSONArray("user_symptoms");
+                    for (int i = 0; i < userSymptomsJson.length(); i++) {
+                        final JSONObject element = userSymptomsJson.getJSONObject(i);
+                        final long userSymptomId = element.getLong("user_symptom_id");
+                        final long userSymptomServerId = element.getLong("user_symptom_server_id");
+                        final UserSymptom userSymptom = mUserSymptomsById.get(userSymptomId);
+                        if (userSymptom != null) {
+                            userSymptom.setServerId(userSymptomServerId);
+                        }
+                    }
+                    userSymptomDao.update(notSyncedUserSymtpoms);
+                }
+            } else if (response.code() == 401) {
+                throw new UnauthorizedException();
+            }
         }
     }
 
-    private String createJsonContent () {
+    private Request createRequest (
+            @NonNull final String apiBaseUrl,
+            @NonNull final String authToken,
+            @NonNull final String content
+    ) {
+        final RequestBody body = RequestBody.create(JSON_TYPE, content);
+        return new Request.Builder().
+                url(apiBaseUrl + "addusersymptom").
+                post(body).
+                header("Authorization", String.format("Token %s", authToken)).
+                build();
+    }
+
+    private String createJsonContent (
+            @NonNull final Long userId,
+            @NonNull final Collection<UserSymptom> userSymptoms
+    ) {
         final StringBuilder content = new StringBuilder();
-        content.append(String.format(Locale.ENGLISH, "{\"user_id\":%d,\"user_symptoms\":[", mUserId));
+        content.append(String.format(Locale.ENGLISH, "{\"user_id\":%d,\"user_symptoms\":[", userId));
 
         boolean isFirst = true;
-        for (UserSymptom userSymptom : mUserSymptoms) {
+        for (UserSymptom userSymptom : userSymptoms) {
             if (!isFirst) {
                 content.append(',');
             } else {
@@ -92,44 +137,6 @@ public final class AddUserSymptomsExecutor
         content.append("]}");
         return content.toString();
     }
-
-    @Override
-    public ApiResult execute (
-            @NonNull final String apiBaseUrl,
-            @NonNull final OkHttpClient okHttpClient
-    ) throws JSONException, IOException, UnauthorizedException {
-        Log.d(TAG, "execute apiBaseUrl=" + apiBaseUrl);
-        final String content = createJsonContent();
-        Log.d(TAG, "content=" + content);
-        final RequestBody body = RequestBody.create(JSON_TYPE, content);
-        final Request request = new Request.Builder()
-                .url(apiBaseUrl + "addusersymptom")
-                .post(body)
-                .build();
-        final Response response = okHttpClient.newCall(request).execute();
-        Log.d(TAG, "response.code=" + response.code());
-        if (response.code() == 200) {
-            if (response.body() != null) {
-                final String responseBody = response.body().string();
-                Log.d(TAG, "responseBody=" + responseBody);
-                final JSONObject responseJson = new JSONObject(responseBody);
-                final JSONArray userSymptomsJson = responseJson.getJSONArray("user_symptoms");
-                for (int i = 0; i < userSymptomsJson.length(); i++) {
-                    final JSONObject element = userSymptomsJson.getJSONObject(i);
-                    final long userSymptomId = element.getLong("user_symptom_id");
-                    final long userSymptomServerId = element.getLong("user_symptom_server_id");
-                    final UserSymptom userSymptom = mUserSymptomsById.get(userSymptomId);
-                    if (userSymptom != null) {
-                        userSymptom.setServerId(userSymptomServerId);
-                    }
-                }
-            }
-        } else if (response.code() == 403) {
-            throw new UnauthorizedException();
-        }
-        return new ApiResult();
-    }
-
 
     private static final class LocationObfuscator {
         /**

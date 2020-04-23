@@ -41,7 +41,11 @@ public final class KeyType
         /**
          * Идентификатор аккаунта Google.
          */
-        GOOGLE_ACCOUNT_ID(3L, "GoogleAccountId");
+        GOOGLE_ACCOUNT_ID(3L, "GoogleAccountId"),
+        /**
+         * Идентификатор аккаунта Google.
+         */
+        BLAGODARIE_KEY(4L, "BlagodarieKey");
 
         /**
          * Тип ключа.

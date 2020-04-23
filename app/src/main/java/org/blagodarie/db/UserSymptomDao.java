@@ -1,5 +1,6 @@
 package org.blagodarie.db;
 
+import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.Query;
@@ -12,7 +13,7 @@ import java.util.List;
 public abstract class UserSymptomDao {
 
     @Insert
-    public abstract void insert (final UserSymptom userSymptom);
+    public abstract long insert (final UserSymptom userSymptom);
 
     @Update
     public abstract void update (final Collection<UserSymptom> userSymptom);
@@ -38,5 +39,12 @@ public abstract class UserSymptomDao {
             "WHERE symptom_id = :symptomId " +
             "AND user_id = :userId ")
     public abstract int getCountBySymptomId (final long userId, final long symptomId);
+
+    @Query ("SELECT COUNT(*) " +
+            "FROM tbl_user_symptom " +
+            "WHERE symptom_id = :symptomId " +
+            "AND user_id = :userId " +
+            "AND server_id IS NULL")
+    public abstract LiveData<Boolean> isHaveNotSynced (final long userId, final long symptomId);
 
 }

@@ -33,9 +33,11 @@ import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import static android.app.Activity.RESULT_OK;
+import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
 /**
  * @author sergeGabrus
@@ -75,6 +77,8 @@ public final class SignUpFragment
             }
         }
 
+        private static final String JSON_PATTERN = "{\"oauth\":{\"provider\":\"google\",\"id\":\"%s\",\"token\":\"%s\"}}";
+
         @NonNull
         private final String mGoogleAccountId;
 
@@ -94,7 +98,7 @@ public final class SignUpFragment
                 @NonNull String apiBaseUrl,
                 @NonNull OkHttpClient okHttpClient
         ) throws JSONException, IOException {
-            Long userId = null;
+            /*Long userId = null;
             final Request request = new Request.Builder()
                     .url(apiBaseUrl + "getorcreateuser" + String.format(Locale.ENGLISH, "?googleaccountid=%s", mGoogleAccountId))
                     .build();
@@ -106,7 +110,27 @@ public final class SignUpFragment
                     userId = userJSON.getLong("server_id");
                 }
             }
-            return new ApiResult(userId.toString(), "token-from-sign-up:" + UUID.randomUUID().toString());
+            return new ApiResult(userId.toString(), "token-from-sign-up");*/
+
+            String userId = null;
+            String authToken = null;
+            final String content = String.format(JSON_PATTERN, mGoogleAccountId, mGoogleTokenId);
+            final RequestBody body = RequestBody.create(JSON_TYPE, content);
+            final Request request = new Request.Builder()
+                    .url(apiBaseUrl + "auth/signup")
+                    .post(body)
+                    .build();
+            final Response response = okHttpClient.newCall(request).execute();
+            if (response.body() != null) {
+                final String responseBody = response.body().string();
+                if (response.code() == 200) {
+                    final JSONObject userJSON = new JSONObject(responseBody);
+                    userId = userJSON.getString("user_id");
+                    authToken = userJSON.getString("token");
+                }
+            }
+            return new ApiResult(userId, authToken);
+
         }
     }
 

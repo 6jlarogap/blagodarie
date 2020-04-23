@@ -71,7 +71,11 @@ public abstract class BlagodarieDatabase
 
     abstract KeyTypeDao keyTypeDao ();
 
+    public abstract KeyDao keyDao ();
+
     public abstract SymptomDao symptomDao ();
 
     public abstract UserSymptomDao userSymptomDao ();
+
+    public abstract UserSymptomKeyJoinDao userSymptomKeyJoinDao ();
 }

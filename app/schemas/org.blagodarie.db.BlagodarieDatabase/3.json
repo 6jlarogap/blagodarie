@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "e20508a94872d304522b62be08a62669",
+    "identityHash": "ff95a12d1010cbb210e4ce23af8fa83c",
     "entities": [
       {
         "tableName": "tbl_key_type",
@@ -280,20 +280,29 @@
         },
         "indices": [
           {
-            "name": "index_tbl_user_symptom_key_join_user_symptom_id",
+            "name": "index_tbl_user_symptom_key_join_user_symptom_id_key_id",
             "unique": true,
+            "columnNames": [
+              "user_symptom_id",
+              "key_id"
+            ],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id_key_id` ON `${TABLE_NAME}` (`user_symptom_id`, `key_id`)"
+          },
+          {
+            "name": "index_tbl_user_symptom_key_join_user_symptom_id",
+            "unique": false,
             "columnNames": [
               "user_symptom_id"
             ],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id` ON `${TABLE_NAME}` (`user_symptom_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id` ON `${TABLE_NAME}` (`user_symptom_id`)"
           },
           {
             "name": "index_tbl_user_symptom_key_join_key_id",
-            "unique": true,
+            "unique": false,
             "columnNames": [
               "key_id"
             ],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_key_id` ON `${TABLE_NAME}` (`key_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_key_id` ON `${TABLE_NAME}` (`key_id`)"
           },
           {
             "name": "index_tbl_user_symptom_key_join_server_id",
@@ -333,7 +342,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e20508a94872d304522b62be08a62669')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ff95a12d1010cbb210e4ce23af8fa83c')"
     ]
   }
 }

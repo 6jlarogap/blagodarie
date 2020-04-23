@@ -11,8 +11,9 @@ import androidx.room.Index;
         tableName = "tbl_user_symptom_key_join",
         inheritSuperIndices = true,
         indices = {
-                @Index (value = {"user_symptom_id"}, unique = true),
-                @Index (value = {"key_id"}, unique = true)
+                @Index (value = {"user_symptom_id","key_id"}, unique = true),
+                @Index (value = {"user_symptom_id"}),
+                @Index (value = {"key_id"})
         },
         foreignKeys = {
                 @ForeignKey (
@@ -38,13 +39,11 @@ public final class UserSymptomKeyJoin
     @ColumnInfo (name = "key_id")
     private final Long KeyId;
 
-    UserSymptomKeyJoin (
-            @Nullable final Long Id,
-            @Nullable final Long ServerId,
+    public UserSymptomKeyJoin (
             @NonNull final Long UserSymptomId,
             @NonNull final Long KeyId
     ) {
-        super(Id, ServerId);
+        super(null, null);
         this.UserSymptomId = UserSymptomId;
         this.KeyId = KeyId;
     }

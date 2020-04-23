@@ -1,6 +1,7 @@
 package org.blagodarie;
 
 import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.content.ContentResolver;
 import android.os.Bundle;
 import android.util.Log;
@@ -23,11 +24,15 @@ public final class BlagodarieApp
         Log.d(TAG, "start application");
     }
 
-    public static void requestSync (@NonNull final Account account) {
+    public static void requestSync (
+            @NonNull final Account account,
+            @NonNull final String authToken
+    ) {
         Log.d(TAG, "requestSync account=" + account);
         final Bundle settingsBundle = new Bundle();
         settingsBundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
         settingsBundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
+        settingsBundle.putString(AccountManager.KEY_AUTHTOKEN, authToken);
 
         ContentResolver.requestSync(account, "org.blagodarie.datasync.provider", settingsBundle);
     }

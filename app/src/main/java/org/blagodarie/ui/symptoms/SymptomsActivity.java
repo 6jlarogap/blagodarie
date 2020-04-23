@@ -2,6 +2,9 @@ package org.blagodarie.ui.symptoms;
 
 import android.Manifest;
 import android.accounts.Account;
+import android.accounts.AccountManager;
+import android.accounts.AuthenticatorException;
+import android.accounts.OperationCanceledException;
 import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -37,7 +40,9 @@ import org.blagodarie.R;
 import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.db.BlagodarieDatabase;
+import org.blagodarie.db.Key;
 import org.blagodarie.db.UserSymptom;
+import org.blagodarie.db.UserSymptomKeyJoin;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.sync.SyncAdapter;
 import org.blagodarie.sync.SyncService;
@@ -45,10 +50,10 @@ import org.blagodarie.ui.splash.SplashActivity;
 import org.blagodarie.ui.update.UpdateActivity;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
 import io.reactivex.Completable;
 import io.reactivex.Observable;
@@ -99,10 +104,14 @@ public final class SymptomsActivity
 
     private SymptomsActivityBinding mActivityBinding;
 
+    private BlagodarieDatabase mBlagodarieDatabase;
+
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate");
+
+        mBlagodarieDatabase = BlagodarieDatabase.getInstance(this);
 
         initAccount();
 
@@ -117,12 +126,13 @@ public final class SymptomsActivity
         setupToolbar();
 
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
     }
 
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
         //создаем фабрику
-        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(Long.valueOf(mAccount.name), BlagodarieDatabase.getInstance(this).userSymptomDao());
+        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(Long.valueOf(mAccount.name), mBlagodarieDatabase.userSymptomDao());
 
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
@@ -140,7 +150,7 @@ public final class SymptomsActivity
         }
         mViewModel.updateUserSymptomCount(
                 Long.valueOf(mAccount.name),
-                BlagodarieDatabase.getInstance(this).userSymptomDao(),
+                mBlagodarieDatabase.userSymptomDao(),
                 () -> {
                     mSymptomsAdapter.order();
                     if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
@@ -223,39 +233,52 @@ public final class SymptomsActivity
 
         mDisposables.add(
                 Completable.
-                        fromAction(() -> BlagodarieDatabase.getInstance(this).userSymptomDao().insert(userSymptom)).
+                        fromAction(() ->
+                                mBlagodarieDatabase.runInTransaction(() -> {
+                                    long userSymptomId = mBlagodarieDatabase.userSymptomDao().insert(userSymptom);
+                                    userSymptom.setId(userSymptomId);
+                                    final Key incognitoKey = mBlagodarieDatabase.keyDao().getOrCreateIncognitoKey(Long.valueOf(mAccount.name));
+                                    UserSymptomKeyJoin userSymptomKeyJoin = new UserSymptomKeyJoin(userSymptomId, incognitoKey.getId());
+                                    mBlagodarieDatabase.userSymptomKeyJoinDao().insert(userSymptomKeyJoin);
+                                })
+                        ).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(() -> {
                             displaySymptom.isHaveNotSynced().set(true);
                             displaySymptom.highlight();
                             //BlagodarieApp.requestSync(mAccount);
-                            syncUserSymptoms(mAccount, "");
+                            getAuthTokenAndRequestSync();
+                            //syncUserSymptoms(mAccount, "");
                         })
         );
     }
 
-    private void syncUserSymptoms (
-            @NonNull final Account account,
-            @NonNull final String authToken
-    ) {
-        Log.d(TAG, "syncUserSymptoms account=" + account + "; authToken=" + authToken);
-        final Long userId = Long.valueOf(account.name);
-        Completable.
-                fromAction(() -> {
-                    final List<UserSymptom> notSyncedUserSymtpoms = BlagodarieDatabase.getInstance(this).userSymptomDao().getNotSynced(userId);
-                    final AddUserSymptomsExecutor addUserSymptomsExecutor = new AddUserSymptomsExecutor(Long.valueOf(account.name), notSyncedUserSymtpoms);
-                    new ServerConnector(this).execute(addUserSymptomsExecutor);
-                    BlagodarieDatabase.getInstance(this).userSymptomDao().update(notSyncedUserSymtpoms);
-                }).
-                subscribeOn(Schedulers.io()).
-                subscribe(
-                        () -> {
-                            Log.d(TAG, "syncUserSymptoms complete");
-                            mViewModel.updateIsHaveNotSynced(Long.valueOf(mAccount.name), BlagodarieDatabase.getInstance(this).userSymptomDao());
-                        },
-                        throwable -> Log.e(TAG, "syncUserSymptoms error=" + throwable)
-                );
+    private void getAuthTokenAndRequestSync () {
+        AccountManager.get(this).getAuthToken(
+                mAccount,
+                getString(R.string.token_type),
+                null,
+                this,
+                future -> {
+                    try {
+                        Bundle bundle = future.getResult();
+                        if (bundle != null) {
+                            final String authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN);
+                            if (authToken != null) {
+                                BlagodarieApp.requestSync(mAccount, authToken);
+                            }
+                        }
+                    } catch (AuthenticatorException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (OperationCanceledException e) {
+                        e.printStackTrace();
+                    }
+                },
+                null
+        );
     }
 
     private boolean checkLocationPermission () {

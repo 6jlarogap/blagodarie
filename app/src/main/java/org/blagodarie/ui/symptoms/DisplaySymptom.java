@@ -5,6 +5,7 @@ import android.os.Handler;
 import androidx.annotation.NonNull;
 import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
+import androidx.lifecycle.LiveData;
 
 import java.util.Date;
 import java.util.Objects;
@@ -46,10 +47,12 @@ public final class DisplaySymptom
 
     public DisplaySymptom (
             @NonNull final Long symptomId,
-            @NonNull final String symptomName
+            @NonNull final String symptomName,
+            @NonNull final LiveData<Boolean> haveNotSynced
     ) {
         mSymptomId = symptomId;
         mSymptomName = symptomName;
+        haveNotSynced.observeForever(input -> mHaveNotSynced.set(input));
     }
 
     @NonNull

@@ -6,8 +6,6 @@ import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 
-import java.util.Locale;
-
 /**
  * Базовый абстрактный класс для всех сущностей базы данных.
  * Содержит общие для всех сущностей поля и методы.
