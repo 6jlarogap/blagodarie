@@ -1,6 +1,7 @@
 package org.blagodarie.db;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.room.Database;
@@ -8,8 +9,9 @@ import androidx.room.Room;
 import androidx.room.RoomDatabase;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-import io.reactivex.Completable;
-import io.reactivex.schedulers.Schedulers;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.concurrent.Executors;
 
 
 @Database (
@@ -24,6 +26,8 @@ import io.reactivex.schedulers.Schedulers;
 public abstract class BlagodarieDatabase
         extends RoomDatabase {
 
+    private static final String TAG = BlagodarieDatabase.class.getSimpleName();
+
     private static final String DATABASE_NAME = "blagodarie.db";
 
     private static volatile BlagodarieDatabase INSTANCE;
@@ -37,25 +41,35 @@ public abstract class BlagodarieDatabase
         return INSTANCE;
     }
 
-    private static BlagodarieDatabase buildDatabase (final Context applicationContext) {
+    private static BlagodarieDatabase buildDatabase (@NonNull final Context applicationContext) {
+        Log.d(TAG, "buildDatabase");
         return Room.
                 databaseBuilder(applicationContext, BlagodarieDatabase.class, DATABASE_NAME).
                 addCallback(new RoomDatabase.Callback() {
                     @Override
                     public void onCreate (@NonNull final SupportSQLiteDatabase db) {
-                        Completable.
-                                fromAction(() -> {
-                                    BlagodarieDatabase.getInstance(applicationContext).symptomDao().insert(Symptom.getSymptoms());
-                                    //BlagodarieDatabase.getInstance(applicationContext).
-                                }).
-                                subscribeOn(Schedulers.io()).
-                                subscribe();
-
+                        super.onCreate(db);
+                        prepopulateDatabase(applicationContext);
                     }
                 }).
                 addMigrations(MigrationKeeper.getMigrations()).
                 build();
     }
+
+    private static void prepopulateDatabase (@NonNull final Context context) {
+        Log.d(TAG, "prepopulateDatabase");
+        final Collection<KeyType> keyTypes = new ArrayList<>();
+        for (KeyType.Type t : KeyType.Type.values()) {
+            keyTypes.add(t.getKeyType());
+        }
+        Executors.newSingleThreadExecutor().execute(() -> {
+                    getInstance(context).symptomDao().insert(Symptom.getSymptoms());
+                    getInstance(context).keyTypeDao().insert(keyTypes);
+                }
+        );
+    }
+
+    abstract KeyTypeDao keyTypeDao ();
 
     public abstract SymptomDao symptomDao ();
 
