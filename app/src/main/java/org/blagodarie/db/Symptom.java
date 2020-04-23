@@ -86,9 +86,13 @@ public final class Symptom
         symptoms.add(new Symptom(37L, "Хорошая погода"));
         symptoms.add(new Symptom(40L, "Влажно"));
         symptoms.add(new Symptom(41L, "Сухо"));
-        symptoms.add(new Symptom(42L, "Свежо"));
+        symptoms.add(new Symptom(42L, "Прохладно"));
         symptoms.add(new Symptom(44L, "Прием пищи"));
         symptoms.add(new Symptom(45L, "Запор"));
+        symptoms.add(new Symptom(46L, "Чихание"));
+        symptoms.add(new Symptom(47L, "Першит в горле"));
+        symptoms.add(new Symptom(48L, "Пасмурно"));
+        symptoms.add(new Symptom(49L, "Учащённое сердцебиение"));
         return symptoms;
     }
 }
