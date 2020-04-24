@@ -17,6 +17,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 
 import io.reactivex.Completable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -68,26 +69,26 @@ public final class SymptomsViewModel
 
 
     public SymptomsViewModel (
-            @NonNull final Long userId,
+            @NonNull final UUID incognitoId,
             @NonNull final UserSymptomDao userSymptomDao
     ) {
         super();
 
         for (Symptom symptom : Symptom.getSymptoms()) {
-            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), userSymptomDao.isHaveNotSynced(userId, symptom.getId())));
+            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), userSymptomDao.isHaveNotSynced(incognitoId, symptom.getId())));
         }
 
-        loadLastValues(userId, userSymptomDao);
+        loadLastValues(incognitoId, userSymptomDao);
     }
 
     private void loadLastValues (
-            @NonNull final Long userId,
+            @NonNull final UUID incognitoId,
             @NonNull final UserSymptomDao userSymptomDao
     ) {
         Completable.
                 fromAction(() -> {
                     for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(userId, displaySymptom.getSymptomId());
+                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(incognitoId, displaySymptom.getSymptomId());
                         if (lastUserSymptom != null) {
                             displaySymptom.getLastDate().set(new Date(lastUserSymptom.getTimestamp()));
                             if (lastUserSymptom.getLatitude() != null) {
@@ -104,14 +105,14 @@ public final class SymptomsViewModel
     }
 
     void updateUserSymptomCount (
-            @NonNull final Long userId,
+            @NonNull final UUID incognitoId,
             @NonNull final UserSymptomDao userSymptomDao,
             @NonNull final Action action
     ) {
         Completable.
                 fromAction(() -> {
                     for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final int userSymptomCount = userSymptomDao.getCountBySymptomId(userId, displaySymptom.getSymptomId());
+                        final int userSymptomCount = userSymptomDao.getCountBySymptomId(incognitoId, displaySymptom.getSymptomId());
                         displaySymptom.setUserSymptomCount(userSymptomCount);
                     }
                 }).
@@ -170,16 +171,16 @@ public final class SymptomsViewModel
             implements ViewModelProvider.Factory {
 
         @NonNull
-        private final Long mUserId;
+        private final UUID mIncognitoId;
 
         @NonNull
         private final UserSymptomDao mUserSymptomDao;
 
         Factory (
-                @NonNull final Long userId,
+                @NonNull final UUID incognitoId,
                 @NonNull final UserSymptomDao userSymptomDao
         ) {
-            mUserId = userId;
+            mIncognitoId = incognitoId;
             mUserSymptomDao = userSymptomDao;
         }
 
@@ -188,7 +189,7 @@ public final class SymptomsViewModel
         public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
             if (modelClass.isAssignableFrom(SymptomsViewModel.class)) {
                 try {
-                    return modelClass.getConstructor(Long.class, UserSymptomDao.class).newInstance(mUserId, mUserSymptomDao);
+                    return modelClass.getConstructor(UUID.class, UserSymptomDao.class).newInstance(mIncognitoId, mUserSymptomDao);
                 } catch (IllegalAccessException | InstantiationException | InvocationTargetException | NoSuchMethodException e) {
                     e.printStackTrace();
                 }

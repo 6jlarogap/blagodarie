@@ -101,44 +101,32 @@ final class MigrationKeeper {
 
             //в таблице tbl_symptom изменить столбец id, он может быть пустым
             {
-                //создать новую таблицу tbl_symptom
+                //создать новую таблицу
                 database.execSQL("CREATE TABLE IF NOT EXISTS `tbl_symptom_new` (`name` TEXT NOT NULL, `id` INTEGER PRIMARY KEY AUTOINCREMENT)");
                 //перенести данные из старой таблицы в новую
-                database.execSQL("INSERT INTO tbl_symptom_new(`id`, `name`) SELECT id, name FROM tbl_symptom");
+                database.execSQL("INSERT INTO `tbl_symptom_new`(`id`, `name`) SELECT `id`, `name` FROM `tbl_symptom`");
                 //удалить старую таблицу
                 database.execSQL("DROP TABLE IF EXISTS `tbl_symptom`");
                 //переименовать новую таблицу
-                database.execSQL("ALTER TABLE tbl_symptom_new RENAME TO tbl_symptom");
+                database.execSQL("ALTER TABLE `tbl_symptom_new` RENAME TO `tbl_symptom`");
                 //Добавить индексы
                 database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_symptom_name` ON `tbl_symptom` (`name`)");
             }
 
-            //создать таблицу tbl_key_type
-            database.execSQL("CREATE TABLE IF NOT EXISTS `tbl_key_type` (`title` TEXT NOT NULL, `id` INTEGER PRIMARY KEY AUTOINCREMENT)");
-            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_key_type_title` ON `tbl_key_type` (`title`)");
-
-            //заполнить таблицу tbl_key_type
-            database.execSQL("INSERT INTO `tbl_key_type` (`id`, `title`) values(1, 'PhoneNumber')");
-            database.execSQL("INSERT INTO `tbl_key_type` (`id`, `title`) values(2, 'Email')");
-            database.execSQL("INSERT INTO `tbl_key_type` (`id`, `title`) values(3, 'GoogleAccountId')");
-            database.execSQL("INSERT INTO `tbl_key_type` (`id`, `title`) values(4, 'BlagodarieKey')");
-
-            //создать таблицу tbl_key
-            database.execSQL("CREATE TABLE IF NOT EXISTS `tbl_key` (`owner_id` INTEGER, `value` TEXT NOT NULL, `type_id` INTEGER NOT NULL, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`type_id`) REFERENCES `tbl_key_type`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )");
-            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_key_value_type_id` ON `tbl_key` (`value`, `type_id`)");
-            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_key_owner_id` ON `tbl_key` (`owner_id`)");
-            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_key_type_id` ON `tbl_key` (`type_id`)");
-            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_key_value` ON `tbl_key` (`value`)");
-
-            //создать таблицу tbl_user_symptom_key_join
-            database.execSQL("CREATE TABLE IF NOT EXISTS `tbl_user_symptom_key_join` (`user_symptom_id` INTEGER NOT NULL, `key_id` INTEGER NOT NULL, `server_id` INTEGER, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`user_symptom_id`) REFERENCES `tbl_user_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`key_id`) REFERENCES `tbl_key`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )");
-            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id_key_id` ON `tbl_user_symptom_key_join` (`user_symptom_id`, `key_id`)");
-            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id` ON `tbl_user_symptom_key_join` (`user_symptom_id`)");
-            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_key_id` ON `tbl_user_symptom_key_join` (`key_id`)");
-            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_server_id` ON `tbl_user_symptom_key_join` (`server_id`)");
-
-            //создать индекс для таблицы tbl_user_symptom к столбцу symptom_id
-            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_symptom_id` ON `tbl_user_symptom` (`symptom_id`)");
+            //добавить в таблицу tbl_user_symptom столбец incognito_id
+            {
+                //создать новую таблицу
+                database.execSQL("CREATE TABLE IF NOT EXISTS `tbl_user_symptom_new` (`user_id` INTEGER, `incognito_id` TEXT NOT NULL, `symptom_id` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `latitude` REAL, `longitude` REAL, `server_id` INTEGER, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`symptom_id`) REFERENCES `tbl_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )");
+                //перенести данные из старой таблицы в новую
+                database.execSQL("INSERT INTO `tbl_user_symptom_new` (`id`, `server_id`, `user_id`, `incognito_id`, `symptom_id`, `timestamp`, `latitude`, `longitude`) SELECT `id`, `server_id`, `user_id`, 'null', `symptom_id`, `timestamp`, `latitude`, `longitude` FROM tbl_user_symptom");
+                //удалить старую таблицу
+                database.execSQL("DROP TABLE IF EXISTS `tbl_user_symptom`");
+                //переименовать новую таблицу
+                database.execSQL("ALTER TABLE `tbl_user_symptom_new` RENAME TO `tbl_user_symptom`");
+                //Добавить индексы
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_symptom_id` ON `tbl_user_symptom` (`symptom_id`)");
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_server_id` ON `tbl_user_symptom` (`server_id`)");
+            }
 
             //коммит
             database.execSQL("COMMIT");

@@ -24,7 +24,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.util.Locale;
 import java.util.UUID;
 
 import io.reactivex.Observable;
@@ -98,20 +97,6 @@ public final class SignUpFragment
                 @NonNull String apiBaseUrl,
                 @NonNull OkHttpClient okHttpClient
         ) throws JSONException, IOException {
-            /*Long userId = null;
-            final Request request = new Request.Builder()
-                    .url(apiBaseUrl + "getorcreateuser" + String.format(Locale.ENGLISH, "?googleaccountid=%s", mGoogleAccountId))
-                    .build();
-            final Response response = okHttpClient.newCall(request).execute();
-            if (response.body() != null) {
-                final String responseBody = response.body().string();
-                if (response.code() == 200) {
-                    final JSONObject userJSON = new JSONObject(responseBody).getJSONObject("user");
-                    userId = userJSON.getLong("server_id");
-                }
-            }
-            return new ApiResult(userId.toString(), "token-from-sign-up");*/
-
             String userId = null;
             String authToken = null;
             final String content = String.format(JSON_PATTERN, mGoogleAccountId, mGoogleTokenId);
@@ -211,7 +196,9 @@ public final class SignUpFragment
     ) {
         final AccountManager accountManager = AccountManager.get(getContext());
         final Account account = new Account(accountName, getString(R.string.account_type));
-        accountManager.addAccountExplicitly(account, "", null);
+        final Bundle userData = new Bundle();
+        userData.putString(AccountGeneral.USER_DATA_INCOGNITO_ID, UUID.randomUUID().toString());
+        accountManager.addAccountExplicitly(account, "", userData);
         accountManager.setAuthToken(account, getString(R.string.token_type), authToken);
 
         final Bundle bundle = new Bundle();

@@ -25,7 +25,6 @@ public abstract class BaseEntity {
     @ColumnInfo (name = "id")
     private Long Id;
 
-
     BaseEntity (@Nullable final Long id) {
         this.Id = id;
     }
@@ -36,17 +35,8 @@ public abstract class BaseEntity {
      * @return Идентификатор сущности
      */
     @Nullable
-    public final Long getId () {
+    protected Long getId () {
         return this.Id;
-    }
-
-    /**
-     * Устанавливает идентификатор сущности
-     *
-     * @param id Идентификатор сущности
-     */
-    public final void setId (@NonNull final Long id) {
-        this.Id = id;
     }
 
     @NonNull

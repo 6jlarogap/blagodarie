@@ -2,127 +2,8 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "ff95a12d1010cbb210e4ce23af8fa83c",
+    "identityHash": "5ddb69bb2c51c7b0e0e66fb078c76e64",
     "entities": [
-      {
-        "tableName": "tbl_key_type",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`title` TEXT NOT NULL, `id` INTEGER PRIMARY KEY AUTOINCREMENT)",
-        "fields": [
-          {
-            "fieldPath": "Title",
-            "columnName": "title",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "Id",
-            "columnName": "id",
-            "affinity": "INTEGER",
-            "notNull": false
-          }
-        ],
-        "primaryKey": {
-          "columnNames": [
-            "id"
-          ],
-          "autoGenerate": true
-        },
-        "indices": [
-          {
-            "name": "index_tbl_key_type_title",
-            "unique": true,
-            "columnNames": [
-              "title"
-            ],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_key_type_title` ON `${TABLE_NAME}` (`title`)"
-          }
-        ],
-        "foreignKeys": []
-      },
-      {
-        "tableName": "tbl_key",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`owner_id` INTEGER, `value` TEXT NOT NULL, `type_id` INTEGER NOT NULL, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`type_id`) REFERENCES `tbl_key_type`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
-        "fields": [
-          {
-            "fieldPath": "OwnerId",
-            "columnName": "owner_id",
-            "affinity": "INTEGER",
-            "notNull": false
-          },
-          {
-            "fieldPath": "Value",
-            "columnName": "value",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "TypeId",
-            "columnName": "type_id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "Id",
-            "columnName": "id",
-            "affinity": "INTEGER",
-            "notNull": false
-          }
-        ],
-        "primaryKey": {
-          "columnNames": [
-            "id"
-          ],
-          "autoGenerate": true
-        },
-        "indices": [
-          {
-            "name": "index_tbl_key_value_type_id",
-            "unique": true,
-            "columnNames": [
-              "value",
-              "type_id"
-            ],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_key_value_type_id` ON `${TABLE_NAME}` (`value`, `type_id`)"
-          },
-          {
-            "name": "index_tbl_key_owner_id",
-            "unique": false,
-            "columnNames": [
-              "owner_id"
-            ],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_tbl_key_owner_id` ON `${TABLE_NAME}` (`owner_id`)"
-          },
-          {
-            "name": "index_tbl_key_type_id",
-            "unique": false,
-            "columnNames": [
-              "type_id"
-            ],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_tbl_key_type_id` ON `${TABLE_NAME}` (`type_id`)"
-          },
-          {
-            "name": "index_tbl_key_value",
-            "unique": false,
-            "columnNames": [
-              "value"
-            ],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_tbl_key_value` ON `${TABLE_NAME}` (`value`)"
-          }
-        ],
-        "foreignKeys": [
-          {
-            "table": "tbl_key_type",
-            "onDelete": "NO ACTION",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "type_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          }
-        ]
-      },
       {
         "tableName": "tbl_symptom",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `id` INTEGER PRIMARY KEY AUTOINCREMENT)",
@@ -160,12 +41,18 @@
       },
       {
         "tableName": "tbl_user_symptom",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`user_id` INTEGER NOT NULL, `symptom_id` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `latitude` REAL, `longitude` REAL, `server_id` INTEGER, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`symptom_id`) REFERENCES `tbl_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`user_id` INTEGER, `incognito_id` TEXT NOT NULL, `symptom_id` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `latitude` REAL, `longitude` REAL, `server_id` INTEGER, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`symptom_id`) REFERENCES `tbl_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
         "fields": [
           {
             "fieldPath": "UserId",
             "columnName": "user_id",
             "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "IncognitoId",
+            "columnName": "incognito_id",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -242,107 +129,12 @@
             ]
           }
         ]
-      },
-      {
-        "tableName": "tbl_user_symptom_key_join",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`user_symptom_id` INTEGER NOT NULL, `key_id` INTEGER NOT NULL, `server_id` INTEGER, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`user_symptom_id`) REFERENCES `tbl_user_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`key_id`) REFERENCES `tbl_key`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
-        "fields": [
-          {
-            "fieldPath": "UserSymptomId",
-            "columnName": "user_symptom_id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "KeyId",
-            "columnName": "key_id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "ServerId",
-            "columnName": "server_id",
-            "affinity": "INTEGER",
-            "notNull": false
-          },
-          {
-            "fieldPath": "Id",
-            "columnName": "id",
-            "affinity": "INTEGER",
-            "notNull": false
-          }
-        ],
-        "primaryKey": {
-          "columnNames": [
-            "id"
-          ],
-          "autoGenerate": true
-        },
-        "indices": [
-          {
-            "name": "index_tbl_user_symptom_key_join_user_symptom_id_key_id",
-            "unique": true,
-            "columnNames": [
-              "user_symptom_id",
-              "key_id"
-            ],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id_key_id` ON `${TABLE_NAME}` (`user_symptom_id`, `key_id`)"
-          },
-          {
-            "name": "index_tbl_user_symptom_key_join_user_symptom_id",
-            "unique": false,
-            "columnNames": [
-              "user_symptom_id"
-            ],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_user_symptom_id` ON `${TABLE_NAME}` (`user_symptom_id`)"
-          },
-          {
-            "name": "index_tbl_user_symptom_key_join_key_id",
-            "unique": false,
-            "columnNames": [
-              "key_id"
-            ],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_key_id` ON `${TABLE_NAME}` (`key_id`)"
-          },
-          {
-            "name": "index_tbl_user_symptom_key_join_server_id",
-            "unique": true,
-            "columnNames": [
-              "server_id"
-            ],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_key_join_server_id` ON `${TABLE_NAME}` (`server_id`)"
-          }
-        ],
-        "foreignKeys": [
-          {
-            "table": "tbl_user_symptom",
-            "onDelete": "NO ACTION",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "user_symptom_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          },
-          {
-            "table": "tbl_key",
-            "onDelete": "NO ACTION",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "key_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          }
-        ]
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ff95a12d1010cbb210e4ce23af8fa83c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5ddb69bb2c51c7b0e0e66fb078c76e64')"
     ]
   }
 }

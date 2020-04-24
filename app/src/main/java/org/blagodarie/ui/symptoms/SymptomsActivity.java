@@ -37,12 +37,11 @@ import androidx.lifecycle.ViewModelProvider;
 import org.blagodarie.BlagodarieApp;
 import org.blagodarie.BuildConfig;
 import org.blagodarie.R;
+import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.db.BlagodarieDatabase;
-import org.blagodarie.db.Key;
 import org.blagodarie.db.UserSymptom;
-import org.blagodarie.db.UserSymptomKeyJoin;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.sync.SyncAdapter;
 import org.blagodarie.sync.SyncService;
@@ -54,6 +53,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.UUID;
 
 import io.reactivex.Completable;
 import io.reactivex.Observable;
@@ -94,6 +94,10 @@ public final class SymptomsActivity
 
     private Account mAccount;
 
+    private Long mUserId;
+
+    private UUID mIncognitoId;
+
     private SymptomsViewModel mViewModel;
 
     private CompositeDisposable mDisposables = new CompositeDisposable();
@@ -106,6 +110,8 @@ public final class SymptomsActivity
 
     private BlagodarieDatabase mBlagodarieDatabase;
 
+    private AccountManager mAccountManager;
+
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -113,7 +119,9 @@ public final class SymptomsActivity
 
         mBlagodarieDatabase = BlagodarieDatabase.getInstance(this);
 
-        initAccount();
+        mAccountManager = AccountManager.get(this);
+
+        initUserData();
 
         initViewModel();
 
@@ -127,12 +135,18 @@ public final class SymptomsActivity
 
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
+        Completable.
+                fromAction(() ->
+                        mBlagodarieDatabase.userSymptomDao().updateIncognitoId(mUserId, mIncognitoId)
+                ).
+                subscribeOn(Schedulers.io()).
+                subscribe();
     }
 
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
         //создаем фабрику
-        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(Long.valueOf(mAccount.name), mBlagodarieDatabase.userSymptomDao());
+        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(mIncognitoId, mBlagodarieDatabase.userSymptomDao());
 
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
@@ -149,7 +163,7 @@ public final class SymptomsActivity
             attemptRequestLocationPermissions();
         }
         mViewModel.updateUserSymptomCount(
-                Long.valueOf(mAccount.name),
+                mIncognitoId,
                 mBlagodarieDatabase.userSymptomDao(),
                 () -> {
                     mSymptomsAdapter.order();
@@ -206,9 +220,16 @@ public final class SymptomsActivity
         mLocationManager.removeUpdates(this);
     }
 
-    private void initAccount () {
-        Log.d(TAG, "initAccount");
+    private void initUserData () {
+        Log.d(TAG, "initUserData");
         mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
+        mUserId = Long.valueOf(mAccount.name);
+        String incognitoId = mAccountManager.getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
+        if (incognitoId == null) {
+            incognitoId = UUID.randomUUID().toString();
+            mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID, incognitoId);
+        }
+        mIncognitoId = UUID.fromString(incognitoId);
     }
 
     public void createUserSymptom (
@@ -225,7 +246,7 @@ public final class SymptomsActivity
         displaySymptom.getLastLongitude().set(longitude);
 
         final UserSymptom userSymptom = new UserSymptom(
-                Long.valueOf(mAccount.name),
+                mIncognitoId,
                 displaySymptom.getSymptomId(),
                 timestamp,
                 latitude,
@@ -234,28 +255,20 @@ public final class SymptomsActivity
         mDisposables.add(
                 Completable.
                         fromAction(() ->
-                                mBlagodarieDatabase.runInTransaction(() -> {
-                                    long userSymptomId = mBlagodarieDatabase.userSymptomDao().insert(userSymptom);
-                                    userSymptom.setId(userSymptomId);
-                                    final Key incognitoKey = mBlagodarieDatabase.keyDao().getOrCreateIncognitoKey(Long.valueOf(mAccount.name));
-                                    UserSymptomKeyJoin userSymptomKeyJoin = new UserSymptomKeyJoin(userSymptomId, incognitoKey.getId());
-                                    mBlagodarieDatabase.userSymptomKeyJoinDao().insert(userSymptomKeyJoin);
-                                })
+                                mBlagodarieDatabase.userSymptomDao().insert(userSymptom)
                         ).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(() -> {
                             displaySymptom.isHaveNotSynced().set(true);
                             displaySymptom.highlight();
-                            //BlagodarieApp.requestSync(mAccount);
                             getAuthTokenAndRequestSync();
-                            //syncUserSymptoms(mAccount, "");
                         })
         );
     }
 
     private void getAuthTokenAndRequestSync () {
-        AccountManager.get(this).getAuthToken(
+        mAccountManager.getAuthToken(
                 mAccount,
                 getString(R.string.token_type),
                 null,

@@ -7,22 +7,19 @@ import androidx.annotation.NonNull;
 import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
+import androidx.room.TypeConverters;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.concurrent.Executors;
 
 
 @Database (
         entities = {
-                KeyType.class,
-                Key.class,
                 Symptom.class,
-                UserSymptom.class,
-                UserSymptomKeyJoin.class
+                UserSymptom.class
         },
         version = 3)
+@TypeConverters ({Converters.class})
 public abstract class BlagodarieDatabase
         extends RoomDatabase {
 
@@ -58,24 +55,14 @@ public abstract class BlagodarieDatabase
 
     private static void prepopulateDatabase (@NonNull final Context context) {
         Log.d(TAG, "prepopulateDatabase");
-        final Collection<KeyType> keyTypes = new ArrayList<>();
-        for (KeyType.Type t : KeyType.Type.values()) {
-            keyTypes.add(t.getKeyType());
-        }
         Executors.newSingleThreadExecutor().execute(() -> {
                     getInstance(context).symptomDao().insert(Symptom.getSymptoms());
-                    getInstance(context).keyTypeDao().insert(keyTypes);
                 }
         );
     }
 
-    abstract KeyTypeDao keyTypeDao ();
-
-    public abstract KeyDao keyDao ();
 
     public abstract SymptomDao symptomDao ();
 
     public abstract UserSymptomDao userSymptomDao ();
-
-    public abstract UserSymptomKeyJoinDao userSymptomKeyJoinDao ();
 }

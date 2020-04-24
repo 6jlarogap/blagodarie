@@ -12,11 +12,13 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import org.blagodarie.UnauthorizedException;
+import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.db.BlagodarieDatabase;
 import org.blagodarie.server.ServerConnector;
 import org.json.JSONException;
 
 import java.io.IOException;
+import java.util.UUID;
 
 public final class SyncAdapter
         extends AbstractThreadedSyncAdapter {
@@ -36,9 +38,10 @@ public final class SyncAdapter
             final SyncResult syncResult
     ) {
         Log.d(TAG, "onPerformSync");
-        String authToken = extras.getString(AccountManager.KEY_AUTHTOKEN, "");
+        final String authToken = extras.getString(AccountManager.KEY_AUTHTOKEN, "");
+        final UUID incognitoId = UUID.fromString(AccountManager.get(getContext()).getUserData(account, AccountGeneral.USER_DATA_INCOGNITO_ID));
         try {
-            syncAll(Long.valueOf(account.name), authToken);
+            syncAll(incognitoId, authToken);
         } catch (JSONException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -50,7 +53,7 @@ public final class SyncAdapter
     }
 
     private void syncAll (
-            @NonNull final Long userId,
+            @NonNull final UUID incognitoId,
             @NonNull final String authToken
     ) throws JSONException, IOException, UnauthorizedException {
         Log.d(TAG, "syncAll");
@@ -60,7 +63,7 @@ public final class SyncAdapter
         UserSymptomSyncer.
                 getInstance().
                 sync(
-                        userId,
+                        incognitoId,
                         authToken,
                         serverConnector.getApiBaseUrl(),
                         blagodarieDatabase.userSymptomDao()

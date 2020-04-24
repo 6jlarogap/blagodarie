@@ -30,11 +30,19 @@ public final class Symptom
         this.Name = Name;
     }
 
+    @Override
+    @NonNull
+    public Long getId(){
+        assert super.getId() != null;
+        return super.getId();
+    }
+
     @NonNull
     public String getName () {
         return Name;
     }
 
+    @NonNull
     @Override
     public String toString () {
         return "Symptom{" +

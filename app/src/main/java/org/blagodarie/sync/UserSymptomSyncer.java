@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.UUID;
 
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -48,19 +49,19 @@ final class UserSymptomSyncer {
     }
 
     final synchronized void sync (
-            @NonNull final Long userId,
+            @NonNull final UUID incognitoId,
             @NonNull final String authToken,
             @NonNull final String apiBaseUrl,
             @NonNull final UserSymptomDao userSymptomDao
     ) throws IOException, JSONException, UnauthorizedException {
-        final List<UserSymptom> notSyncedUserSymtpoms = userSymptomDao.getNotSynced(userId);
+        final List<UserSymptom> notSyncedUserSymtpoms = userSymptomDao.getNotSynced(incognitoId);
         if (notSyncedUserSymtpoms.size() > 0) {
             final LongSparseArray<UserSymptom> mUserSymptomsById = new LongSparseArray<>();
             for (UserSymptom userSymptom : notSyncedUserSymtpoms) {
                 assert userSymptom.getId() != null;
                 mUserSymptomsById.put(userSymptom.getId(), userSymptom);
             }
-            final String content = createJsonContent(userId, notSyncedUserSymtpoms);
+            final String content = createJsonContent(incognitoId, notSyncedUserSymtpoms);
             final Request request = createRequest(apiBaseUrl, authToken, content);
             final Response response = ServerConnector.sendRequestAndGetRespone(request);
 
@@ -95,18 +96,18 @@ final class UserSymptomSyncer {
     ) {
         final RequestBody body = RequestBody.create(JSON_TYPE, content);
         return new Request.Builder().
-                url(apiBaseUrl + "addusersymptom").
+                url(apiBaseUrl + "add_user_symptom").
                 post(body).
                 header("Authorization", String.format("Token %s", authToken)).
                 build();
     }
 
     private String createJsonContent (
-            @NonNull final Long userId,
+            @NonNull final UUID incognitoId,
             @NonNull final Collection<UserSymptom> userSymptoms
     ) {
         final StringBuilder content = new StringBuilder();
-        content.append(String.format(Locale.ENGLISH, "{\"user_id\":%d,\"user_symptoms\":[", userId));
+        content.append(String.format(Locale.ENGLISH, "{\"incognito_id\":\"%s\",\"user_symptoms\":[", incognitoId));
 
         boolean isFirst = true;
         for (UserSymptom userSymptom : userSymptoms) {

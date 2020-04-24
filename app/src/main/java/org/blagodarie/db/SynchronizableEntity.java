@@ -37,7 +37,7 @@ abstract class SynchronizableEntity
      * @return Серверный идентификатор
      */
     @Nullable
-    public final Long getServerId () {
+    final Long getServerId () {
         return this.ServerId;
     }
 
