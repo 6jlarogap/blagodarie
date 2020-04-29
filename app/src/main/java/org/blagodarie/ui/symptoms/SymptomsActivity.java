@@ -235,8 +235,8 @@ public final class SymptomsActivity
             @NonNull final DisplaySymptom displaySymptom
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
-        long timestamp = System.currentTimeMillis();
-        displaySymptom.getLastDate().set(new Date(timestamp));
+        Date currentDate  = new Date();
+        displaySymptom.getLastDate().set(currentDate);
 
         final Double latitude = mViewModel.getCurrentLatitude().get();
         final Double longitude = mViewModel.getCurrentLongitude().get();
@@ -247,7 +247,7 @@ public final class SymptomsActivity
         final UserSymptom userSymptom = new UserSymptom(
                 mIncognitoId,
                 displaySymptom.getSymptomId(),
-                timestamp,
+                currentDate,
                 latitude,
                 longitude);
 
@@ -359,7 +359,6 @@ public final class SymptomsActivity
                     BlagodarieApp.class.getSimpleName() + ":D",
                     SplashActivity.class.getSimpleName() + ":D",
                     SymptomsActivity.class.getSimpleName() + ":D",
-                    AddUserSymptomsExecutor.class.getSimpleName() + ":D",
                     SyncService.class.getSimpleName() + ":D",
                     SyncAdapter.class.getSimpleName() + ":D"
             });

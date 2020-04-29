@@ -5,19 +5,14 @@ import androidx.annotation.Nullable;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.ForeignKey;
-import androidx.room.Ignore;
 import androidx.room.Index;
 
 import java.util.Date;
 import java.util.UUID;
 
-/**
- * @author sergeGabrus
- * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
- */
 @Entity (
-        tableName = "tbl_user_symptom",
-        inheritSuperIndices = true,
+        tableName = "tbl_last_user_symptom",
+        primaryKeys = {"incognito_id", "symptom_id"},
         indices = {
                 @Index (value = {"symptom_id"})
         },
@@ -29,12 +24,7 @@ import java.util.UUID;
                 )
         }
 )
-public final class UserSymptom
-        extends BaseEntity {
-
-    @Nullable
-    @ColumnInfo (name = "user_id")
-    private final Long UserId;
+public final class LastUserSymptom {
 
     @NonNull
     @ColumnInfo (name = "incognito_id", typeAffinity = ColumnInfo.TEXT)
@@ -46,64 +36,38 @@ public final class UserSymptom
 
     @NonNull
     @ColumnInfo (name = "timestamp", typeAffinity = ColumnInfo.TEXT)
-    private final Date Timestamp;
+    private Date Timestamp;
 
     @Nullable
     @ColumnInfo (name = "latitude")
-    private final Double Latitude;
+    private Double Latitude;
 
     @Nullable
     @ColumnInfo (name = "longitude")
-    private final Double Longitude;
+    private Double Longitude;
 
-    UserSymptom (
-            @NonNull final Long Id,
-            @Nullable final Long UserId,
+    @NonNull
+    @ColumnInfo (name = "symptoms_count", defaultValue = "0")
+    private Long SymptomsCount;
+
+    LastUserSymptom (
             @NonNull final UUID IncognitoId,
             @NonNull final Long SymptomId,
             @NonNull final Date Timestamp,
             @Nullable final Double Latitude,
-            @Nullable final Double Longitude
+            @Nullable final Double Longitude,
+            @NonNull final Long SymptomsCount
     ) {
-        super(Id);
-        this.UserId = UserId;
         this.IncognitoId = IncognitoId;
         this.SymptomId = SymptomId;
         this.Timestamp = Timestamp;
         this.Latitude = Latitude;
         this.Longitude = Longitude;
-    }
-
-    @Ignore
-    public UserSymptom (
-            @NonNull final UUID IncognitoId,
-            @NonNull final Long SymptomId,
-            @NonNull final Date Timestamp,
-            @Nullable final Double Latitude,
-            @Nullable final Double Longitude
-    ) {
-        super(null);
-        this.UserId = null;
-        this.IncognitoId = IncognitoId;
-        this.SymptomId = SymptomId;
-        this.Timestamp = Timestamp;
-        this.Latitude = Latitude;
-        this.Longitude = Longitude;
-    }
-
-    @Override
-    @Nullable
-    public Long getId(){
-        return super.getId();
-    }
-
-    @Nullable
-    final Long getUserId () {
-        return UserId;
+        this.SymptomsCount = SymptomsCount;
     }
 
     @NonNull
-    UUID getIncognitoId () {
+    public final UUID getIncognitoId () {
         return IncognitoId;
     }
 
@@ -117,9 +81,17 @@ public final class UserSymptom
         return Timestamp;
     }
 
+    public final void setTimestamp (@NonNull final Date timestamp) {
+        Timestamp = timestamp;
+    }
+
     @Nullable
     public final Double getLatitude () {
         return Latitude;
+    }
+
+    public final void setLatitude (@NonNull final Double latitude) {
+        Latitude = latitude;
     }
 
     @Nullable
@@ -127,17 +99,29 @@ public final class UserSymptom
         return Longitude;
     }
 
+    public final void setLongitude (@NonNull final Double longitude) {
+        Longitude = longitude;
+    }
+
+    @NonNull
+    public final Long getSymptomsCount () {
+        return SymptomsCount;
+    }
+
+    public final void setSymptomsCount (@NonNull final Long symptomsCount) {
+        SymptomsCount = symptomsCount;
+    }
+
     @NonNull
     @Override
     public String toString () {
-        return "UserSymptom{" +
-                "Id=" + getId() +
-                ", UserId=" + UserId +
-                ", IncognitoId=" + IncognitoId +
+        return "LastUserSymptom{" +
+                "IncognitoId=" + IncognitoId +
                 ", SymptomId=" + SymptomId +
                 ", Timestamp=" + Timestamp +
                 ", Latitude=" + Latitude +
                 ", Longitude=" + Longitude +
+                ", SymptomsCount=" + SymptomsCount +
                 '}';
     }
 }

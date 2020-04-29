@@ -16,7 +16,8 @@ import java.util.concurrent.Executors;
 @Database (
         entities = {
                 Symptom.class,
-                UserSymptom.class
+                UserSymptom.class,
+                LastUserSymptom.class
         },
         version = 3)
 @TypeConverters ({Converters.class})
@@ -69,4 +70,6 @@ public abstract class BlagodarieDatabase
     public abstract SymptomDao symptomDao ();
 
     public abstract UserSymptomDao userSymptomDao ();
+
+    public abstract LastUserSymptomDao lastUserSymptomDao ();
 }

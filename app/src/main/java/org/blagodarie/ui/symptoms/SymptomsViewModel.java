@@ -106,7 +106,7 @@ public final class SymptomsViewModel
                     for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
                         final UserSymptom lastUserSymptom = mRepository.getLastUserSymptomForSymptomId(incognitoId, displaySymptom.getSymptomId());
                         if (lastUserSymptom != null) {
-                            displaySymptom.getLastDate().set(new Date(lastUserSymptom.getTimestamp()));
+                            displaySymptom.getLastDate().set(lastUserSymptom.getTimestamp());
                             if (lastUserSymptom.getLatitude() != null) {
                                 displaySymptom.getLastLatitude().set(lastUserSymptom.getLatitude());
                             }

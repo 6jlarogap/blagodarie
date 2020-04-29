@@ -1,20 +1,23 @@
-package org.blagodarie.db;
+package org.blagodatie.database;
 
 import androidx.room.testing.MigrationTestHelper;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
 import java.io.IOException;
 
+@RunWith (AndroidJUnit4.class)
 public class MigrationTest {
     private static final String TEST_DB = "migration-test";
 
     MigrationTestHelper helper;
 
-    public MigrationTest() {
+    public MigrationTest () {
         helper = new MigrationTestHelper(InstrumentationRegistry.getInstrumentation(),
                 BlagodarieDatabase.class.getName(),
                 new FrameworkSQLiteOpenHelperFactory());

@@ -9,6 +9,14 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.multidex.MultiDexApplication;
 
+import java.text.DateFormat;
+import java.text.FieldPosition;
+import java.text.ParseException;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
@@ -22,6 +30,16 @@ public final class BlagodarieApp
     public void onCreate () {
         super.onCreate();
         Log.d(TAG, "start application");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ", Locale.ENGLISH);
+        Date d1 = new Date();
+        String ds = sdf.format(d1);
+        try {
+            Date d2 = sdf.parse(ds);
+            d2.equals(d1);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+
     }
 
     public static void requestSync (

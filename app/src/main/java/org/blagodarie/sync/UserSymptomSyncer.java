@@ -78,10 +78,10 @@ final class UserSymptomSyncer {
                         final long userSymptomServerId = element.getLong("user_symptom_server_id");
                         final UserSymptom userSymptom = mUserSymptomsById.get(userSymptomId);
                         if (userSymptom != null) {
-                            userSymptom.setServerId(userSymptomServerId);
+                            //userSymptom.setServerId(userSymptomServerId);
                         }
                     }
-                    repository.updateUserSymptoms(notSyncedUserSymtpoms);
+                    //repository.updateUserSymptoms(notSyncedUserSymtpoms);
                 }
             } else if (response.code() == 401) {
                 throw new UnauthorizedException();
@@ -131,7 +131,7 @@ final class UserSymptomSyncer {
                     USER_SYMPTOM_JSON_PATTERN,
                     userSymptom.getId(),
                     userSymptom.getSymptomId(),
-                    (userSymptom.getTimestamp() / 1000),
+                    (userSymptom.getTimestamp().getTime() / 1000),
                     latitude,
                     longitude));
         }

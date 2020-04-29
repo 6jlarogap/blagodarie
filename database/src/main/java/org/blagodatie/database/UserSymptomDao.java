@@ -31,8 +31,7 @@ public abstract class UserSymptomDao {
 
     @Query ("SELECT us.* " +
             "FROM tbl_user_symptom us " +
-            "WHERE incognito_id = :incognitoId " +
-            "AND server_id IS NULL")
+            "WHERE incognito_id = :incognitoId")
     public abstract List<UserSymptom> getNotSynced (final UUID incognitoId);
 
     @Query ("SELECT COUNT(*) " +
@@ -44,8 +43,7 @@ public abstract class UserSymptomDao {
     @Query ("SELECT COUNT(*) " +
             "FROM tbl_user_symptom " +
             "WHERE symptom_id = :symptomId " +
-            "AND incognito_id = :incognitoId " +
-            "AND server_id IS NULL")
+            "AND incognito_id = :incognitoId")
     public abstract LiveData<Boolean> isHaveNotSynced (final UUID incognitoId, final long symptomId);
 
     @Query ("UPDATE tbl_user_symptom " +
