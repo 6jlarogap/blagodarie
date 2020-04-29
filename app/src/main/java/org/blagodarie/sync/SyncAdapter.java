@@ -18,6 +18,7 @@ import org.blagodarie.server.ServerConnector;
 import org.json.JSONException;
 
 import java.io.IOException;
+import java.util.Date;
 import java.util.UUID;
 
 public final class SyncAdapter
@@ -43,8 +44,10 @@ public final class SyncAdapter
         try {
             syncAll(incognitoId, authToken);
         } catch (JSONException e) {
+            Log.e(TAG, "onPerformSync error=" + e);
             e.printStackTrace();
         } catch (IOException e) {
+            Log.e(TAG, "onPerformSync error=" + e);
             e.printStackTrace();
         } catch (UnauthorizedException e) {
             Log.e(TAG, "onPerformSync error=" + e);
