@@ -6,10 +6,10 @@ import androidx.annotation.NonNull;
 import androidx.collection.LongSparseArray;
 import androidx.core.util.Pair;
 
+import org.blagodarie.Repository;
 import org.blagodarie.UnauthorizedException;
-import org.blagodarie.db.UserSymptom;
-import org.blagodarie.db.UserSymptomDao;
 import org.blagodarie.server.ServerConnector;
+import org.blagodatie.database.UserSymptom;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -52,9 +52,9 @@ final class UserSymptomSyncer {
             @NonNull final UUID incognitoId,
             @NonNull final String authToken,
             @NonNull final String apiBaseUrl,
-            @NonNull final UserSymptomDao userSymptomDao
+            @NonNull final Repository repository
     ) throws IOException, JSONException, UnauthorizedException {
-        final List<UserSymptom> notSyncedUserSymtpoms = userSymptomDao.getNotSynced(incognitoId);
+        final List<UserSymptom> notSyncedUserSymtpoms = repository.getNotSyncedUserSymptoms(incognitoId);
         if (notSyncedUserSymtpoms.size() > 0) {
             final LongSparseArray<UserSymptom> mUserSymptomsById = new LongSparseArray<>();
             for (UserSymptom userSymptom : notSyncedUserSymtpoms) {
@@ -81,7 +81,7 @@ final class UserSymptomSyncer {
                             userSymptom.setServerId(userSymptomServerId);
                         }
                     }
-                    userSymptomDao.update(notSyncedUserSymtpoms);
+                    repository.updateUserSymptoms(notSyncedUserSymtpoms);
                 }
             } else if (response.code() == 401) {
                 throw new UnauthorizedException();

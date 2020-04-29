@@ -1,10 +1,11 @@
-package org.blagodarie.db;
+package org.blagodatie.database;
 
 import androidx.room.TypeConverter;
 
 import java.util.UUID;
 
 final class Converters {
+
     @TypeConverter
     public UUID StringToUuid (final String o) {
         return UUID.fromString(o);
@@ -14,4 +15,5 @@ final class Converters {
     public String UuidToString (final UUID o) {
         return o.toString();
     }
+
 }

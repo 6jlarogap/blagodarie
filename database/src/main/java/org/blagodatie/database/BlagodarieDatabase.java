@@ -1,4 +1,4 @@
-package org.blagodarie.db;
+package org.blagodatie.database;
 
 import android.content.Context;
 import android.util.Log;
@@ -29,10 +29,12 @@ public abstract class BlagodarieDatabase
 
     private static volatile BlagodarieDatabase INSTANCE;
 
-    public static BlagodarieDatabase getInstance (@NonNull final Context context) {
-        synchronized (BlagodarieDatabase.class) {
-            if (INSTANCE == null) {
-                INSTANCE = buildDatabase(context.getApplicationContext());
+    public static BlagodarieDatabase getDatabase (@NonNull final Context context) {
+        if (INSTANCE == null) {
+            synchronized (BlagodarieDatabase.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = buildDatabase(context.getApplicationContext());
+                }
             }
         }
         return INSTANCE;
@@ -55,10 +57,12 @@ public abstract class BlagodarieDatabase
 
     private static void prepopulateDatabase (@NonNull final Context context) {
         Log.d(TAG, "prepopulateDatabase");
-        Executors.newSingleThreadExecutor().execute(() -> {
-                    getInstance(context).symptomDao().insert(Symptom.getSymptoms());
-                }
-        );
+        Executors.
+                newSingleThreadExecutor().
+                execute(() ->
+                        getDatabase(context).symptomDao().insert(Symptom.getSymptoms())
+
+                );
     }
 
 

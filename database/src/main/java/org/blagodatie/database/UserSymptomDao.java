@@ -1,4 +1,4 @@
-package org.blagodarie.db;
+package org.blagodatie.database;
 
 import androidx.lifecycle.LiveData;
 import androidx.room.Dao;

@@ -1,4 +1,4 @@
-package org.blagodarie.db;
+package org.blagodatie.database;
 
 import androidx.room.Dao;
 import androidx.room.Insert;

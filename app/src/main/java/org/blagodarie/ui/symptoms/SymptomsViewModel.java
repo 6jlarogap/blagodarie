@@ -1,14 +1,17 @@
 package org.blagodarie.ui.symptoms;
 
+import android.app.Application;
+
 import androidx.annotation.NonNull;
 import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
+import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
-import org.blagodarie.db.Symptom;
-import org.blagodarie.db.UserSymptom;
-import org.blagodarie.db.UserSymptomDao;
+import org.blagodarie.Repository;
+import org.blagodatie.database.Symptom;
+import org.blagodatie.database.UserSymptom;
 
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
@@ -21,6 +24,7 @@ import java.util.UUID;
 
 import io.reactivex.Completable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.functions.Action;
 import io.reactivex.schedulers.Schedulers;
 
@@ -29,12 +33,24 @@ import io.reactivex.schedulers.Schedulers;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class SymptomsViewModel
-        extends ViewModel {
+        extends AndroidViewModel {
 
     private static final long CURRENT_DATE_TIME_UPDATE_PERIOD = 1000L;
 
     @NonNull
     private final ObservableField<String> mCurrentDateTime = new ObservableField<>(getCurrentDateTimeString());
+
+    @NonNull
+    private final Timer mCurrentDateTimeUpdateTimer = new Timer();
+
+    {
+        mCurrentDateTimeUpdateTimer.schedule(new TimerTask() {
+            @Override
+            public void run () {
+                mCurrentDateTime.set(getCurrentDateTimeString());
+            }
+        }, 0, CURRENT_DATE_TIME_UPDATE_PERIOD);
+    }
 
     @NonNull
     private final ObservableField<Double> mCurrentLatitude = new ObservableField<>();
@@ -52,43 +68,43 @@ public final class SymptomsViewModel
     private final ObservableBoolean mShowLocationProvidersDisabledWarning = new ObservableBoolean(false);
 
     @NonNull
-    private final Timer mCurrentDateTimeUpdateTimer = new Timer();
-
-    @NonNull
     private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
 
-    {
+    @NonNull
+    private final Repository mRepository;
 
-        mCurrentDateTimeUpdateTimer.schedule(new TimerTask() {
-            @Override
-            public void run () {
-                mCurrentDateTime.set(getCurrentDateTimeString());
-            }
-        }, 0, CURRENT_DATE_TIME_UPDATE_PERIOD);
-    }
-
+    @NonNull
+    private final CompositeDisposable mDisposables = new CompositeDisposable();
 
     public SymptomsViewModel (
-            @NonNull final UUID incognitoId,
-            @NonNull final UserSymptomDao userSymptomDao
+            @NonNull final Application application,
+            @NonNull final UUID incognitoId
     ) {
-        super();
+        super(application);
+
+        mRepository = new Repository(application.getApplicationContext());
 
         for (Symptom symptom : Symptom.getSymptoms()) {
-            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), userSymptomDao.isHaveNotSynced(incognitoId, symptom.getId())));
+            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(incognitoId, symptom.getId())));
         }
 
-        loadLastValues(incognitoId, userSymptomDao);
+        loadLastValues(incognitoId);
+    }
+
+    @Override
+    protected void onCleared () {
+        mDisposables.dispose();
+        mCurrentDateTimeUpdateTimer.cancel();
+        super.onCleared();
     }
 
     private void loadLastValues (
-            @NonNull final UUID incognitoId,
-            @NonNull final UserSymptomDao userSymptomDao
+            @NonNull final UUID incognitoId
     ) {
         Completable.
                 fromAction(() -> {
                     for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(incognitoId, displaySymptom.getSymptomId());
+                        final UserSymptom lastUserSymptom = mRepository.getLastUserSymptomForSymptomId(incognitoId, displaySymptom.getSymptomId());
                         if (lastUserSymptom != null) {
                             displaySymptom.getLastDate().set(new Date(lastUserSymptom.getTimestamp()));
                             if (lastUserSymptom.getLatitude() != null) {
@@ -106,25 +122,20 @@ public final class SymptomsViewModel
 
     void updateUserSymptomCount (
             @NonNull final UUID incognitoId,
-            @NonNull final UserSymptomDao userSymptomDao,
             @NonNull final Action action
     ) {
-        Completable.
-                fromAction(() -> {
-                    for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final int userSymptomCount = userSymptomDao.getCountBySymptomId(incognitoId, displaySymptom.getSymptomId());
-                        displaySymptom.setUserSymptomCount(userSymptomCount);
-                    }
-                }).
-                subscribeOn(Schedulers.io()).
-                observeOn(AndroidSchedulers.mainThread()).
-                subscribe(action);
-    }
-
-    @Override
-    protected void onCleared () {
-        mCurrentDateTimeUpdateTimer.cancel();
-        super.onCleared();
+        mDisposables.add(
+                Completable.
+                        fromAction(() -> {
+                            for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
+                                final int userSymptomCount = mRepository.getUserSymptomsCountBySymptomId(incognitoId, displaySymptom.getSymptomId());
+                                displaySymptom.setUserSymptomCount(userSymptomCount);
+                            }
+                        }).
+                        subscribeOn(Schedulers.io()).
+                        observeOn(AndroidSchedulers.mainThread()).
+                        subscribe(action)
+        );
     }
 
     @NonNull
@@ -168,33 +179,39 @@ public final class SymptomsViewModel
     }
 
     static final class Factory
-            implements ViewModelProvider.Factory {
+            extends ViewModelProvider.AndroidViewModelFactory {
+
+        @NonNull
+        private final Application mApplication;
 
         @NonNull
         private final UUID mIncognitoId;
 
-        @NonNull
-        private final UserSymptomDao mUserSymptomDao;
-
         Factory (
-                @NonNull final UUID incognitoId,
-                @NonNull final UserSymptomDao userSymptomDao
+                @NonNull final Application application,
+                @NonNull final UUID incognitoId
         ) {
+            super(application);
+            mApplication = application;
             mIncognitoId = incognitoId;
-            mUserSymptomDao = userSymptomDao;
         }
+
 
         @NonNull
         @Override
         public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
-            if (modelClass.isAssignableFrom(SymptomsViewModel.class)) {
+            if (AndroidViewModel.class.isAssignableFrom(modelClass)) {
                 try {
-                    return modelClass.getConstructor(UUID.class, UserSymptomDao.class).newInstance(mIncognitoId, mUserSymptomDao);
-                } catch (IllegalAccessException | InstantiationException | InvocationTargetException | NoSuchMethodException e) {
-                    e.printStackTrace();
+                    return modelClass.getConstructor(Application.class, UUID.class).newInstance(mApplication, mIncognitoId);
+                } catch (NoSuchMethodException |
+                        IllegalAccessException |
+                        InstantiationException |
+                        InvocationTargetException e
+                ) {
+                    throw new RuntimeException("Cannot create an instance of " + modelClass, e);
                 }
             }
-            throw new IllegalArgumentException("Unknown ViewModel class");
+            return super.create(modelClass);
         }
     }
 }

@@ -37,16 +37,16 @@ import androidx.lifecycle.ViewModelProvider;
 import org.blagodarie.BlagodarieApp;
 import org.blagodarie.BuildConfig;
 import org.blagodarie.R;
+import org.blagodarie.Repository;
 import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
-import org.blagodarie.db.BlagodarieDatabase;
-import org.blagodarie.db.UserSymptom;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.sync.SyncAdapter;
 import org.blagodarie.sync.SyncService;
 import org.blagodarie.ui.splash.SplashActivity;
 import org.blagodarie.ui.update.UpdateActivity;
+import org.blagodatie.database.UserSymptom;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -108,7 +108,7 @@ public final class SymptomsActivity
 
     private SymptomsActivityBinding mActivityBinding;
 
-    private BlagodarieDatabase mBlagodarieDatabase;
+    private Repository mRepository;
 
     private AccountManager mAccountManager;
 
@@ -117,7 +117,7 @@ public final class SymptomsActivity
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate");
 
-        mBlagodarieDatabase = BlagodarieDatabase.getInstance(this);
+        mRepository = new Repository(this);
 
         mAccountManager = AccountManager.get(this);
 
@@ -137,7 +137,7 @@ public final class SymptomsActivity
 
         Completable.
                 fromAction(() ->
-                        mBlagodarieDatabase.userSymptomDao().updateIncognitoId(mUserId, mIncognitoId)
+                        mRepository.updateIncognitoId(mUserId, mIncognitoId)
                 ).
                 subscribeOn(Schedulers.io()).
                 subscribe();
@@ -146,7 +146,7 @@ public final class SymptomsActivity
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
         //создаем фабрику
-        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(mIncognitoId, mBlagodarieDatabase.userSymptomDao());
+        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(getApplication(), mIncognitoId);
 
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
@@ -164,7 +164,6 @@ public final class SymptomsActivity
         }
         mViewModel.updateUserSymptomCount(
                 mIncognitoId,
-                mBlagodarieDatabase.userSymptomDao(),
                 () -> {
                     mSymptomsAdapter.order();
                     if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
@@ -255,7 +254,7 @@ public final class SymptomsActivity
         mDisposables.add(
                 Completable.
                         fromAction(() ->
-                                mBlagodarieDatabase.userSymptomDao().insert(userSymptom)
+                                mRepository.insertUserSymptom(userSymptom)
                         ).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
@@ -282,11 +281,7 @@ public final class SymptomsActivity
                                 BlagodarieApp.requestSync(mAccount, authToken);
                             }
                         }
-                    } catch (AuthenticatorException e) {
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    } catch (OperationCanceledException e) {
+                    } catch (AuthenticatorException | IOException | OperationCanceledException e) {
                         e.printStackTrace();
                     }
                 },

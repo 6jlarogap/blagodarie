@@ -11,14 +11,13 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import org.blagodarie.Repository;
 import org.blagodarie.UnauthorizedException;
 import org.blagodarie.authentication.AccountGeneral;
-import org.blagodarie.db.BlagodarieDatabase;
 import org.blagodarie.server.ServerConnector;
 import org.json.JSONException;
 
 import java.io.IOException;
-import java.util.Date;
 import java.util.UUID;
 
 public final class SyncAdapter
@@ -60,7 +59,7 @@ public final class SyncAdapter
             @NonNull final String authToken
     ) throws JSONException, IOException, UnauthorizedException {
         Log.d(TAG, "syncAll");
-        final BlagodarieDatabase blagodarieDatabase = BlagodarieDatabase.getInstance(getContext());
+        final Repository repository = new Repository(getContext());
         final ServerConnector serverConnector = new ServerConnector(getContext());
 
         UserSymptomSyncer.
@@ -69,7 +68,7 @@ public final class SyncAdapter
                         incognitoId,
                         authToken,
                         serverConnector.getApiBaseUrl(),
-                        blagodarieDatabase.userSymptomDao()
+                        repository
                 );
     }
 

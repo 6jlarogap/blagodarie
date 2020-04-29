@@ -7,8 +7,8 @@ import androidx.collection.LongSparseArray;
 import androidx.core.util.Pair;
 
 import org.blagodarie.UnauthorizedException;
-import org.blagodarie.db.UserSymptom;
 import org.blagodarie.server.ServerApiExecutor;
+import org.blagodatie.database.UserSymptom;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;

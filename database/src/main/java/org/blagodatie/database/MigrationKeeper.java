@@ -1,4 +1,4 @@
-package org.blagodarie.db;
+package org.blagodatie.database;
 
 import android.util.Log;
 
