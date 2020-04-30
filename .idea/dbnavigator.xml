@@ -25,7 +25,7 @@
     <show-object-properties value="true" />
     <loaded-nodes>
       <connection connection-id="f91f0ff1-0ff7-405d-8941-d801d45b43ed">
-        <schema name="main" object-types="column, view, table" />
+        <schema name="main" object-types="table, view, column" />
       </connection>
     </loaded-nodes>
   </component>
@@ -64,25 +64,27 @@ SELECT incognito_id,
 FROM tbl_user_symptom us
 GROUP BY incognito_id, symptom_id;
 
-insert into tbl_user_symptom
 WITH last_coords AS (
-SELECT incognito_id, symptom_id, latitude, longitude 
-     FROM tbl_user_symptom us1 
-     WHERE us1.timestamp = (SELECT MAX(timestamp) 
-                          FROM tbl_user_symptom us2
-                          WHERE us2.incognito_id = us1.incognito_id
-                          AND us2.symptom_id = us1.symptom_id
-                          AND latitude IS NOT null
-                          AND longitude IS NOT null)
+SELECT incognito_id,
+       symptom_id, 
+       latitude as last_latitude, 
+       longitude as last_longitude
+FROM tbl_user_symptom us1 
+WHERE us1.timestamp = (SELECT MAX(timestamp) 
+                       FROM tbl_user_symptom us2
+                       WHERE us2.incognito_id = us1.incognito_id
+                       AND us2.symptom_id = us1.symptom_id
+                       AND latitude IS NOT null
+                       AND longitude IS NOT null)
 )
-select us.incognito_id,
-    us.symptom_id,
-    MAX(us.timestamp)||'asdf',
-    COUNT(us.id),
-    us1.latitude,
-    us1.longitude
-from tbl_user_symptom us
-left join last_coords us1 ON us1.incognito_id = us.incognito_id
+SELECT us.incognito_id,
+       us.symptom_id,
+       MAX(us.timestamp)||'asdf',
+       COUNT(us.id),
+       lc.last_latitude,
+       lc.last_longitude
+FROM tbl_user_symptom us
+LEFT JOIN last_coords lc ON lc.incognito_id = us.incognito_id
 GROUP BY us.incognito_id, us.symptom_id;]]></console>
     </connection>
   </component>

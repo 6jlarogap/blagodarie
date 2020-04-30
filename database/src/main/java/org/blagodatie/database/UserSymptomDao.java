@@ -47,9 +47,7 @@ public abstract class UserSymptomDao {
     public abstract LiveData<Boolean> isHaveNotSynced (final UUID incognitoId, final long symptomId);
 
     @Query ("UPDATE tbl_user_symptom " +
-            "SET user_id = null, " +
-            "incognito_id = :incognitoId " +
-            "WHERE user_id = :userId " +
-            "AND incognito_id = 'null'")
-    public abstract void updateIncognitoId (final long userId, final UUID incognitoId);
+            "SET incognito_id = :incognitoId " +
+            "WHERE incognito_id = 'null'")
+    public abstract void setupIncognitoId (final UUID incognitoId);
 }

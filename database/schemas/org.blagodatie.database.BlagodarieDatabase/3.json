@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "74df556e1ba63a5ea7c5c740a81a9038",
+    "identityHash": "9406023986a8f8db5ceb1f62b358c460",
     "entities": [
       {
         "tableName": "tbl_symptom",
@@ -41,14 +41,8 @@
       },
       {
         "tableName": "tbl_user_symptom",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`user_id` INTEGER, `incognito_id` TEXT NOT NULL, `symptom_id` INTEGER NOT NULL, `timestamp` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`symptom_id`) REFERENCES `tbl_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`incognito_id` TEXT NOT NULL, `symptom_id` INTEGER NOT NULL, `timestamp` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, `id` INTEGER PRIMARY KEY AUTOINCREMENT, FOREIGN KEY(`symptom_id`) REFERENCES `tbl_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
         "fields": [
-          {
-            "fieldPath": "UserId",
-            "columnName": "user_id",
-            "affinity": "INTEGER",
-            "notNull": false
-          },
           {
             "fieldPath": "IncognitoId",
             "columnName": "incognito_id",
@@ -193,7 +187,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '74df556e1ba63a5ea7c5c740a81a9038')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9406023986a8f8db5ceb1f62b358c460')"
     ]
   }
 }

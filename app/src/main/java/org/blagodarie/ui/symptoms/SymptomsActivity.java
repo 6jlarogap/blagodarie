@@ -94,8 +94,6 @@ public final class SymptomsActivity
 
     private Account mAccount;
 
-    private Long mUserId;
-
     private UUID mIncognitoId;
 
     private SymptomsViewModel mViewModel;
@@ -137,7 +135,7 @@ public final class SymptomsActivity
 
         Completable.
                 fromAction(() ->
-                        mRepository.updateIncognitoId(mUserId, mIncognitoId)
+                        mRepository.setupIncognitoId(mIncognitoId)
                 ).
                 subscribeOn(Schedulers.io()).
                 subscribe();
@@ -222,7 +220,6 @@ public final class SymptomsActivity
     private void initUserData () {
         Log.d(TAG, "initUserData");
         mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
-        mUserId = Long.valueOf(mAccount.name);
         String incognitoId = mAccountManager.getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
         if (incognitoId == null) {
             incognitoId = UUID.randomUUID().toString();

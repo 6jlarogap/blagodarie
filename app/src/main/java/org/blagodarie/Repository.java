@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 
 import org.blagodatie.database.BlagodarieDatabase;
+import org.blagodatie.database.LastUserSymptomDao;
 import org.blagodatie.database.UserSymptom;
 import org.blagodatie.database.UserSymptomDao;
 
@@ -18,11 +19,18 @@ import static org.blagodatie.database.BlagodarieDatabase.*;
 public final class Repository {
 
     @NonNull
+    private final BlagodarieDatabase mBlagodarieDatabase;
+
+    @NonNull
     private final UserSymptomDao mUserSymptomDao;
 
+    @NonNull
+    private final LastUserSymptomDao mLastUserSymptomDao;
+
     public Repository (@NonNull final Context context) {
-        final BlagodarieDatabase blagodarieDatabase = getDatabase(context);
-        this.mUserSymptomDao = blagodarieDatabase.userSymptomDao();
+        mBlagodarieDatabase = getDatabase(context);
+        mUserSymptomDao = mBlagodarieDatabase.userSymptomDao();
+        mLastUserSymptomDao = mBlagodarieDatabase.lastUserSymptomDao();
     }
 
     public LiveData<Boolean> isHaveNotSyncedUserSymptoms (@NonNull final UUID incognitoId, final long symptomId) {
@@ -37,8 +45,11 @@ public final class Repository {
         mUserSymptomDao.update(userSymptoms);
     }
 
-    public void updateIncognitoId (final long userId, @NonNull final UUID incognitoId) {
-        mUserSymptomDao.updateIncognitoId(userId, incognitoId);
+    public void setupIncognitoId (@NonNull final UUID incognitoId) {
+        mBlagodarieDatabase.runInTransaction(()->{
+            mUserSymptomDao.setupIncognitoId(incognitoId);
+            mLastUserSymptomDao.setupIncognitoId(incognitoId);
+        });
     }
 
     public UserSymptom getLastUserSymptomForSymptomId (@NonNull final UUID incognitoId, final long symptomId) {

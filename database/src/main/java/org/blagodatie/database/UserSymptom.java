@@ -32,10 +32,6 @@ import java.util.UUID;
 public final class UserSymptom
         extends BaseEntity {
 
-    @Nullable
-    @ColumnInfo (name = "user_id")
-    private final Long UserId;
-
     @NonNull
     @ColumnInfo (name = "incognito_id", typeAffinity = ColumnInfo.TEXT)
     private final UUID IncognitoId;
@@ -58,7 +54,6 @@ public final class UserSymptom
 
     UserSymptom (
             @NonNull final Long Id,
-            @Nullable final Long UserId,
             @NonNull final UUID IncognitoId,
             @NonNull final Long SymptomId,
             @NonNull final Date Timestamp,
@@ -66,7 +61,6 @@ public final class UserSymptom
             @Nullable final Double Longitude
     ) {
         super(Id);
-        this.UserId = UserId;
         this.IncognitoId = IncognitoId;
         this.SymptomId = SymptomId;
         this.Timestamp = Timestamp;
@@ -83,7 +77,6 @@ public final class UserSymptom
             @Nullable final Double Longitude
     ) {
         super(null);
-        this.UserId = null;
         this.IncognitoId = IncognitoId;
         this.SymptomId = SymptomId;
         this.Timestamp = Timestamp;
@@ -95,11 +88,6 @@ public final class UserSymptom
     @Nullable
     public Long getId(){
         return super.getId();
-    }
-
-    @Nullable
-    final Long getUserId () {
-        return UserId;
     }
 
     @NonNull
@@ -132,7 +120,6 @@ public final class UserSymptom
     public String toString () {
         return "UserSymptom{" +
                 "Id=" + getId() +
-                ", UserId=" + UserId +
                 ", IncognitoId=" + IncognitoId +
                 ", SymptomId=" + SymptomId +
                 ", Timestamp=" + Timestamp +
