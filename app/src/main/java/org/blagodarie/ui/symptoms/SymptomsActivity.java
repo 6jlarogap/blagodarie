@@ -133,6 +133,7 @@ public final class SymptomsActivity
 
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
+        //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
         mDisposables.add(
                 Completable.
                         fromAction(() ->

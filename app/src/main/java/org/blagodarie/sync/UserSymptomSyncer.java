@@ -11,6 +11,7 @@ import org.blagodarie.server.ServerConnector;
 import org.blagodatie.database.UserSymptom;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -27,7 +28,7 @@ final class UserSymptomSyncer {
 
     private static final String TAG = UserSymptomSyncer.class.getSimpleName();
 
-    private static final String USER_SYMPTOM_JSON_PATTERN = "{\"user_symptom_id\":%d,\"symptom_id\":%d,\"timestamp\":%d,\"latitude\":%f,\"longitude\":%f}";
+    private static final String USER_SYMPTOM_JSON_PATTERN = "{\"symptom_id\":%d,\"timestamp\":%d,\"timezone\":\"%s\",\"latitude\":%f,\"longitude\":%f}";
 
     private static volatile UserSymptomSyncer INSTANCE;
 
@@ -108,13 +109,18 @@ final class UserSymptomSyncer {
                 latitude = obfuscatedLocation.first;
                 longitude = obfuscatedLocation.second;
             }
-            content.append(String.format(Locale.ENGLISH,
-                    USER_SYMPTOM_JSON_PATTERN,
-                    userSymptom.getId(),
-                    userSymptom.getSymptomId(),
-                    (userSymptom.getTimestamp().getTime() / 1000),
-                    latitude,
-                    longitude));
+            final SimpleDateFormat sdfTimeZone = new SimpleDateFormat("Z", Locale.ENGLISH);
+            content.append(
+                    String.format(
+                            Locale.ENGLISH,
+                            USER_SYMPTOM_JSON_PATTERN,
+                            userSymptom.getSymptomId(),
+                            (userSymptom.getTimestamp().getTime() / 1000),
+                            sdfTimeZone.format(userSymptom.getTimestamp()),
+                            latitude,
+                            longitude
+                    )
+            );
         }
         content.append("]}");
         return content.toString();
