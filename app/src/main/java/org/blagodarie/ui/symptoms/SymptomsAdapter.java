@@ -14,7 +14,6 @@ import org.blagodarie.databinding.SymptomItemBinding;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -65,7 +64,18 @@ final class SymptomsAdapter
 
     void order () {
         final List<DisplaySymptom> newDisplaySymptoms = new ArrayList<>(mDisplaySymptoms);
-        Collections.sort(newDisplaySymptoms, (o1, o2) -> o2.getUserSymptomCount() - o1.getUserSymptomCount());
+        Collections.sort(
+                newDisplaySymptoms,
+                (o1, o2) -> {
+                    long difference = o2.getUserSymptomCount() - o1.getUserSymptomCount();
+                    if (difference < 0) {
+                        return -1;
+                    } else if (difference > 0) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                });
         final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomDiffUtilCallBack(newDisplaySymptoms, mDisplaySymptoms));
         diffResult.dispatchUpdatesTo(this);
         mDisplaySymptoms = newDisplaySymptoms;

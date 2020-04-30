@@ -19,26 +19,10 @@ public abstract class UserSymptomDao {
     @Update
     public abstract void update (final Collection<UserSymptom> userSymptom);
 
-    @Query ("SELECT * " +
-            "FROM tbl_user_symptom " +
-            "WHERE symptom_id = :symptomId " +
-            "AND incognito_id = :incognitoId " +
-            "AND timestamp = (SELECT MAX(timestamp) " +
-            "                 FROM tbl_user_symptom us2" +
-            "                 WHERE us2.symptom_id = :symptomId" +
-            "                 AND us2.incognito_id = :incognitoId)")
-    public abstract UserSymptom getLastForSymptomId (final UUID incognitoId, final long symptomId);
-
     @Query ("SELECT us.* " +
             "FROM tbl_user_symptom us " +
             "WHERE incognito_id = :incognitoId")
     public abstract List<UserSymptom> getNotSynced (final UUID incognitoId);
-
-    @Query ("SELECT COUNT(*) " +
-            "FROM tbl_user_symptom " +
-            "WHERE symptom_id = :symptomId " +
-            "AND incognito_id = :incognitoId ")
-    public abstract int getCountBySymptomId (final UUID incognitoId, final long symptomId);
 
     @Query ("SELECT COUNT(*) " +
             "FROM tbl_user_symptom " +

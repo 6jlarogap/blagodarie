@@ -10,8 +10,8 @@ import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
 import org.blagodarie.Repository;
+import org.blagodatie.database.LastUserSymptom;
 import org.blagodatie.database.Symptom;
-import org.blagodatie.database.UserSymptom;
 
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
@@ -104,9 +104,10 @@ public final class SymptomsViewModel
         Completable.
                 fromAction(() -> {
                     for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final UserSymptom lastUserSymptom = mRepository.getLastUserSymptomForSymptomId(incognitoId, displaySymptom.getSymptomId());
+                        final LastUserSymptom lastUserSymptom = mRepository.getLastUserSymptom(incognitoId, displaySymptom.getSymptomId());
                         if (lastUserSymptom != null) {
                             displaySymptom.getLastDate().set(lastUserSymptom.getTimestamp());
+                            displaySymptom.setUserSymptomCount(lastUserSymptom.getSymptomsCount());
                             if (lastUserSymptom.getLatitude() != null) {
                                 displaySymptom.getLastLatitude().set(lastUserSymptom.getLatitude());
                             }
@@ -118,24 +119,6 @@ public final class SymptomsViewModel
                 }).
                 subscribeOn(Schedulers.io()).
                 subscribe();
-    }
-
-    void updateUserSymptomCount (
-            @NonNull final UUID incognitoId,
-            @NonNull final Action action
-    ) {
-        mDisposables.add(
-                Completable.
-                        fromAction(() -> {
-                            for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                                final int userSymptomCount = mRepository.getUserSymptomsCountBySymptomId(incognitoId, displaySymptom.getSymptomId());
-                                displaySymptom.setUserSymptomCount(userSymptomCount);
-                            }
-                        }).
-                        subscribeOn(Schedulers.io()).
-                        observeOn(AndroidSchedulers.mainThread()).
-                        subscribe(action)
-        );
     }
 
     @NonNull

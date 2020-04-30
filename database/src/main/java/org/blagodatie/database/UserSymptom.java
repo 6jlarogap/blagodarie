@@ -91,7 +91,7 @@ public final class UserSymptom
     }
 
     @NonNull
-    UUID getIncognitoId () {
+    public UUID getIncognitoId () {
         return IncognitoId;
     }
 

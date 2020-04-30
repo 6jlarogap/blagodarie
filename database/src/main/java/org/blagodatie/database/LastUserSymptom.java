@@ -5,6 +5,7 @@ import androidx.annotation.Nullable;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.ForeignKey;
+import androidx.room.Ignore;
 import androidx.room.Index;
 
 import java.util.Date;
@@ -47,8 +48,8 @@ public final class LastUserSymptom {
     private Double Longitude;
 
     @NonNull
-    @ColumnInfo (name = "symptoms_count", defaultValue = "0")
-    private Long SymptomsCount;
+    @ColumnInfo (name = "symptoms_count", defaultValue = "1")
+    private Long SymptomsCount = 1L;
 
     LastUserSymptom (
             @NonNull final UUID IncognitoId,
@@ -64,6 +65,21 @@ public final class LastUserSymptom {
         this.Latitude = Latitude;
         this.Longitude = Longitude;
         this.SymptomsCount = SymptomsCount;
+    }
+
+    @Ignore
+    public LastUserSymptom (
+            @NonNull final UUID IncognitoId,
+            @NonNull final Long SymptomId,
+            @NonNull final Date Timestamp,
+            @Nullable final Double Latitude,
+            @Nullable final Double Longitude
+    ) {
+        this.IncognitoId = IncognitoId;
+        this.SymptomId = SymptomId;
+        this.Timestamp = Timestamp;
+        this.Latitude = Latitude;
+        this.Longitude = Longitude;
     }
 
     @NonNull

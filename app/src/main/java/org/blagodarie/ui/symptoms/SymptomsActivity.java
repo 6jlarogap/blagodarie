@@ -160,14 +160,11 @@ public final class SymptomsActivity
         } else {
             attemptRequestLocationPermissions();
         }
-        mViewModel.updateUserSymptomCount(
-                mIncognitoId,
-                () -> {
-                    mSymptomsAdapter.order();
-                    if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
-                        mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
-                    }
-                });
+
+        mSymptomsAdapter.order();
+        if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
+            mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
+        }
     }
 
     @Override
@@ -240,6 +237,7 @@ public final class SymptomsActivity
 
         displaySymptom.getLastLatitude().set(latitude);
         displaySymptom.getLastLongitude().set(longitude);
+        displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
 
         final UserSymptom userSymptom = new UserSymptom(
                 mIncognitoId,
