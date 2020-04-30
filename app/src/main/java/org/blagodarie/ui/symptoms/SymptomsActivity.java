@@ -133,12 +133,16 @@ public final class SymptomsActivity
 
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
-        Completable.
-                fromAction(() ->
-                        mRepository.setupIncognitoId(mIncognitoId)
-                ).
-                subscribeOn(Schedulers.io()).
-                subscribe();
+        mDisposables.add(
+                Completable.
+                        fromAction(() ->
+                                mRepository.setupIncognitoId(mIncognitoId)
+                        ).
+                        subscribeOn(Schedulers.io()).
+                        subscribe(() ->
+                                mViewModel.loadLastValues(mIncognitoId)
+                        )
+        );
     }
 
     private void initViewModel () {
@@ -229,7 +233,7 @@ public final class SymptomsActivity
             @NonNull final DisplaySymptom displaySymptom
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
-        Date currentDate  = new Date();
+        Date currentDate = new Date();
         displaySymptom.getLastDate().set(currentDate);
 
         final Double latitude = mViewModel.getCurrentLatitude().get();

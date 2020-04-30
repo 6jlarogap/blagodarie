@@ -171,8 +171,9 @@ final class MigrationKeeper {
                                 "`incognito_id` TEXT NOT NULL, " +
                                 "`symptom_id` INTEGER NOT NULL, " +
                                 "`timestamp` TEXT NOT NULL, " +
-                                "`latitude` REAL, `longitude` REAL, " +
-                                "`symptoms_count` INTEGER NOT NULL DEFAULT 0, " +
+                                "`latitude` REAL, " +
+                                "`longitude` REAL, " +
+                                "`symptoms_count` INTEGER NOT NULL DEFAULT 1, " +
                                 "PRIMARY KEY(`incognito_id`, `symptom_id`), " +
                                 "FOREIGN KEY(`symptom_id`) REFERENCES `tbl_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )"
                 );
@@ -196,10 +197,10 @@ final class MigrationKeeper {
                                 ") " +
                                 "SELECT 'null', " +
                                 "       us.symptom_id, " +
-                                "       strftime('%Y-%m-%d %H:%M:%S.000" + currentTimezone + "', datetime(MAX(us.timestamp), 'unixepoch')), " +
-                                "       COUNT(us.id), " +
+                                "       strftime('%Y-%m-%d %H:%M:%S.000" + currentTimezone + "', datetime(MAX(us.timestamp) / 1000, 'unixepoch')), " +
                                 "       lc.last_latitude, " +
-                                "       lc.last_longitude " +
+                                "       lc.last_longitude, " +
+                                "       COUNT(us.id) " +
                                 "FROM tbl_user_symptom us " +
                                 "LEFT JOIN last_coords lc ON lc.symptom_id = us.symptom_id " +
                                 "GROUP BY us.symptom_id"
@@ -222,8 +223,9 @@ final class MigrationKeeper {
                 //перенести данные из старой таблицы в новую
                 database.execSQL(
                         "INSERT INTO `tbl_user_symptom_new` (`id`, `incognito_id`, `symptom_id`, `timestamp`, `latitude`, `longitude`) " +
-                                "SELECT `id`, 'null', `symptom_id`, strftime('%Y-%m-%d %H:%M:%S.000" + currentTimezone + "', datetime(`timestamp`, 'unixepoch')), `latitude`, `longitude` " +
-                                "FROM tbl_user_symptom"
+                                "SELECT `id`, 'null', `symptom_id`, strftime('%Y-%m-%d %H:%M:%S.000" + currentTimezone + "', datetime(`timestamp` / 1000, 'unixepoch')), `latitude`, `longitude` " +
+                                "FROM tbl_user_symptom " /*+
+                                "WHERE server_id IS NULL"*/
                 );
                 //удалить старую таблицу
                 database.execSQL("DROP TABLE IF EXISTS `tbl_user_symptom`");

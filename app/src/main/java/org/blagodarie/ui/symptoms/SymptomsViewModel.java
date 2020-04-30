@@ -23,9 +23,7 @@ import java.util.TimerTask;
 import java.util.UUID;
 
 import io.reactivex.Completable;
-import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
-import io.reactivex.functions.Action;
 import io.reactivex.schedulers.Schedulers;
 
 /**
@@ -98,7 +96,7 @@ public final class SymptomsViewModel
         super.onCleared();
     }
 
-    private void loadLastValues (
+    void loadLastValues (
             @NonNull final UUID incognitoId
     ) {
         Completable.

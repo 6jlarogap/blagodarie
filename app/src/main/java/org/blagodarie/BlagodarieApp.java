@@ -30,16 +30,6 @@ public final class BlagodarieApp
     public void onCreate () {
         super.onCreate();
         Log.d(TAG, "start application");
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ", Locale.ENGLISH);
-        Date d1 = new Date();
-        String ds = sdf.format(d1);
-        try {
-            Date d2 = sdf.parse(ds);
-            d2.equals(d1);
-        } catch (ParseException e) {
-            e.printStackTrace();
-        }
-
     }
 
     public static void requestSync (

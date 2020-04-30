@@ -65,27 +65,27 @@ FROM tbl_user_symptom us
 GROUP BY incognito_id, symptom_id;
 
 WITH last_coords AS (
-SELECT incognito_id,
-       symptom_id, 
+SELECT symptom_id, 
        latitude as last_latitude, 
        longitude as last_longitude
 FROM tbl_user_symptom us1 
 WHERE us1.timestamp = (SELECT MAX(timestamp) 
                        FROM tbl_user_symptom us2
-                       WHERE us2.incognito_id = us1.incognito_id
-                       AND us2.symptom_id = us1.symptom_id
+                       WHERE us2.symptom_id = us1.symptom_id
                        AND latitude IS NOT null
                        AND longitude IS NOT null)
 )
-SELECT us.incognito_id,
+SELECT 'null',
        us.symptom_id,
-       MAX(us.timestamp)||'asdf',
+       strftime('%Y-%m-%d %H:%M:%S.000', datetime(MAX(us.timestamp) / 1000, 'unixepoch')),
+       --us.timestamp /,
        COUNT(us.id),
        lc.last_latitude,
        lc.last_longitude
 FROM tbl_user_symptom us
-LEFT JOIN last_coords lc ON lc.incognito_id = us.incognito_id
-GROUP BY us.incognito_id, us.symptom_id;]]></console>
+LEFT JOIN last_coords lc ON lc.symptom_id = us.symptom_id
+--GROUP BY us.symptom_id
+;]]></console>
     </connection>
   </component>
   <component name="DBNavigator.Project.DatabaseFileManager">
@@ -132,7 +132,7 @@ GROUP BY us.incognito_id, us.symptom_id;]]></console>
           <port value="1234" />
           <database value="database" />
           <files>
-            <file path="c:\Users\sergeGabrus\Documents\AndroidStudio\DeviceExplorer\emulator-5554\data\data\org.blagodarie\databases\blagodarie.db" schema="main" />
+            <file path="c:\Users\sergeGabrus\Documents\AndroidStudio\DeviceExplorer\xiaomi_6a_API_28 [emulator-5554]\data\data\org.blagodarie\databases\blagodarie.db" schema="main" />
           </files>
           <type value="NONE" />
           <user value="" />
