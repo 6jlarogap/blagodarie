@@ -7,6 +7,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -21,13 +22,17 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 
+import java.util.Arrays;
+
 /**
  * @author sergeGabrus
- * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
+ * @link https://github.com/6jlarogap/blagodarie/raw/master/LICENSE License
  */
 public final class AuthenticationActivity
         extends AppCompatActivity
         implements AuthenticationNavigator {
+
+    private static final String TAG = AuthenticationActivity.class.getSimpleName();
 
     private static final String EXTRA_ACCOUNT_TYPE = "org.blagodarie.authentication.ACCOUNT_TYPE";
     static final String EXTRA_USER_ID = "org.blagodarie.authentication.USER_ID";
@@ -40,7 +45,10 @@ public final class AuthenticationActivity
 
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
+        Log.d(TAG, "onCreate");
+
         super.onCreate(savedInstanceState);
+
         mAccountAuthenticatorResponse = getIntent().getParcelableExtra(AccountManager.KEY_ACCOUNT_AUTHENTICATOR_RESPONSE);
 
         if (mAccountAuthenticatorResponse != null) {
@@ -54,6 +62,7 @@ public final class AuthenticationActivity
             toSignIn();
         } else {
             final Account[] accounts = AccountManager.get(this).getAccountsByType(getString(R.string.account_type));
+            Log.d(TAG, "existing accounts=" + Arrays.toString(accounts));
 
             if (accounts.length > 0) {
                 Toast.makeText(this, R.string.one_account_only, Toast.LENGTH_LONG).show();
@@ -67,6 +76,7 @@ public final class AuthenticationActivity
 
     @Override
     public void onBackPressed () {
+        Log.d(TAG, "onBackPressed");
         if (mNavController.getCurrentDestination() != null) {
             if (mNavController.getCurrentDestination().getId() == R.id.greetingFragment ||
                     mNavController.getCurrentDestination().getId() == R.id.signInFragment) {
@@ -82,6 +92,7 @@ public final class AuthenticationActivity
             @NonNull final Fragment fragment,
             @NonNull final String oauth2ClientId
     ) {
+        Log.d(TAG, "googleSignIn");
         final GoogleSignInOptions gso = new GoogleSignInOptions.
                 Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).
                 requestEmail().
@@ -97,6 +108,7 @@ public final class AuthenticationActivity
             @NonNull final String accountType,
             final AccountAuthenticatorResponse response
     ) {
+        Log.d(TAG, "createSelfIntent");
         final Intent intent = new Intent(context, AuthenticationActivity.class);
         intent.putExtra(AuthenticationActivity.EXTRA_ACCOUNT_TYPE, accountType);
         intent.putExtra(AccountManager.KEY_ACCOUNT_AUTHENTICATOR_RESPONSE, response);
@@ -109,6 +121,7 @@ public final class AuthenticationActivity
             @NonNull final Long userId,
             final AccountAuthenticatorResponse response
     ) {
+        Log.d(TAG, "createSelfIntent");
         final Intent intent = createSelfIntent(context, accountType, response);
         intent.putExtra(EXTRA_USER_ID, userId);
         return intent;
@@ -116,13 +129,14 @@ public final class AuthenticationActivity
 
     @Override
     public void fromGreetingToSignUp () {
+        Log.d(TAG, "fromGreetingToSignUp");
         mNavController.navigate(R.id.action_greetingFragment_to_signUpFragment);
     }
 
     @Override
     public void finish () {
+        Log.d(TAG, "finish");
         if (mAccountAuthenticatorResponse != null) {
-            // send the result bundle back if set, otherwise send an error.
             if (mResultBundle != null) {
                 mAccountAuthenticatorResponse.onResult(mResultBundle);
             } else {
@@ -135,15 +149,25 @@ public final class AuthenticationActivity
     }
 
     public final void setAccountAuthenticatorResult (Bundle result) {
+        Log.d(TAG, "setAccountAuthenticatorResult result=" + result);
         mResultBundle = result;
     }
 
     void toGreeting () {
+        Log.d(TAG, "toGreeting");
         mNavController.navigate(R.id.action_startFragment_to_greetingFragment);
     }
 
     void toSignIn () {
-        final NavDirections action = StartFragmentDirections.actionStartFragmentToSignInFragment(getIntent().getLongExtra(EXTRA_USER_ID, -1));
-        mNavController.navigate(action);
+        Log.d(TAG, "toSignIn");
+        final long badUserId = Long.MIN_VALUE;
+        final long userId = getIntent().getLongExtra(EXTRA_USER_ID, badUserId);
+        if (userId != badUserId) {
+            final NavDirections action = StartFragmentDirections.actionStartFragmentToSignInFragment(userId);
+            mNavController.navigate(action);
+        } else{
+            Toast.makeText(this, R.string.error_bad_user_id,Toast.LENGTH_SHORT).show();
+            finish();
+        }
     }
 }

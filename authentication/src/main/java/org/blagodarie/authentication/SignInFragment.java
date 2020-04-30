@@ -3,6 +3,7 @@ package org.blagodarie.authentication;
 import android.accounts.AccountManager;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,12 +39,19 @@ import static android.app.Activity.RESULT_OK;
 import static org.blagodarie.authentication.AuthenticationActivity.ACTIVITY_REQUEST_CODE_GOGGLE_SIGN_IN;
 import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
-
+/**
+ * @author sergeGabrus
+ * @link https://github.com/6jlarogap/blagodarie/raw/master/LICENSE License
+ */
 public final class SignInFragment
         extends Fragment {
 
+    private static final String TAG = SignInFragment.class.getSimpleName();
+
     private static final class SignInExecutor
             implements ServerApiExecutor<SignInExecutor.ApiResult> {
+
+        private static final String TAG = SignInExecutor.class.getSimpleName();
 
         private static final class ApiResult
                 extends ServerApiExecutor.ApiResult {
@@ -89,16 +97,20 @@ public final class SignInFragment
                 @NonNull final String apiBaseUrl,
                 @NonNull final OkHttpClient okHttpClient
         ) throws JSONException, IOException {
+            Log.d(TAG, "execute");
             String authToken = null;
             final String content = String.format(Locale.ENGLISH, JSON_PATTERN, mGoogleAccountId, mGoogleTokenId, mUserId);
+            Log.d(TAG, "content=" + content);
             final RequestBody body = RequestBody.create(JSON_TYPE, content);
             final Request request = new Request.Builder()
                     .url(apiBaseUrl + "auth/signin")
                     .post(body)
                     .build();
             final Response response = okHttpClient.newCall(request).execute();
+            Log.d(TAG, "response.code=" + response.code());
             if (response.body() != null) {
                 final String responseBody = response.body().string();
+                Log.d(TAG, "responseBody=" + responseBody);
                 if (response.code() == 200) {
                     final JSONObject userJSON = new JSONObject(responseBody);
                     authToken = userJSON.getString("token");
@@ -119,6 +131,7 @@ public final class SignInFragment
             final ViewGroup container,
             final Bundle savedInstanceState
     ) {
+        Log.d(TAG, "onCreateView");
         final View view = inflater.inflate(R.layout.sign_up_fragment, container, false);
         initViews(view);
         return view;
@@ -129,6 +142,7 @@ public final class SignInFragment
             @NonNull final View view,
             @Nullable final Bundle savedInstanceState
     ) {
+        Log.d(TAG, "onViewCreated");
         super.onViewCreated(view, savedInstanceState);
         if (getArguments() != null) {
             mUserId = SignInFragmentArgs.fromBundle(getArguments()).getUserId();
@@ -139,6 +153,7 @@ public final class SignInFragment
 
     @Override
     public void onActivityCreated (@Nullable Bundle savedInstanceState) {
+        Log.d(TAG, "onActivityCreated");
         super.onActivityCreated(savedInstanceState);
         AuthenticationActivity.googleSignIn(
                 requireActivity(),
@@ -149,12 +164,14 @@ public final class SignInFragment
 
     @Override
     public void onDestroy () {
+        Log.d(TAG, "onDestroy");
         super.onDestroy();
         mDisposables.dispose();
     }
 
 
     private void initViews (View view) {
+        Log.d(TAG, "initViews");
         view.findViewById(R.id.btnSignIn).setOnClickListener(
                 v -> AuthenticationActivity.googleSignIn(
                         requireActivity(),
@@ -170,6 +187,7 @@ public final class SignInFragment
             final int resultCode,
             @Nullable final Intent data
     ) {
+        Log.d(TAG, "onActivityResult");
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == ACTIVITY_REQUEST_CODE_GOGGLE_SIGN_IN) {
             final Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
@@ -190,6 +208,7 @@ public final class SignInFragment
             @NonNull final String googleAccountId,
             @NonNull final String googleTokenId
     ) {
+        Log.d(TAG, "startSignIn");
         final ServerConnector serverConnector = new ServerConnector(requireContext());
         final SignInExecutor signInExecutor = new SignInExecutor(googleAccountId, googleTokenId, mUserId);
         mDisposables.add(
@@ -209,6 +228,7 @@ public final class SignInFragment
     private void finishSignIn (
             @NonNull final String authToken
     ) {
+        Log.d(TAG, "finishSignIn");
         final Bundle bundle = new Bundle();
         bundle.putString(AccountManager.KEY_ACCOUNT_NAME, mUserId.toString());
         bundle.putString(AccountManager.KEY_ACCOUNT_TYPE, getString(R.string.account_type));

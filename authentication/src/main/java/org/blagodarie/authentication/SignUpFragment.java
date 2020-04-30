@@ -4,6 +4,7 @@ import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -40,13 +41,17 @@ import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
 /**
  * @author sergeGabrus
- * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
+ * @link https://github.com/6jlarogap/blagodarie/raw/master/LICENSE License
  */
 public final class SignUpFragment
         extends Fragment {
 
+    private static final String TAG = SignUpFragment.class.getSimpleName();
+
     private static final class SignUpExecutor
             implements ServerApiExecutor<SignUpExecutor.ApiResult> {
+
+        private static final String TAG = SignUpExecutor.class.getSimpleName();
 
         private static final class ApiResult
                 extends ServerApiExecutor.ApiResult {
@@ -97,17 +102,21 @@ public final class SignUpFragment
                 @NonNull final String apiBaseUrl,
                 @NonNull final OkHttpClient okHttpClient
         ) throws JSONException, IOException {
+            Log.d(TAG, "execute");
             String userId = null;
             String authToken = null;
             final String content = String.format(JSON_PATTERN, mGoogleAccountId, mGoogleTokenId);
+            Log.d(TAG, "content=" + content);
             final RequestBody body = RequestBody.create(JSON_TYPE, content);
             final Request request = new Request.Builder()
                     .url(apiBaseUrl + "auth/signup")
                     .post(body)
                     .build();
             final Response response = okHttpClient.newCall(request).execute();
+            Log.d(TAG, "response.code=" + response.code());
             if (response.body() != null) {
                 final String responseBody = response.body().string();
+                Log.d(TAG, "responseBody=" + responseBody);
                 if (response.code() == 200) {
                     final JSONObject userJSON = new JSONObject(responseBody);
                     userId = userJSON.getString("user_id");
@@ -128,6 +137,7 @@ public final class SignUpFragment
             @NonNull final LayoutInflater inflater,
             final ViewGroup container,
             final Bundle savedInstanceState) {
+        Log.d(TAG, "onCreateView");
         final View view = inflater.inflate(R.layout.sign_up_fragment, container, false);
         initViews(view);
         return view;
@@ -136,16 +146,19 @@ public final class SignUpFragment
 
     @Override
     public void onActivityCreated (@Nullable Bundle savedInstanceState) {
+        Log.d(TAG, "onActivityCreated");
         super.onActivityCreated(savedInstanceState);
         AuthenticationActivity.googleSignIn(requireActivity(), this, getString(R.string.oauth2_client_id));
     }
 
     private void initViews (View view) {
+        Log.d(TAG, "initViews");
         view.findViewById(R.id.btnSignIn).setOnClickListener(v -> AuthenticationActivity.googleSignIn(requireActivity(), this, getString(R.string.oauth2_client_id)));
     }
 
     @Override
     public void onDestroy () {
+        Log.d(TAG, "onDestroy");
         super.onDestroy();
         mDisposables.dispose();
     }
@@ -156,6 +169,7 @@ public final class SignUpFragment
             final int resultCode,
             @Nullable final Intent data
     ) {
+        Log.d(TAG, "onActivityResult");
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == ACTIVITY_REQUEST_CODE_GOGGLE_SIGN_IN) {
             final Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
@@ -176,6 +190,7 @@ public final class SignUpFragment
             @NonNull final String googleAccountId,
             @NonNull final String googleTokenId
     ) {
+        Log.d(TAG, "startSignUp");
         final ServerConnector serverConnector = new ServerConnector(requireContext());
         final SignUpExecutor signUpExecutor = new SignUpExecutor(googleAccountId, googleTokenId);
         mDisposables.add(
@@ -194,6 +209,7 @@ public final class SignUpFragment
             @NonNull final String accountName,
             @NonNull final String authToken
     ) {
+        Log.d(TAG, "createAccount");
         final AccountManager accountManager = AccountManager.get(getContext());
         final Account account = new Account(accountName, getString(R.string.account_type));
         final Bundle userData = new Bundle();
