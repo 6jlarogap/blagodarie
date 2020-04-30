@@ -66,6 +66,9 @@ public final class SymptomsViewModel
     private final ObservableBoolean mShowLocationProvidersDisabledWarning = new ObservableBoolean(false);
 
     @NonNull
+    private final ObservableBoolean mLocationEnabled;
+
+    @NonNull
     private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
 
     @NonNull
@@ -76,11 +79,14 @@ public final class SymptomsViewModel
 
     public SymptomsViewModel (
             @NonNull final Application application,
-            @NonNull final UUID incognitoId
+            @NonNull final UUID incognitoId,
+            final boolean locationEnabled
     ) {
         super(application);
 
         mRepository = new Repository(application.getApplicationContext());
+
+        mLocationEnabled = new ObservableBoolean(locationEnabled);
 
         for (Symptom symptom : Symptom.getSymptoms()) {
             mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(incognitoId, symptom.getId())));
@@ -155,6 +161,11 @@ public final class SymptomsViewModel
     }
 
     @NonNull
+    public final ObservableBoolean isLocationEnabled () {
+        return mLocationEnabled;
+    }
+
+    @NonNull
     private static String getCurrentDateTimeString () {
         return SimpleDateFormat.getDateTimeInstance().format(new Date());
     }
@@ -168,13 +179,17 @@ public final class SymptomsViewModel
         @NonNull
         private final UUID mIncognitoId;
 
+        private final boolean mLocationEnabled;
+
         Factory (
                 @NonNull final Application application,
-                @NonNull final UUID incognitoId
+                @NonNull final UUID incognitoId,
+                final boolean locationEnabled
         ) {
             super(application);
             mApplication = application;
             mIncognitoId = incognitoId;
+            mLocationEnabled = locationEnabled;
         }
 
 
@@ -183,7 +198,7 @@ public final class SymptomsViewModel
         public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
             if (AndroidViewModel.class.isAssignableFrom(modelClass)) {
                 try {
-                    return modelClass.getConstructor(Application.class, UUID.class).newInstance(mApplication, mIncognitoId);
+                    return modelClass.getConstructor(Application.class, UUID.class, boolean.class).newInstance(mApplication, mIncognitoId, mLocationEnabled);
                 } catch (NoSuchMethodException |
                         IllegalAccessException |
                         InstantiationException |

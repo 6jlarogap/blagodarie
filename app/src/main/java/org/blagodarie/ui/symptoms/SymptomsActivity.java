@@ -32,6 +32,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
+import androidx.databinding.ObservableBoolean;
 import androidx.lifecycle.ViewModelProvider;
 
 import org.blagodarie.BlagodarieApp;
@@ -71,6 +72,8 @@ public final class SymptomsActivity
 
     private static final String TAG = SymptomsActivity.class.getSimpleName();
 
+    private static final String USER_PREFERENCE_PATTERN = "org.blagodarie.ui.symptoms.preference.%s";
+    private static final String PREF_LOCATION_ENABLED = "locationEnabled";
     private static final String EXTRA_ACCOUNT = "org.blagodarie.ui.symptoms.ACCOUNT";
 
     /**
@@ -112,8 +115,8 @@ public final class SymptomsActivity
 
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate");
+        super.onCreate(savedInstanceState);
 
         mRepository = new Repository(this);
 
@@ -123,11 +126,9 @@ public final class SymptomsActivity
 
         initViewModel();
 
-        mSymptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getDisplaySymptoms()), this::createUserSymptom);
+        mSymptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getDisplaySymptoms()), this::checkLocationEnabled);
 
-        mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
-        mActivityBinding.setViewModel(mViewModel);
-        mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
+        initBinding();
 
         setupToolbar();
 
@@ -148,22 +149,49 @@ public final class SymptomsActivity
 
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
+
+        final boolean locationEnable = getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE).getBoolean(PREF_LOCATION_ENABLED, false);//.edit().putString(PREF_LOCATION_ENABLED, contactsOrder.name()).apply();
+
         //создаем фабрику
-        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(getApplication(), mIncognitoId);
+        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
+                getApplication(),
+                mIncognitoId,
+                locationEnable
+        );
 
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
+
+        mViewModel.isLocationEnabled().addOnPropertyChangedCallback(new androidx.databinding.Observable.OnPropertyChangedCallback() {
+            @Override
+            public void onPropertyChanged (androidx.databinding.Observable sender, int propertyId) {
+                if (sender == mViewModel.isLocationEnabled()) {
+                    final boolean newValue = ((ObservableBoolean) sender).get();
+                    getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE).edit().putBoolean(PREF_LOCATION_ENABLED, newValue).apply();
+                    if (newValue) {
+                        checkLocationPermissionAndStartUpdates();
+                    } else {
+                        mViewModel.getCurrentLatitude().set(null);
+                        mViewModel.getCurrentLongitude().set(null);
+                    }
+                }
+            }
+        });
+    }
+
+    private void initBinding () {
+        mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
+        mActivityBinding.setViewModel(mViewModel);
+        mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
     }
 
     @Override
     public void onResume () {
-        super.onResume();
         Log.d(TAG, "onResume");
+        super.onResume();
         checkLatestVersion();
-        if (checkLocationPermission()) {
-            startLocationUpdates();
-        } else {
-            attemptRequestLocationPermissions();
+        if (mViewModel.isLocationEnabled().get()) {
+            checkLocationPermissionAndStartUpdates();
         }
 
         mSymptomsAdapter.order();
@@ -174,16 +202,25 @@ public final class SymptomsActivity
 
     @Override
     protected void onPause () {
-        super.onPause();
         Log.d(TAG, "onPause");
+        super.onPause();
         stopLocationUpdates();
     }
 
     @Override
     protected void onDestroy () {
-        super.onDestroy();
         Log.d(TAG, "onDestroy");
+        super.onDestroy();
         mDisposables.dispose();
+    }
+
+    private void checkLocationPermissionAndStartUpdates () {
+        Log.d(TAG, "checkLocationPermissionAndStartUpdates");
+        if (checkLocationPermission()) {
+            startLocationUpdates();
+        } else {
+            attemptRequestLocationPermissions();
+        }
     }
 
     private void setupToolbar () {
@@ -230,6 +267,34 @@ public final class SymptomsActivity
         mIncognitoId = UUID.fromString(incognitoId);
     }
 
+    public void checkLocationEnabled (
+            @NonNull final DisplaySymptom displaySymptom
+    ) {
+        if (mViewModel.isLocationEnabled().get() &&
+                (mViewModel.getCurrentLatitude().get() == null ||
+                        mViewModel.getCurrentLongitude().get() == null)) {
+            showEmptyLocationAlertDialog(displaySymptom);
+        } else {
+            createUserSymptom(displaySymptom);
+        }
+    }
+
+    private void showEmptyLocationAlertDialog (
+            @NonNull final DisplaySymptom displaySymptom
+    ) {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.empty_location_alert);
+        builder.setMessage(R.string.add_symptom_without_location);
+        builder.setPositiveButton(
+                R.string.action_save_symptom,
+                (dialog, which) -> {
+                    createUserSymptom(displaySymptom);
+                });
+        builder.setNegativeButton(R.string.action_wait, null);
+        builder.create();
+        builder.show();
+    }
+
     public void createUserSymptom (
             @NonNull final DisplaySymptom displaySymptom
     ) {
@@ -267,6 +332,7 @@ public final class SymptomsActivity
     }
 
     private void getAuthTokenAndRequestSync () {
+        Log.d(TAG, "getAuthTokenAndRequestSync");
         mAccountManager.getAuthToken(
                 mAccount,
                 getString(R.string.token_type),
@@ -428,7 +494,7 @@ public final class SymptomsActivity
 
     @Override
     public void onStatusChanged (String provider, int status, Bundle extras) {
-
+        Log.d(TAG, "onStatusChanged");
     }
 
     @Override
