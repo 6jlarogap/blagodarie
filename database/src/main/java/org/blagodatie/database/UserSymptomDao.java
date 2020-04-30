@@ -2,6 +2,7 @@ package org.blagodatie.database;
 
 import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
+import androidx.room.Delete;
 import androidx.room.Insert;
 import androidx.room.Query;
 import androidx.room.Update;
@@ -18,6 +19,9 @@ public abstract class UserSymptomDao {
 
     @Update
     public abstract void update (final Collection<UserSymptom> userSymptom);
+
+    @Delete
+    public abstract void delete (final Collection<UserSymptom> userSymptoms);
 
     @Query ("SELECT us.* " +
             "FROM tbl_user_symptom us " +

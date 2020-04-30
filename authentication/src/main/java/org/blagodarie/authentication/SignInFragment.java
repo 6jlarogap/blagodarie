@@ -24,7 +24,6 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.Locale;
-import java.util.UUID;
 
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -32,10 +31,12 @@ import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import static android.app.Activity.RESULT_OK;
 import static org.blagodarie.authentication.AuthenticationActivity.ACTIVITY_REQUEST_CODE_GOGGLE_SIGN_IN;
+import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
 
 public final class SignInFragment
@@ -62,38 +63,49 @@ public final class SignInFragment
             }
         }
 
+        private static final String JSON_PATTERN = "{\"oauth\":{\"provider\":\"google\",\"id\":\"%s\",\"token\":\"%s\"},\"user_id\":%d}";
+
         @NonNull
         private final String mGoogleAccountId;
 
         @NonNull
         private final String mGoogleTokenId;
 
+        @NonNull
+        private final Long mUserId;
+
         private SignInExecutor (
                 @NonNull final String googleAccountId,
-                @NonNull final String googleTokenId
+                @NonNull final String googleTokenId,
+                @NonNull final Long userId
         ) {
-            this.mGoogleAccountId = googleAccountId;
-            this.mGoogleTokenId = googleTokenId;
+            mGoogleAccountId = googleAccountId;
+            mGoogleTokenId = googleTokenId;
+            mUserId = userId;
         }
 
         @Override
         public SignInExecutor.ApiResult execute (
-                @NonNull String apiBaseUrl,
-                @NonNull OkHttpClient okHttpClient
+                @NonNull final String apiBaseUrl,
+                @NonNull final OkHttpClient okHttpClient
         ) throws JSONException, IOException {
-            Long userId = null;
+            String authToken = null;
+            final String content = String.format(Locale.ENGLISH, JSON_PATTERN, mGoogleAccountId, mGoogleTokenId, mUserId);
+            final RequestBody body = RequestBody.create(JSON_TYPE, content);
             final Request request = new Request.Builder()
-                    .url(apiBaseUrl + "getorcreateuser" + String.format(Locale.ENGLISH, "?googleaccountid=%s", mGoogleAccountId))
+                    .url(apiBaseUrl + "auth/signin")
+                    .post(body)
                     .build();
             final Response response = okHttpClient.newCall(request).execute();
             if (response.body() != null) {
                 final String responseBody = response.body().string();
                 if (response.code() == 200) {
-                    final JSONObject userJSON = new JSONObject(responseBody).getJSONObject("user");
-                    userId = userJSON.getLong("server_id");
+                    final JSONObject userJSON = new JSONObject(responseBody);
+                    authToken = userJSON.getString("token");
                 }
             }
-            return new SignInExecutor.ApiResult("token-from-sign-in:" + UUID.randomUUID().toString());
+            return new SignInExecutor.ApiResult(authToken);
+
         }
     }
 
@@ -179,10 +191,12 @@ public final class SignInFragment
             @NonNull final String googleTokenId
     ) {
         final ServerConnector serverConnector = new ServerConnector(requireContext());
-        final SignInExecutor signUpExecutor = new SignInExecutor(googleAccountId, googleTokenId);
+        final SignInExecutor signInExecutor = new SignInExecutor(googleAccountId, googleTokenId, mUserId);
         mDisposables.add(
                 Observable.
-                        fromCallable(() -> serverConnector.execute(signUpExecutor)).
+                        fromCallable(
+                                () -> serverConnector.execute(signInExecutor)
+                        ).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(

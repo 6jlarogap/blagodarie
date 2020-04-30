@@ -3,16 +3,12 @@ package org.blagodarie.sync;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.collection.LongSparseArray;
 import androidx.core.util.Pair;
 
 import org.blagodarie.Repository;
 import org.blagodarie.UnauthorizedException;
 import org.blagodarie.server.ServerConnector;
 import org.blagodatie.database.UserSymptom;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -53,36 +49,21 @@ final class UserSymptomSyncer {
             @NonNull final String authToken,
             @NonNull final String apiBaseUrl,
             @NonNull final Repository repository
-    ) throws IOException, JSONException, UnauthorizedException {
+    ) throws IOException, UnauthorizedException {
+        Log.d(TAG, "sync");
         final List<UserSymptom> notSyncedUserSymtpoms = repository.getNotSyncedUserSymptoms(incognitoId);
+        Log.d(TAG, "notSyncedUserSymtpoms.size=" + notSyncedUserSymtpoms.size());
         if (notSyncedUserSymtpoms.size() > 0) {
-            final LongSparseArray<UserSymptom> mUserSymptomsById = new LongSparseArray<>();
-            for (UserSymptom userSymptom : notSyncedUserSymtpoms) {
-                assert userSymptom.getId() != null;
-                mUserSymptomsById.put(userSymptom.getId(), userSymptom);
-            }
             final String content = createJsonContent(incognitoId, notSyncedUserSymtpoms);
-            final Request request = createRequest(apiBaseUrl, authToken, content);
-            final Response response = ServerConnector.sendRequestAndGetRespone(request);
+            Log.d(TAG, "content=" + content);
 
+            final Request request = createRequest(apiBaseUrl, authToken, content);
+
+            final Response response = ServerConnector.sendRequestAndGetRespone(request);
             Log.d(TAG, "response.code=" + response.code());
+
             if (response.code() == 200) {
-                if (response.body() != null) {
-                    final String responseBody = response.body().string();
-                    Log.d(TAG, "responseBody=" + responseBody);
-                    final JSONObject responseJson = new JSONObject(responseBody);
-                    final JSONArray userSymptomsJson = responseJson.getJSONArray("user_symptoms");
-                    for (int i = 0; i < userSymptomsJson.length(); i++) {
-                        final JSONObject element = userSymptomsJson.getJSONObject(i);
-                        final long userSymptomId = element.getLong("user_symptom_id");
-                        final long userSymptomServerId = element.getLong("user_symptom_server_id");
-                        final UserSymptom userSymptom = mUserSymptomsById.get(userSymptomId);
-                        if (userSymptom != null) {
-                            //userSymptom.setServerId(userSymptomServerId);
-                        }
-                    }
-                    //repository.updateUserSymptoms(notSyncedUserSymtpoms);
-                }
+                repository.deleteUserSymptoms(notSyncedUserSymtpoms);
             } else if (response.code() == 401) {
                 throw new UnauthorizedException();
             }

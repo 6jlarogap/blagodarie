@@ -11,6 +11,7 @@ import org.blagodatie.database.LastUserSymptomDao;
 import org.blagodatie.database.UserSymptom;
 import org.blagodatie.database.UserSymptomDao;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -76,5 +77,9 @@ public final class Repository {
 
     public LastUserSymptom getLastUserSymptom (@NonNull final UUID incognitoId, final long symptomId) {
         return mLastUserSymptomDao.get(incognitoId, symptomId);
+    }
+
+    public void deleteUserSymptoms (@NonNull final Collection<UserSymptom> userSymptoms) {
+        mUserSymptomDao.delete(userSymptoms);
     }
 }

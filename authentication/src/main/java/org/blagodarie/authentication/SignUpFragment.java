@@ -94,8 +94,8 @@ public final class SignUpFragment
 
         @Override
         public SignUpExecutor.ApiResult execute (
-                @NonNull String apiBaseUrl,
-                @NonNull OkHttpClient okHttpClient
+                @NonNull final String apiBaseUrl,
+                @NonNull final OkHttpClient okHttpClient
         ) throws JSONException, IOException {
             String userId = null;
             String authToken = null;
