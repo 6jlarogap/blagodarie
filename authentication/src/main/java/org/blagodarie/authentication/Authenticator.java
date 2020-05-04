@@ -12,6 +12,8 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import java.util.UUID;
+
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/raw/master/LICENSE License
@@ -20,6 +22,8 @@ public final class Authenticator
         extends AbstractAccountAuthenticator {
 
     private static final String TAG = Authenticator.class.getSimpleName();
+
+    public static final String OPTION_IS_INCOGNITO_USER = "org.blagodarie.authentication.Authenticator.isIncognitoUser";
 
     @NonNull
     private final Context mContext;
@@ -49,13 +53,21 @@ public final class Authenticator
             final Bundle options
     ) throws NetworkErrorException {
         Log.d(TAG, "addAccount");
-        final Intent intent = AuthenticationActivity.createSelfIntent(mContext, accountType, response);
-        final Bundle bundle = new Bundle();
-        if (options != null) {
-            bundle.putAll(options);
+        if(options.getBoolean(OPTION_IS_INCOGNITO_USER, false)) {
+            final String accountName = mContext.getString(R.string.incognito_account_name);
+            final AccountManager accountManager = AccountManager.get(mContext);
+            final Account account = new Account(accountName, mContext.getString(R.string.account_type));
+            final Bundle userData = new Bundle();
+            userData.putString(AccountGeneral.USER_DATA_INCOGNITO_ID, UUID.randomUUID().toString());
+            accountManager.addAccountExplicitly(account, "", userData);
+            return null;
+        } else {
+            final Intent intent = AuthenticationActivity.createSelfIntent(mContext, accountType, response);
+            final Bundle bundle = new Bundle();
+                bundle.putAll(options);
+            bundle.putParcelable(AccountManager.KEY_INTENT, intent);
+            return bundle;
         }
-        bundle.putParcelable(AccountManager.KEY_INTENT, intent);
-        return bundle;
     }
 
     @Override
@@ -73,7 +85,8 @@ public final class Authenticator
             final Bundle options
     ) throws NetworkErrorException {
         Log.d(TAG, "getAuthToken");
-        final Intent intent = AuthenticationActivity.createSelfIntent(mContext, account.type, Long.valueOf(account.name), response);
+        final Long userId = Long.valueOf(AccountManager.get(mContext).getUserData(account, AccountGeneral.USER_DATA_USER_ID));
+        final Intent intent = AuthenticationActivity.createSelfIntent(mContext, account.type, userId, response);
         final Bundle bundle = new Bundle();
         if (options != null) {
             bundle.putAll(options);

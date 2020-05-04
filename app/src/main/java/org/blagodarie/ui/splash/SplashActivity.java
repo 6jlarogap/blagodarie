@@ -12,6 +12,9 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.blagodarie.R;
+import org.blagodarie.authentication.AccountGeneral;
+import org.blagodarie.authentication.Authenticator;
+import org.blagodarie.ui.greeting.GreetingActivity;
 import org.blagodarie.ui.symptoms.SymptomsActivity;
 
 import java.util.Arrays;
@@ -47,11 +50,17 @@ public final class SplashActivity
         final String accountType = getString(R.string.account_type);
         final Account[] accounts = mAccountManager.getAccountsByType(accountType);
         if (accounts.length == 1) {
-            toMainActivity(accounts[0]);
+            if (!accounts[0].name.equals(getString(R.string.incognito_account_name))) {
+                final String userId = mAccountManager.getUserData(accounts[0], AccountGeneral.USER_DATA_USER_ID);
+                if (userId == null) {
+                    mAccountManager.setUserData(accounts[0], AccountGeneral.USER_DATA_USER_ID, accounts[0].name);
+                }
+            }
+            toGreetingActivity(accounts[0]);
         } else if (accounts.length > 1) {
             showAccountPicker(accounts);
         } else {
-            addNewAccount(accountType);
+            addNewAccount(accountType, true);
         }
     }
 
@@ -70,27 +79,32 @@ public final class SplashActivity
                         new ArrayAdapter<>(
                                 getBaseContext(),
                                 android.R.layout.simple_list_item_1, names),
-                        (dialog, which) -> toMainActivity(accounts[which])
+                        (dialog, which) -> toGreetingActivity(accounts[which])
                 ).
                 create().
                 show();
     }
 
-    private void addNewAccount (@NonNull final String accountType) {
+    private void addNewAccount (
+            @NonNull final String accountType,
+            final boolean isIncognitoAccount
+    ) {
         Log.d(TAG, "addNewAccount accountType=" + accountType);
+        Bundle bundle = new Bundle();
+        bundle.putBoolean(Authenticator.OPTION_IS_INCOGNITO_USER, isIncognitoAccount);
         mAccountManager.addAccount(
                 accountType,
                 getString(R.string.token_type),
                 null,
-                null,
+                bundle,
                 this,
                 future -> chooseAccount(),
                 null);
     }
 
-    private void toMainActivity (@NonNull final Account account) {
-        Log.d(TAG, "toMainActivity account=" + account);
-        startActivity(SymptomsActivity.createSelfIntent(this, account));
+    private void toGreetingActivity (@NonNull final Account account) {
+        Log.d(TAG, "toGreetingActivity account=" + account);
+        startActivity(GreetingActivity.createSelfIntent(this, account));
         finish();
     }
 }

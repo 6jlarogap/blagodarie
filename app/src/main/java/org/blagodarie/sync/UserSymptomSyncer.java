@@ -3,6 +3,7 @@ package org.blagodarie.sync;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.util.Pair;
 
 import org.blagodarie.Repository;
@@ -47,7 +48,7 @@ final class UserSymptomSyncer {
 
     final synchronized void sync (
             @NonNull final UUID incognitoId,
-            @NonNull final String authToken,
+            @Nullable final String authToken,
             @NonNull final String apiBaseUrl,
             @NonNull final Repository repository
     ) throws IOException, UnauthorizedException {
@@ -73,15 +74,19 @@ final class UserSymptomSyncer {
 
     private Request createRequest (
             @NonNull final String apiBaseUrl,
-            @NonNull final String authToken,
+            @Nullable final String authToken,
             @NonNull final String content
     ) {
         final RequestBody body = RequestBody.create(JSON_TYPE, content);
-        return new Request.Builder().
-                url(apiBaseUrl + "add_user_symptom").
-                post(body).
-                header("Authorization", String.format("Token %s", authToken)).
-                build();
+        final Request.Builder requestBuilder = new Request.Builder();
+        if (authToken != null) {
+            requestBuilder.url(apiBaseUrl + "add_user_symptom");
+            requestBuilder.header("Authorization", String.format("Token %s", authToken));
+        } else {
+            requestBuilder.url(apiBaseUrl + "addincognitosymptom");
+        }
+        requestBuilder.post(body);
+        return requestBuilder.build();
     }
 
     private String createJsonContent (

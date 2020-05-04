@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.multidex.MultiDexApplication;
 
 import java.text.DateFormat;
@@ -34,7 +35,7 @@ public final class BlagodarieApp
 
     public static void requestSync (
             @NonNull final Account account,
-            @NonNull final String authToken
+            @Nullable final String authToken
     ) {
         Log.d(TAG, "requestSync account=" + account);
         final Bundle settingsBundle = new Bundle();
