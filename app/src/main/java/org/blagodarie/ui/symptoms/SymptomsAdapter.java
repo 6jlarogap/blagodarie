@@ -96,13 +96,7 @@ final class SymptomsAdapter
                 @NonNull final DisplaySymptom displaySymptom,
                 @NonNull final View.OnClickListener onClickListener
         ) {
-            itemView.setOnClickListener(onClickListener);/*
-            itemView.setOnClickListener(v -> {
-                long timestamp = System.currentTimeMillis();
-                displaySymptom.setLastTimestamp(timestamp);
-                userSymptomCreator.onClick(displaySymptom.getSymptom(), timestamp);
-                order();
-            });*/
+            itemView.setOnClickListener(onClickListener);
             mBinding.setDisplaySymptom(displaySymptom);
         }
     }

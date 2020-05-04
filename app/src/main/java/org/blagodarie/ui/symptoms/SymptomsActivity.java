@@ -37,21 +37,17 @@ import androidx.lifecycle.ViewModelProvider;
 
 import org.blagodarie.BlagodarieApp;
 import org.blagodarie.BuildConfig;
+import org.blagodarie.LogReader;
 import org.blagodarie.R;
 import org.blagodarie.Repository;
 import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
-import org.blagodarie.sync.SyncAdapter;
-import org.blagodarie.sync.SyncService;
-import org.blagodarie.ui.splash.SplashActivity;
 import org.blagodarie.ui.update.UpdateActivity;
 import org.blagodatie.database.UserSymptom;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.UUID;
@@ -287,9 +283,7 @@ public final class SymptomsActivity
         builder.setMessage(R.string.add_symptom_without_location);
         builder.setPositiveButton(
                 R.string.action_save_symptom,
-                (dialog, which) -> {
-                    createUserSymptom(displaySymptom);
-                });
+                (dialog, which) -> createUserSymptom(displaySymptom));
         builder.setNegativeButton(R.string.action_wait, null);
         builder.create();
         builder.show();
@@ -414,33 +408,10 @@ public final class SymptomsActivity
 
     public void showLog (final View view) {
         Log.d(TAG, "showLog");
-        Process logcat;
-        final StringBuilder log = new StringBuilder();
-        try {
-            logcat = Runtime.getRuntime().exec(new String[]{
-                    "logcat",
-                    "-d",
-                    "-s",
-                    "-v long",
-                    BlagodarieApp.class.getSimpleName() + ":D",
-                    SplashActivity.class.getSimpleName() + ":D",
-                    SymptomsActivity.class.getSimpleName() + ":D",
-                    SyncService.class.getSimpleName() + ":D",
-                    SyncAdapter.class.getSimpleName() + ":D"
-            });
-            BufferedReader br = new BufferedReader(new InputStreamReader(logcat.getInputStream()), 4 * 1024);
-            String line;
-            String separator = System.getProperty("line.separator");
-            while ((line = br.readLine()) != null) {
-                log.append(line);
-                log.append(separator);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        String log = LogReader.getLog();
 
         final LogDialogBinding logDialogBinding = LogDialogBinding.inflate(getLayoutInflater(), null, false);
-        logDialogBinding.setLog(log.toString());
+        logDialogBinding.setLog(log);
         //перемотать в конец
         logDialogBinding.svLog.post(() -> logDialogBinding.svLog.fullScroll(ScrollView.FOCUS_DOWN));
 
@@ -527,11 +498,16 @@ public final class SymptomsActivity
                         fromCallable(() -> serverConnector.execute(getLatestVersionExecutor)).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
-                        subscribe(apiResult -> {
-                            if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
-                                showUpdateVersionDialog(apiResult.getVersionName(), apiResult.getUri());
-                            }
-                        })
+                        subscribe(
+                                apiResult -> {
+                                    if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
+                                        showUpdateVersionDialog(apiResult.getVersionName(), apiResult.getUri());
+                                    }
+                                },
+                                throwable -> {
+                                    Log.e(TAG, "chechLatestVersion error=" + throwable);
+                                    Toast.makeText(this, R.string.error_server_connection, Toast.LENGTH_LONG).show();
+                                })
         );
     }
 

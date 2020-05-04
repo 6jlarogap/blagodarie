@@ -162,6 +162,15 @@ final class MigrationKeeper {
                         "CREATE UNIQUE INDEX IF NOT EXISTS " +
                                 "`index_tbl_symptom_name` ON `tbl_symptom` (`name`)"
                 );
+
+                //добавить симптомы tbl_symptom
+                database.execSQL(
+                        "INSERT INTO `tbl_symptom` (`id`, `name`) " +
+                                "VALUES (46, 'Чихание'), " +
+                                "(47, 'Першит в горле'), " +
+                                "(48, 'Пасмурно'), " +
+                                "(49, 'Учащённое сердцебиение')"
+                );
             }
 
             //добавить таблицу tbl_last_user_symptom

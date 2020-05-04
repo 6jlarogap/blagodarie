@@ -36,4 +36,5 @@
     <string name="add_symptom_without_location">Желаете сохранить симптом без местоположения?</string>
     <string name="action_wait">Подождать</string>
     <string name="action_save_symptom">Сохранить</string>
+    <string name="error_server_connection">Ошибка связи с сервером</string>
 </resources>
