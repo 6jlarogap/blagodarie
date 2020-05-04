@@ -233,8 +233,8 @@ final class MigrationKeeper {
                 database.execSQL(
                         "INSERT INTO `tbl_user_symptom_new` (`id`, `incognito_id`, `symptom_id`, `timestamp`, `latitude`, `longitude`) " +
                                 "SELECT `id`, 'null', `symptom_id`, strftime('%Y-%m-%d %H:%M:%S.000" + currentTimezone + "', datetime(`timestamp` / 1000, 'unixepoch')), `latitude`, `longitude` " +
-                                "FROM tbl_user_symptom " /*+
-                                "WHERE server_id IS NULL"*/
+                                "FROM tbl_user_symptom " +
+                                "WHERE server_id IS NULL"
                 );
                 //удалить старую таблицу
                 database.execSQL("DROP TABLE IF EXISTS `tbl_user_symptom`");
