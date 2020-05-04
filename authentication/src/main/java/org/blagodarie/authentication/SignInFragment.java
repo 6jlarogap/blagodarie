@@ -71,10 +71,7 @@ public final class SignInFragment
             }
         }
 
-        private static final String JSON_PATTERN = "{\"oauth\":{\"provider\":\"google\",\"id\":\"%s\",\"token\":\"%s\"},\"user_id\":%d}";
-
-        @NonNull
-        private final String mGoogleAccountId;
+        private static final String JSON_PATTERN = "{\"oauth\":{\"provider\":\"google\",\"token\":\"%s\"},\"user_id\":%d}";
 
         @NonNull
         private final String mGoogleTokenId;
@@ -83,11 +80,9 @@ public final class SignInFragment
         private final Long mUserId;
 
         private SignInExecutor (
-                @NonNull final String googleAccountId,
                 @NonNull final String googleTokenId,
                 @NonNull final Long userId
         ) {
-            mGoogleAccountId = googleAccountId;
             mGoogleTokenId = googleTokenId;
             mUserId = userId;
         }
@@ -99,7 +94,7 @@ public final class SignInFragment
         ) throws JSONException, IOException {
             Log.d(TAG, "execute");
             String authToken = null;
-            final String content = String.format(Locale.ENGLISH, JSON_PATTERN, mGoogleAccountId, mGoogleTokenId, mUserId);
+            final String content = String.format(Locale.ENGLISH, JSON_PATTERN, mGoogleTokenId, mUserId);
             Log.d(TAG, "content=" + content);
             final RequestBody body = RequestBody.create(JSON_TYPE, content);
             final Request request = new Request.Builder()
@@ -194,9 +189,8 @@ public final class SignInFragment
             try {
                 final GoogleSignInAccount account = task.getResult(ApiException.class);
                 if (account != null &&
-                        account.getId() != null &&
                         account.getIdToken() != null) {
-                    startSignIn(account.getId(), account.getIdToken());
+                    startSignIn(account.getIdToken());
                 }
             } catch (ApiException e) {
                 Toast.makeText(requireActivity(), e.getMessage(), Toast.LENGTH_LONG).show();
@@ -205,12 +199,11 @@ public final class SignInFragment
     }
 
     private void startSignIn (
-            @NonNull final String googleAccountId,
             @NonNull final String googleTokenId
     ) {
         Log.d(TAG, "startSignIn");
         final ServerConnector serverConnector = new ServerConnector(requireContext());
-        final SignInExecutor signInExecutor = new SignInExecutor(googleAccountId, googleTokenId, mUserId);
+        final SignInExecutor signInExecutor = new SignInExecutor(googleTokenId, mUserId);
         mDisposables.add(
                 Observable.
                         fromCallable(

@@ -81,19 +81,14 @@ public final class SignUpFragment
             }
         }
 
-        private static final String JSON_PATTERN = "{\"oauth\":{\"provider\":\"google\",\"id\":\"%s\",\"token\":\"%s\"}}";
-
-        @NonNull
-        private final String mGoogleAccountId;
+        private static final String JSON_PATTERN = "{\"oauth\":{\"provider\":\"google\",\"token\":\"%s\"}}";
 
         @NonNull
         private final String mGoogleTokenId;
 
         private SignUpExecutor (
-                @NonNull final String googleAccountId,
                 @NonNull final String googleTokenId
         ) {
-            this.mGoogleAccountId = googleAccountId;
             this.mGoogleTokenId = googleTokenId;
         }
 
@@ -105,7 +100,7 @@ public final class SignUpFragment
             Log.d(TAG, "execute");
             String userId = null;
             String authToken = null;
-            final String content = String.format(JSON_PATTERN, mGoogleAccountId, mGoogleTokenId);
+            final String content = String.format(JSON_PATTERN, mGoogleTokenId);
             Log.d(TAG, "content=" + content);
             final RequestBody body = RequestBody.create(JSON_TYPE, content);
             final Request request = new Request.Builder()
@@ -176,9 +171,8 @@ public final class SignUpFragment
             try {
                 final GoogleSignInAccount account = task.getResult(ApiException.class);
                 if (account != null &&
-                        account.getId() != null &&
                         account.getIdToken() != null) {
-                    startSignUp(account.getId(), account.getIdToken());
+                    startSignUp(account.getIdToken());
                 }
             } catch (ApiException e) {
                 Toast.makeText(requireActivity(), e.getMessage(), Toast.LENGTH_LONG).show();
@@ -187,12 +181,11 @@ public final class SignUpFragment
     }
 
     private void startSignUp (
-            @NonNull final String googleAccountId,
             @NonNull final String googleTokenId
     ) {
         Log.d(TAG, "startSignUp");
         final ServerConnector serverConnector = new ServerConnector(requireContext());
-        final SignUpExecutor signUpExecutor = new SignUpExecutor(googleAccountId, googleTokenId);
+        final SignUpExecutor signUpExecutor = new SignUpExecutor(googleTokenId);
         mDisposables.add(
                 Observable.
                         fromCallable(() -> serverConnector.execute(signUpExecutor)).
