@@ -5,6 +5,7 @@ import android.os.Handler;
 import androidx.annotation.NonNull;
 import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
+import androidx.lifecycle.LiveData;
 
 import java.util.Date;
 import java.util.Objects;
@@ -39,17 +40,19 @@ public final class DisplaySymptom
     @NonNull
     private ObservableBoolean mHaveNotSynced = new ObservableBoolean(false);
 
-    private volatile int mUserSymptomCount = 0;
+    private volatile long mUserSymptomCount = 0;
 
     @NonNull
     private ObservableBoolean mHighlight = new ObservableBoolean(false);
 
     public DisplaySymptom (
             @NonNull final Long symptomId,
-            @NonNull final String symptomName
+            @NonNull final String symptomName,
+            @NonNull final LiveData<Boolean> haveNotSynced
     ) {
         mSymptomId = symptomId;
         mSymptomName = symptomName;
+        haveNotSynced.observeForever(input -> mHaveNotSynced.set(input));
     }
 
     @NonNull
@@ -82,11 +85,11 @@ public final class DisplaySymptom
         return mHaveNotSynced;
     }
 
-    int getUserSymptomCount () {
+    long getUserSymptomCount () {
         return mUserSymptomCount;
     }
 
-    void setUserSymptomCount (final int userSymptomCount) {
+    void setUserSymptomCount (final long userSymptomCount) {
         this.mUserSymptomCount = userSymptomCount;
     }
 

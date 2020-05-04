@@ -2,6 +2,9 @@ package org.blagodarie.ui.symptoms;
 
 import android.Manifest;
 import android.accounts.Account;
+import android.accounts.AccountManager;
+import android.accounts.AuthenticatorException;
+import android.accounts.OperationCanceledException;
 import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -29,26 +32,25 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
+import androidx.databinding.ObservableBoolean;
 import androidx.lifecycle.ViewModelProvider;
 
 import org.blagodarie.BlagodarieApp;
 import org.blagodarie.BuildConfig;
+import org.blagodarie.LogReader;
 import org.blagodarie.R;
+import org.blagodarie.Repository;
+import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
-import org.blagodarie.db.BlagodarieDatabase;
-import org.blagodarie.db.UserSymptom;
 import org.blagodarie.server.ServerConnector;
-import org.blagodarie.sync.SyncAdapter;
-import org.blagodarie.sync.SyncService;
-import org.blagodarie.ui.splash.SplashActivity;
 import org.blagodarie.ui.update.UpdateActivity;
+import org.blagodatie.database.UserSymptom;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
+import java.util.UUID;
 
 import io.reactivex.Completable;
 import io.reactivex.Observable;
@@ -66,6 +68,8 @@ public final class SymptomsActivity
 
     private static final String TAG = SymptomsActivity.class.getSimpleName();
 
+    private static final String USER_PREFERENCE_PATTERN = "org.blagodarie.ui.symptoms.preference.%s";
+    private static final String PREF_LOCATION_ENABLED = "locationEnabled";
     private static final String EXTRA_ACCOUNT = "org.blagodarie.ui.symptoms.ACCOUNT";
 
     /**
@@ -89,6 +93,8 @@ public final class SymptomsActivity
 
     private Account mAccount;
 
+    private UUID mIncognitoId;
+
     private SymptomsViewModel mViewModel;
 
     private CompositeDisposable mDisposables = new CompositeDisposable();
@@ -99,68 +105,118 @@ public final class SymptomsActivity
 
     private SymptomsActivityBinding mActivityBinding;
 
+    private Repository mRepository;
+
+    private AccountManager mAccountManager;
+
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate");
+        super.onCreate(savedInstanceState);
 
-        initAccount();
+        mRepository = new Repository(this);
+
+        mAccountManager = AccountManager.get(this);
+
+        initUserData();
 
         initViewModel();
 
-        mSymptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getDisplaySymptoms()), this::createUserSymptom);
+        mSymptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getDisplaySymptoms()), this::checkLocationEnabled);
 
-        mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
-        mActivityBinding.setViewModel(mViewModel);
-        mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
+        initBinding();
 
         setupToolbar();
 
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+        //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
+        mDisposables.add(
+                Completable.
+                        fromAction(() ->
+                                mRepository.setupIncognitoId(mIncognitoId)
+                        ).
+                        subscribeOn(Schedulers.io()).
+                        subscribe(() ->
+                                mViewModel.loadLastValues(mIncognitoId)
+                        )
+        );
     }
 
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
+
+        final boolean locationEnable = getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE).getBoolean(PREF_LOCATION_ENABLED, false);//.edit().putString(PREF_LOCATION_ENABLED, contactsOrder.name()).apply();
+
         //создаем фабрику
-        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(Long.valueOf(mAccount.name), BlagodarieDatabase.getInstance(this).userSymptomDao());
+        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
+                getApplication(),
+                mIncognitoId,
+                locationEnable
+        );
 
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
+
+        mViewModel.isLocationEnabled().addOnPropertyChangedCallback(new androidx.databinding.Observable.OnPropertyChangedCallback() {
+            @Override
+            public void onPropertyChanged (androidx.databinding.Observable sender, int propertyId) {
+                if (sender == mViewModel.isLocationEnabled()) {
+                    final boolean newValue = ((ObservableBoolean) sender).get();
+                    getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE).edit().putBoolean(PREF_LOCATION_ENABLED, newValue).apply();
+                    if (newValue) {
+                        checkLocationPermissionAndStartUpdates();
+                    } else {
+                        mViewModel.getCurrentLatitude().set(null);
+                        mViewModel.getCurrentLongitude().set(null);
+                    }
+                }
+            }
+        });
+    }
+
+    private void initBinding () {
+        mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
+        mActivityBinding.setViewModel(mViewModel);
+        mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
     }
 
     @Override
     public void onResume () {
-        super.onResume();
         Log.d(TAG, "onResume");
+        super.onResume();
         checkLatestVersion();
-        if (checkLocationPermission()) {
-            startLocationUpdates();
-        } else {
-            attemptRequestLocationPermissions();
+        if (mViewModel.isLocationEnabled().get()) {
+            checkLocationPermissionAndStartUpdates();
         }
-        mViewModel.updateUserSymptomCount(
-                Long.valueOf(mAccount.name),
-                BlagodarieDatabase.getInstance(this).userSymptomDao(),
-                () -> {
-                    mSymptomsAdapter.order();
-                    if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
-                        mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
-                    }
-                });
+
+        mSymptomsAdapter.order();
+        if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
+            mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
+        }
     }
 
     @Override
     protected void onPause () {
-        super.onPause();
         Log.d(TAG, "onPause");
+        super.onPause();
         stopLocationUpdates();
     }
 
     @Override
     protected void onDestroy () {
-        super.onDestroy();
         Log.d(TAG, "onDestroy");
+        super.onDestroy();
         mDisposables.dispose();
+    }
+
+    private void checkLocationPermissionAndStartUpdates () {
+        Log.d(TAG, "checkLocationPermissionAndStartUpdates");
+        if (checkLocationPermission()) {
+            startLocationUpdates();
+        } else {
+            attemptRequestLocationPermissions();
+        }
     }
 
     private void setupToolbar () {
@@ -196,66 +252,101 @@ public final class SymptomsActivity
         mLocationManager.removeUpdates(this);
     }
 
-    private void initAccount () {
-        Log.d(TAG, "initAccount");
+    private void initUserData () {
+        Log.d(TAG, "initUserData");
         mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
+        String incognitoId = mAccountManager.getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
+        if (incognitoId == null) {
+            incognitoId = UUID.randomUUID().toString();
+            mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID, incognitoId);
+        }
+        mIncognitoId = UUID.fromString(incognitoId);
+    }
+
+    public void checkLocationEnabled (
+            @NonNull final DisplaySymptom displaySymptom
+    ) {
+        if (mViewModel.isLocationEnabled().get() &&
+                (mViewModel.getCurrentLatitude().get() == null ||
+                        mViewModel.getCurrentLongitude().get() == null)) {
+            showEmptyLocationAlertDialog(displaySymptom);
+        } else {
+            createUserSymptom(displaySymptom);
+        }
+    }
+
+    private void showEmptyLocationAlertDialog (
+            @NonNull final DisplaySymptom displaySymptom
+    ) {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.empty_location_alert);
+        builder.setMessage(R.string.add_symptom_without_location);
+        builder.setPositiveButton(
+                R.string.action_save_symptom,
+                (dialog, which) -> createUserSymptom(displaySymptom));
+        builder.setNegativeButton(R.string.action_wait, null);
+        builder.create();
+        builder.show();
     }
 
     public void createUserSymptom (
             @NonNull final DisplaySymptom displaySymptom
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
-        long timestamp = System.currentTimeMillis();
-        displaySymptom.getLastDate().set(new Date(timestamp));
+        Date currentDate = new Date();
+        displaySymptom.getLastDate().set(currentDate);
 
         final Double latitude = mViewModel.getCurrentLatitude().get();
         final Double longitude = mViewModel.getCurrentLongitude().get();
 
         displaySymptom.getLastLatitude().set(latitude);
         displaySymptom.getLastLongitude().set(longitude);
+        displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
 
         final UserSymptom userSymptom = new UserSymptom(
-                Long.valueOf(mAccount.name),
+                mIncognitoId,
                 displaySymptom.getSymptomId(),
-                timestamp,
+                currentDate,
                 latitude,
                 longitude);
 
         mDisposables.add(
                 Completable.
-                        fromAction(() -> BlagodarieDatabase.getInstance(this).userSymptomDao().insert(userSymptom)).
+                        fromAction(() ->
+                                mRepository.insertUserSymptom(userSymptom)
+                        ).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(() -> {
                             displaySymptom.isHaveNotSynced().set(true);
                             displaySymptom.highlight();
-                            //BlagodarieApp.requestSync(mAccount);
-                            syncUserSymptoms(mAccount, "");
+                            getAuthTokenAndRequestSync();
                         })
         );
     }
 
-    private void syncUserSymptoms (
-            @NonNull final Account account,
-            @NonNull final String authToken
-    ) {
-        Log.d(TAG, "syncUserSymptoms account=" + account + "; authToken=" + authToken);
-        final Long userId = Long.valueOf(account.name);
-        Completable.
-                fromAction(() -> {
-                    final List<UserSymptom> notSyncedUserSymtpoms = BlagodarieDatabase.getInstance(this).userSymptomDao().getNotSynced(userId);
-                    final AddUserSymptomsExecutor addUserSymptomsExecutor = new AddUserSymptomsExecutor(Long.valueOf(account.name), notSyncedUserSymtpoms);
-                    new ServerConnector(this).execute(addUserSymptomsExecutor);
-                    BlagodarieDatabase.getInstance(this).userSymptomDao().update(notSyncedUserSymtpoms);
-                }).
-                subscribeOn(Schedulers.io()).
-                subscribe(
-                        () -> {
-                            Log.d(TAG, "syncUserSymptoms complete");
-                            mViewModel.updateIsHaveNotSynced(Long.valueOf(mAccount.name), BlagodarieDatabase.getInstance(this).userSymptomDao());
-                        },
-                        throwable -> Log.e(TAG, "syncUserSymptoms error=" + throwable)
-                );
+    private void getAuthTokenAndRequestSync () {
+        Log.d(TAG, "getAuthTokenAndRequestSync");
+        mAccountManager.getAuthToken(
+                mAccount,
+                getString(R.string.token_type),
+                null,
+                this,
+                future -> {
+                    try {
+                        Bundle bundle = future.getResult();
+                        if (bundle != null) {
+                            final String authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN);
+                            if (authToken != null) {
+                                BlagodarieApp.requestSync(mAccount, authToken);
+                            }
+                        }
+                    } catch (AuthenticatorException | IOException | OperationCanceledException e) {
+                        e.printStackTrace();
+                    }
+                },
+                null
+        );
     }
 
     private boolean checkLocationPermission () {
@@ -317,34 +408,10 @@ public final class SymptomsActivity
 
     public void showLog (final View view) {
         Log.d(TAG, "showLog");
-        Process logcat;
-        final StringBuilder log = new StringBuilder();
-        try {
-            logcat = Runtime.getRuntime().exec(new String[]{
-                    "logcat",
-                    "-d",
-                    "-s",
-                    "-v long",
-                    BlagodarieApp.class.getSimpleName() + ":D",
-                    SplashActivity.class.getSimpleName() + ":D",
-                    SymptomsActivity.class.getSimpleName() + ":D",
-                    AddUserSymptomsExecutor.class.getSimpleName() + ":D",
-                    SyncService.class.getSimpleName() + ":D",
-                    SyncAdapter.class.getSimpleName() + ":D"
-            });
-            BufferedReader br = new BufferedReader(new InputStreamReader(logcat.getInputStream()), 4 * 1024);
-            String line;
-            String separator = System.getProperty("line.separator");
-            while ((line = br.readLine()) != null) {
-                log.append(line);
-                log.append(separator);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        String log = LogReader.getLog();
 
         final LogDialogBinding logDialogBinding = LogDialogBinding.inflate(getLayoutInflater(), null, false);
-        logDialogBinding.setLog(log.toString());
+        logDialogBinding.setLog(log);
         //перемотать в конец
         logDialogBinding.svLog.post(() -> logDialogBinding.svLog.fullScroll(ScrollView.FOCUS_DOWN));
 
@@ -398,7 +465,7 @@ public final class SymptomsActivity
 
     @Override
     public void onStatusChanged (String provider, int status, Bundle extras) {
-
+        Log.d(TAG, "onStatusChanged");
     }
 
     @Override
@@ -431,11 +498,16 @@ public final class SymptomsActivity
                         fromCallable(() -> serverConnector.execute(getLatestVersionExecutor)).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
-                        subscribe(apiResult -> {
-                            if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
-                                showUpdateVersionDialog(apiResult.getVersionName(), apiResult.getUri());
-                            }
-                        })
+                        subscribe(
+                                apiResult -> {
+                                    if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
+                                        showUpdateVersionDialog(apiResult.getVersionName(), apiResult.getUri());
+                                    }
+                                },
+                                throwable -> {
+                                    Log.e(TAG, "chechLatestVersion error=" + throwable);
+                                    Toast.makeText(this, R.string.error_server_connection, Toast.LENGTH_LONG).show();
+                                })
         );
     }
 

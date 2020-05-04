@@ -96,4 +96,9 @@ public final class ServerConnector {
     ) throws Exception {
         return serverApiExecutor.execute(mApiBaseUrl, generateDefaultOkHttp());
     }
+
+    @NonNull
+    public String getApiBaseUrl () {
+        return mApiBaseUrl;
+    }
 }

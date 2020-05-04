@@ -18,15 +18,15 @@
 
         <include
             layout="@layout/location_permission_rationale"
-            android:visibility="@{ViewModel.isShowLocationPermissionRationale() ? View.VISIBLE : View.GONE}" />
+            android:visibility="@{ViewModel.isLocationEnabled() &amp;&amp; ViewModel.isShowLocationPermissionRationale() ? View.VISIBLE : View.GONE}" />
 
         <include
             layout="@layout/location_permission_denied_explatanion"
-            android:visibility="@{ViewModel.isShowLocationPermissionDeniedExplanation() ? View.VISIBLE : View.GONE}" />
+            android:visibility="@{ViewModel.isLocationEnabled() &amp;&amp; ViewModel.isShowLocationPermissionDeniedExplanation() ? View.VISIBLE : View.GONE}" />
 
         <include
             layout="@layout/location_providers_disabled_warning"
-            android:visibility="@{ViewModel.isShowLocationProvidersDisabledWarning() ? View.VISIBLE : View.GONE}" />
+            android:visibility="@{ViewModel.isLocationEnabled() &amp;&amp; ViewModel.isShowLocationProvidersDisabledWarning() ? View.VISIBLE : View.GONE}" />
 
         <FrameLayout
             android:layout_width="match_parent"
@@ -63,6 +63,12 @@
                 android:layout_gravity="end"
                 android:layout_margin="5dp"
                 android:orientation="vertical">
+
+                <Switch
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/location"
+                    android:checked="@={ViewModel.isLocationEnabled()}"/>
 
                 <TextView
                     android:id="@+id/tvLatitude"

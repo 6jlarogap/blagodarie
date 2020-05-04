@@ -4,6 +4,7 @@ import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,7 +25,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.util.Locale;
 import java.util.UUID;
 
 import io.reactivex.Observable;
@@ -33,19 +33,25 @@ import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import static android.app.Activity.RESULT_OK;
+import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
 /**
  * @author sergeGabrus
- * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
+ * @link https://github.com/6jlarogap/blagodarie/raw/master/LICENSE License
  */
 public final class SignUpFragment
         extends Fragment {
 
+    private static final String TAG = SignUpFragment.class.getSimpleName();
+
     private static final class SignUpExecutor
             implements ServerApiExecutor<SignUpExecutor.ApiResult> {
+
+        private static final String TAG = SignUpExecutor.class.getSimpleName();
 
         private static final class ApiResult
                 extends ServerApiExecutor.ApiResult {
@@ -75,38 +81,45 @@ public final class SignUpFragment
             }
         }
 
-        @NonNull
-        private final String mGoogleAccountId;
+        private static final String JSON_PATTERN = "{\"oauth\":{\"provider\":\"google\",\"token\":\"%s\"}}";
 
         @NonNull
         private final String mGoogleTokenId;
 
         private SignUpExecutor (
-                @NonNull final String googleAccountId,
                 @NonNull final String googleTokenId
         ) {
-            this.mGoogleAccountId = googleAccountId;
             this.mGoogleTokenId = googleTokenId;
         }
 
         @Override
         public SignUpExecutor.ApiResult execute (
-                @NonNull String apiBaseUrl,
-                @NonNull OkHttpClient okHttpClient
+                @NonNull final String apiBaseUrl,
+                @NonNull final OkHttpClient okHttpClient
         ) throws JSONException, IOException {
-            Long userId = null;
+            Log.d(TAG, "execute");
+            String userId = null;
+            String authToken = null;
+            final String content = String.format(JSON_PATTERN, mGoogleTokenId);
+            Log.d(TAG, "content=" + content);
+            final RequestBody body = RequestBody.create(JSON_TYPE, content);
             final Request request = new Request.Builder()
-                    .url(apiBaseUrl + "getorcreateuser" + String.format(Locale.ENGLISH, "?googleaccountid=%s", mGoogleAccountId))
+                    .url(apiBaseUrl + "auth/signup")
+                    .post(body)
                     .build();
             final Response response = okHttpClient.newCall(request).execute();
+            Log.d(TAG, "response.code=" + response.code());
             if (response.body() != null) {
                 final String responseBody = response.body().string();
+                Log.d(TAG, "responseBody=" + responseBody);
                 if (response.code() == 200) {
-                    final JSONObject userJSON = new JSONObject(responseBody).getJSONObject("user");
-                    userId = userJSON.getLong("server_id");
+                    final JSONObject userJSON = new JSONObject(responseBody);
+                    userId = userJSON.getString("user_id");
+                    authToken = userJSON.getString("token");
                 }
             }
-            return new ApiResult(userId.toString(), "token-from-sign-up:" + UUID.randomUUID().toString());
+            return new ApiResult(userId, authToken);
+
         }
     }
 
@@ -119,6 +132,7 @@ public final class SignUpFragment
             @NonNull final LayoutInflater inflater,
             final ViewGroup container,
             final Bundle savedInstanceState) {
+        Log.d(TAG, "onCreateView");
         final View view = inflater.inflate(R.layout.sign_up_fragment, container, false);
         initViews(view);
         return view;
@@ -127,16 +141,19 @@ public final class SignUpFragment
 
     @Override
     public void onActivityCreated (@Nullable Bundle savedInstanceState) {
+        Log.d(TAG, "onActivityCreated");
         super.onActivityCreated(savedInstanceState);
         AuthenticationActivity.googleSignIn(requireActivity(), this, getString(R.string.oauth2_client_id));
     }
 
     private void initViews (View view) {
+        Log.d(TAG, "initViews");
         view.findViewById(R.id.btnSignIn).setOnClickListener(v -> AuthenticationActivity.googleSignIn(requireActivity(), this, getString(R.string.oauth2_client_id)));
     }
 
     @Override
     public void onDestroy () {
+        Log.d(TAG, "onDestroy");
         super.onDestroy();
         mDisposables.dispose();
     }
@@ -147,15 +164,15 @@ public final class SignUpFragment
             final int resultCode,
             @Nullable final Intent data
     ) {
+        Log.d(TAG, "onActivityResult");
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == ACTIVITY_REQUEST_CODE_GOGGLE_SIGN_IN) {
             final Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 final GoogleSignInAccount account = task.getResult(ApiException.class);
                 if (account != null &&
-                        account.getId() != null &&
                         account.getIdToken() != null) {
-                    startSignUp(account.getId(), account.getIdToken());
+                    startSignUp(account.getIdToken());
                 }
             } catch (ApiException e) {
                 Toast.makeText(requireActivity(), e.getMessage(), Toast.LENGTH_LONG).show();
@@ -164,11 +181,11 @@ public final class SignUpFragment
     }
 
     private void startSignUp (
-            @NonNull final String googleAccountId,
             @NonNull final String googleTokenId
     ) {
+        Log.d(TAG, "startSignUp");
         final ServerConnector serverConnector = new ServerConnector(requireContext());
-        final SignUpExecutor signUpExecutor = new SignUpExecutor(googleAccountId, googleTokenId);
+        final SignUpExecutor signUpExecutor = new SignUpExecutor(googleTokenId);
         mDisposables.add(
                 Observable.
                         fromCallable(() -> serverConnector.execute(signUpExecutor)).
@@ -185,9 +202,12 @@ public final class SignUpFragment
             @NonNull final String accountName,
             @NonNull final String authToken
     ) {
+        Log.d(TAG, "createAccount");
         final AccountManager accountManager = AccountManager.get(getContext());
         final Account account = new Account(accountName, getString(R.string.account_type));
-        accountManager.addAccountExplicitly(account, "", null);
+        final Bundle userData = new Bundle();
+        userData.putString(AccountGeneral.USER_DATA_INCOGNITO_ID, UUID.randomUUID().toString());
+        accountManager.addAccountExplicitly(account, "", userData);
         accountManager.setAuthToken(account, getString(R.string.token_type), authToken);
 
         final Bundle bundle = new Bundle();

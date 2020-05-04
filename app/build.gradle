@@ -9,16 +9,10 @@ android {
         applicationId "org.blagodarie"
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 22
-        versionName "0.2.22"
+        versionCode 24
+        versionName "0.3.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
-        javaCompileOptions {
-            annotationProcessorOptions {
-                arguments = ["room.schemaLocation":
-                                     "$projectDir/schemas".toString()]
-            }
-        }
     }
 
     buildTypes {
@@ -44,10 +38,6 @@ android {
         }
     }
 
-    sourceSets {
-        androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
-    }
-
     dataBinding {
         enabled = true
     }
@@ -62,6 +52,7 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation project(path: ':authentication')
     implementation project(path: ':server')
+    implementation project(path: ':database')
 
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation "androidx.cardview:cardview:1.0.0"
@@ -79,9 +70,7 @@ dependencies {
     implementation "io.reactivex.rxjava2:rxjava:2.2.9"
     implementation "io.reactivex.rxjava2:rxandroid:2.1.0"
 
-    annotationProcessor 'androidx.room:room-compiler:2.2.5'
     testImplementation 'junit:junit:4.13'
-    androidTestImplementation "androidx.room:room-testing:2.2.5"
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
     implementation 'com.google.android.material:material:1.1.0'

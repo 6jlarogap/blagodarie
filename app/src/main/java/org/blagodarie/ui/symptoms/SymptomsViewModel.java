@@ -1,14 +1,17 @@
 package org.blagodarie.ui.symptoms;
 
+import android.app.Application;
+
 import androidx.annotation.NonNull;
 import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
+import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
-import org.blagodarie.Symptom;
-import org.blagodarie.db.UserSymptom;
-import org.blagodarie.db.UserSymptomDao;
+import org.blagodarie.Repository;
+import org.blagodatie.database.LastUserSymptom;
+import org.blagodatie.database.Symptom;
 
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
@@ -17,10 +20,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 
 import io.reactivex.Completable;
-import io.reactivex.android.schedulers.AndroidSchedulers;
-import io.reactivex.functions.Action;
+import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 
 /**
@@ -28,12 +31,24 @@ import io.reactivex.schedulers.Schedulers;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class SymptomsViewModel
-        extends ViewModel {
+        extends AndroidViewModel {
 
     private static final long CURRENT_DATE_TIME_UPDATE_PERIOD = 1000L;
 
     @NonNull
     private final ObservableField<String> mCurrentDateTime = new ObservableField<>(getCurrentDateTimeString());
+
+    @NonNull
+    private final Timer mCurrentDateTimeUpdateTimer = new Timer();
+
+    {
+        mCurrentDateTimeUpdateTimer.schedule(new TimerTask() {
+            @Override
+            public void run () {
+                mCurrentDateTime.set(getCurrentDateTimeString());
+            }
+        }, 0, CURRENT_DATE_TIME_UPDATE_PERIOD);
+    }
 
     @NonNull
     private final ObservableField<Double> mCurrentLatitude = new ObservableField<>();
@@ -51,44 +66,52 @@ public final class SymptomsViewModel
     private final ObservableBoolean mShowLocationProvidersDisabledWarning = new ObservableBoolean(false);
 
     @NonNull
-    private final Timer mCurrentDateTimeUpdateTimer = new Timer();
+    private final ObservableBoolean mLocationEnabled;
 
     @NonNull
     private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
 
-    {
-        for (Symptom symptom : Symptom.getSymptoms()) {
-            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName()));
-        }
+    @NonNull
+    private final Repository mRepository;
 
-        mCurrentDateTimeUpdateTimer.schedule(new TimerTask() {
-            @Override
-            public void run () {
-                mCurrentDateTime.set(getCurrentDateTimeString());
-            }
-        }, 0, CURRENT_DATE_TIME_UPDATE_PERIOD);
-    }
-
+    @NonNull
+    private final CompositeDisposable mDisposables = new CompositeDisposable();
 
     public SymptomsViewModel (
-            @NonNull final Long userId,
-            @NonNull final UserSymptomDao userSymptomDao
+            @NonNull final Application application,
+            @NonNull final UUID incognitoId,
+            final boolean locationEnabled
     ) {
-        super();
-        loadLastValues(userId, userSymptomDao);
-        updateIsHaveNotSynced(userId, userSymptomDao);
+        super(application);
+
+        mRepository = new Repository(application.getApplicationContext());
+
+        mLocationEnabled = new ObservableBoolean(locationEnabled);
+
+        for (Symptom symptom : Symptom.getSymptoms()) {
+            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(incognitoId, symptom.getId())));
+        }
+
+        loadLastValues(incognitoId);
     }
 
-    private void loadLastValues (
-            @NonNull final Long userId,
-            @NonNull final UserSymptomDao userSymptomDao
+    @Override
+    protected void onCleared () {
+        mDisposables.dispose();
+        mCurrentDateTimeUpdateTimer.cancel();
+        super.onCleared();
+    }
+
+    void loadLastValues (
+            @NonNull final UUID incognitoId
     ) {
         Completable.
                 fromAction(() -> {
                     for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(userId, displaySymptom.getSymptomId());
+                        final LastUserSymptom lastUserSymptom = mRepository.getLastUserSymptom(incognitoId, displaySymptom.getSymptomId());
                         if (lastUserSymptom != null) {
-                            displaySymptom.getLastDate().set(new Date(lastUserSymptom.getTimestamp()));
+                            displaySymptom.getLastDate().set(lastUserSymptom.getTimestamp());
+                            displaySymptom.setUserSymptomCount(lastUserSymptom.getSymptomsCount());
                             if (lastUserSymptom.getLatitude() != null) {
                                 displaySymptom.getLastLatitude().set(lastUserSymptom.getLatitude());
                             }
@@ -100,46 +123,6 @@ public final class SymptomsViewModel
                 }).
                 subscribeOn(Schedulers.io()).
                 subscribe();
-    }
-
-    void updateUserSymptomCount (
-            @NonNull final Long userId,
-            @NonNull final UserSymptomDao userSymptomDao,
-            @NonNull final Action action
-    ) {
-        Completable.
-                fromAction(() -> {
-                    for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final int userSymptomCount = userSymptomDao.getCountBySymptomId(userId, displaySymptom.getSymptomId());
-                        displaySymptom.setUserSymptomCount(userSymptomCount);
-                    }
-                }).
-                subscribeOn(Schedulers.io()).
-                observeOn(AndroidSchedulers.mainThread()).
-                subscribe(action);
-    }
-
-    void updateIsHaveNotSynced (
-            @NonNull final Long userId,
-            @NonNull final UserSymptomDao userSymptomDao
-    ) {
-        Completable.
-                fromAction(() -> {
-                    for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final UserSymptom lastUserSymptom = userSymptomDao.getLastForSymptomId(userId, displaySymptom.getSymptomId());
-                        if (lastUserSymptom != null) {
-                            displaySymptom.isHaveNotSynced().set(lastUserSymptom.getServerId() == null);
-                        }
-                    }
-                }).
-                subscribeOn(Schedulers.io()).
-                subscribe();
-    }
-
-    @Override
-    protected void onCleared () {
-        mCurrentDateTimeUpdateTimer.cancel();
-        super.onCleared();
     }
 
     @NonNull
@@ -178,38 +161,53 @@ public final class SymptomsViewModel
     }
 
     @NonNull
+    public final ObservableBoolean isLocationEnabled () {
+        return mLocationEnabled;
+    }
+
+    @NonNull
     private static String getCurrentDateTimeString () {
         return SimpleDateFormat.getDateTimeInstance().format(new Date());
     }
 
     static final class Factory
-            implements ViewModelProvider.Factory {
+            extends ViewModelProvider.AndroidViewModelFactory {
 
         @NonNull
-        private final Long mUserId;
+        private final Application mApplication;
 
         @NonNull
-        private final UserSymptomDao mUserSymptomDao;
+        private final UUID mIncognitoId;
+
+        private final boolean mLocationEnabled;
 
         Factory (
-                @NonNull final Long userId,
-                @NonNull final UserSymptomDao userSymptomDao
+                @NonNull final Application application,
+                @NonNull final UUID incognitoId,
+                final boolean locationEnabled
         ) {
-            mUserId = userId;
-            mUserSymptomDao = userSymptomDao;
+            super(application);
+            mApplication = application;
+            mIncognitoId = incognitoId;
+            mLocationEnabled = locationEnabled;
         }
+
 
         @NonNull
         @Override
         public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
-            if (modelClass.isAssignableFrom(SymptomsViewModel.class)) {
+            if (AndroidViewModel.class.isAssignableFrom(modelClass)) {
                 try {
-                    return modelClass.getConstructor(Long.class, UserSymptomDao.class).newInstance(mUserId, mUserSymptomDao);
-                } catch (IllegalAccessException | InstantiationException | InvocationTargetException | NoSuchMethodException e) {
-                    e.printStackTrace();
+                    return modelClass.getConstructor(Application.class, UUID.class, boolean.class).newInstance(mApplication, mIncognitoId, mLocationEnabled);
+                } catch (NoSuchMethodException |
+                        IllegalAccessException |
+                        InstantiationException |
+                        InvocationTargetException e
+                ) {
+                    throw new RuntimeException("Cannot create an instance of " + modelClass, e);
                 }
             }
-            throw new IllegalArgumentException("Unknown ViewModel class");
+            return super.create(modelClass);
         }
     }
 }
