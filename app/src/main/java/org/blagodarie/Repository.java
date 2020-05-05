@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 
 import org.blagodatie.database.BlagodarieDatabase;
+import org.blagodatie.database.Identifier;
 import org.blagodatie.database.LastUserSymptom;
 import org.blagodatie.database.LastUserSymptomDao;
 import org.blagodatie.database.UserSymptom;
@@ -34,7 +35,10 @@ public final class Repository {
         mLastUserSymptomDao = mBlagodarieDatabase.lastUserSymptomDao();
     }
 
-    public LiveData<Boolean> isHaveNotSyncedUserSymptoms (@NonNull final UUID incognitoId, final long symptomId) {
+    public LiveData<Boolean> isHaveNotSyncedUserSymptoms (
+            @NonNull final UUID incognitoId,
+            @NonNull final Identifier symptomId
+    ) {
         return mUserSymptomDao.isHaveNotSynced(incognitoId, symptomId);
     }
 
@@ -50,10 +54,15 @@ public final class Repository {
     }
 
     public void insertUserSymptom (@NonNull final UserSymptom userSymptom) {
+        //выполнить в транзакции
         mBlagodarieDatabase.runInTransaction(() -> {
+            //вставить userSymptom
             mUserSymptomDao.insert(userSymptom);
+            //получить lastUserSymptom, соответствующий userSymptom
             LastUserSymptom lastUserSymptom = mLastUserSymptomDao.get(userSymptom.getIncognitoId(), userSymptom.getSymptomId());
+            //если существует
             if (lastUserSymptom != null) {
+                //обновить данные
                 lastUserSymptom.setTimestamp(userSymptom.getTimestamp());
                 if (userSymptom.getLatitude() != null &&
                         userSymptom.getLongitude() != null) {
@@ -63,6 +72,7 @@ public final class Repository {
                 }
                 mLastUserSymptomDao.update(lastUserSymptom);
             } else {
+                //иначе создать новый lastUserSymptom
                 lastUserSymptom = new LastUserSymptom(
                         userSymptom.getIncognitoId(),
                         userSymptom.getSymptomId(),
@@ -75,7 +85,10 @@ public final class Repository {
         });
     }
 
-    public LastUserSymptom getLastUserSymptom (@NonNull final UUID incognitoId, final long symptomId) {
+    public LastUserSymptom getLastUserSymptom (
+            @NonNull final UUID incognitoId,
+            @NonNull final Identifier symptomId
+    ) {
         return mLastUserSymptomDao.get(incognitoId, symptomId);
     }
 

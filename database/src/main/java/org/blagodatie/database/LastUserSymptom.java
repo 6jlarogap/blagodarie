@@ -32,8 +32,8 @@ public final class LastUserSymptom {
     private final UUID IncognitoId;
 
     @NonNull
-    @ColumnInfo (name = "symptom_id")
-    private final Long SymptomId;
+    @ColumnInfo (name = "symptom_id", typeAffinity = ColumnInfo.INTEGER)
+    private final Identifier SymptomId;
 
     @NonNull
     @ColumnInfo (name = "timestamp", typeAffinity = ColumnInfo.TEXT)
@@ -53,7 +53,7 @@ public final class LastUserSymptom {
 
     LastUserSymptom (
             @NonNull final UUID IncognitoId,
-            @NonNull final Long SymptomId,
+            @NonNull final Identifier SymptomId,
             @NonNull final Date Timestamp,
             @Nullable final Double Latitude,
             @Nullable final Double Longitude,
@@ -70,7 +70,7 @@ public final class LastUserSymptom {
     @Ignore
     public LastUserSymptom (
             @NonNull final UUID IncognitoId,
-            @NonNull final Long SymptomId,
+            @NonNull final Identifier SymptomId,
             @NonNull final Date Timestamp,
             @Nullable final Double Latitude,
             @Nullable final Double Longitude
@@ -83,12 +83,12 @@ public final class LastUserSymptom {
     }
 
     @NonNull
-    public final UUID getIncognitoId () {
+    final UUID getIncognitoId () {
         return IncognitoId;
     }
 
     @NonNull
-    public final Long getSymptomId () {
+    public final Identifier getSymptomId () {
         return SymptomId;
     }
 

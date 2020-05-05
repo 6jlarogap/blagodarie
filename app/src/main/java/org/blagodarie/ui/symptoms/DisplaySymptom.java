@@ -7,6 +7,8 @@ import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
 import androidx.lifecycle.LiveData;
 
+import org.blagodatie.database.Identifier;
+
 import java.util.Date;
 import java.util.Objects;
 
@@ -23,7 +25,7 @@ public final class DisplaySymptom
     private static final long HIGHLIGHT_TIME = 60000;
 
     @NonNull
-    private final Long mSymptomId;
+    private final Identifier mSymptomId;
 
     @NonNull
     private final String mSymptomName;
@@ -46,7 +48,7 @@ public final class DisplaySymptom
     private ObservableBoolean mHighlight = new ObservableBoolean(false);
 
     public DisplaySymptom (
-            @NonNull final Long symptomId,
+            @NonNull final Identifier symptomId,
             @NonNull final String symptomName,
             @NonNull final LiveData<Boolean> haveNotSynced
     ) {
@@ -56,7 +58,7 @@ public final class DisplaySymptom
     }
 
     @NonNull
-    Long getSymptomId () {
+    Identifier getSymptomId () {
         return mSymptomId;
     }
 

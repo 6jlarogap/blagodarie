@@ -3,18 +3,13 @@ package org.blagodatie.database;
 import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
-import androidx.room.Query;
 
 import java.util.Collection;
-import java.util.List;
 
 @Dao
-interface SymptomDao {
+interface SymptomGroupDao {
 
     @Insert (onConflict = OnConflictStrategy.IGNORE)
-    void insert (final Collection<Symptom> symptoms);
+    void insert (final Collection<SymptomGroup> symptomGroups);
 
-    @Query ("SELECT * " +
-            "FROM tbl_symptom")
-    List<Symptom> getAll ();
 }

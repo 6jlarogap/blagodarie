@@ -20,6 +20,16 @@ final class Converters {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(DATE_STRING_FORMAT, Locale.ENGLISH);
 
     @TypeConverter
+    public Identifier longToIdentifier (final Long o) {
+        return o != null ? Identifier.newInstance(o) : Identifier.getNullId();
+    }
+
+    @TypeConverter
+    public Long identifierToLong (@NonNull final Identifier o) {
+        return o.getValue();
+    }
+
+    @TypeConverter
     public UUID stringToUuid (@NonNull final String o) {
         return UUID.fromString(o);
     }

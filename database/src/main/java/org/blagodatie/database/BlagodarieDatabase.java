@@ -15,11 +15,12 @@ import java.util.concurrent.Executors;
 
 @Database (
         entities = {
+                SymptomGroup.class,
                 Symptom.class,
                 UserSymptom.class,
                 LastUserSymptom.class
         },
-        version = 4)
+        version = 5)
 @TypeConverters ({Converters.class})
 public abstract class BlagodarieDatabase
         extends RoomDatabase {
@@ -66,6 +67,8 @@ public abstract class BlagodarieDatabase
                 );
     }
 
+
+    public abstract SymptomGroupDao symptomGroupDao ();
 
     public abstract SymptomDao symptomDao ();
 

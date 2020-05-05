@@ -33,8 +33,8 @@ final class MigrationKeeper {
                             "`name` TEXT NOT NULL)"
             );
             database.execSQL(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS " +
-                            "`index_tbl_symptom_name` ON `tbl_symptom` (`name`)"
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_symptom_name` " +
+                            "ON `tbl_symptom` (`name`)"
             );
 
             //заполнить таблицу tbl_symptom
@@ -113,8 +113,8 @@ final class MigrationKeeper {
                 );
                 //добавить индексы к новой таблице
                 database.execSQL(
-                        "CREATE UNIQUE INDEX IF NOT EXISTS " +
-                                "`index_tbl_user_symptom_server_id` ON `tbl_user_symptom` (`server_id`)"
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_user_symptom_server_id` " +
+                                "ON `tbl_user_symptom` (`server_id`)"
                 );
             }
 
@@ -160,8 +160,8 @@ final class MigrationKeeper {
                 );
                 //Добавить индексы
                 database.execSQL(
-                        "CREATE UNIQUE INDEX IF NOT EXISTS " +
-                                "`index_tbl_symptom_name` ON `tbl_symptom` (`name`)"
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_symptom_name` " +
+                                "ON `tbl_symptom` (`name`)"
                 );
 
                 //добавить симптомы tbl_symptom
@@ -188,8 +188,8 @@ final class MigrationKeeper {
                                 "FOREIGN KEY(`symptom_id`) REFERENCES `tbl_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )"
                 );
                 database.execSQL(
-                        "CREATE INDEX IF NOT EXISTS " +
-                                "`index_tbl_last_user_symptom_symptom_id` ON `tbl_last_user_symptom` (`symptom_id`)"
+                        "CREATE INDEX IF NOT EXISTS `index_tbl_last_user_symptom_symptom_id` " +
+                                "ON `tbl_last_user_symptom` (`symptom_id`)"
                 );
                 database.execSQL(
                         "INSERT INTO `tbl_last_user_symptom` (`incognito_id`, `symptom_id`, `timestamp`, `latitude`, `longitude`, `symptoms_count`) " +
@@ -246,8 +246,8 @@ final class MigrationKeeper {
                 );
                 //Добавить индексы
                 database.execSQL(
-                        "CREATE INDEX IF NOT EXISTS " +
-                                "`index_tbl_user_symptom_symptom_id` ON `tbl_user_symptom` (`symptom_id`)"
+                        "CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_symptom_id` " +
+                                "ON `tbl_user_symptom` (`symptom_id`)"
                 );
             }
 
@@ -261,6 +261,7 @@ final class MigrationKeeper {
     private static final Migration MIGRATION_3_4 = new Migration(3, 4) {
         @Override
         public void migrate (@NonNull SupportSQLiteDatabase database) {
+            Log.d(TAG, "Migrate from 3 to 4");
             //добавить симптомы
             database.execSQL(
                     "INSERT INTO `tbl_symptom` (`id`, `name`) " +
@@ -270,12 +271,106 @@ final class MigrationKeeper {
         }
     };
 
+    private static final Migration MIGRATION_4_5 = new Migration(4, 5) {
+        @Override
+        public void migrate (@NonNull SupportSQLiteDatabase database) {
+            Log.d(TAG, "Migrate from 4 to 5");
+
+            //выключить внешние ключи
+            database.execSQL("PRAGMA foreign_keys = OFF");
+            //начать транзакцию
+            database.execSQL("BEGIN TRANSACTION");
+
+            //создать таблицу tbl_symptom_group
+            {
+                //создать таблицу
+                database.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `tbl_symptom_group` (" +
+                                "`name` TEXT NOT NULL, " +
+                                "`parent_id` INTEGER, " +
+                                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                                "FOREIGN KEY(`parent_id`) REFERENCES `tbl_symptom_group`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )");
+                //создать индексы
+                database.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_symptom_group_name` " +
+                                "ON `tbl_symptom_group` (`name`)");
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_symptom_group_parent_id` " +
+                        "ON `tbl_symptom_group` (`parent_id`)");
+                //заполнить таблицу
+            }
+
+            //изменить таблицу tbl_symptom
+            {
+                //удалить старую таблицу
+                database.execSQL("DROP TABLE IF EXISTS `tbl_symptom`");
+                //создать новую таблицу
+                database.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `tbl_symptom` (" +
+                                "`name` TEXT NOT NULL, " +
+                                "`group_id` INTEGER NOT NULL, " +
+                                "`order` INTEGER NOT NULL, " +
+                                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                                "FOREIGN KEY(`group_id`) REFERENCES `tbl_symptom_group`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )");
+                //создать индексы
+                database.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_symptom_name` " +
+                                "ON `tbl_symptom` (`name`)");
+                database.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_tbl_symptom_group_id` " +
+                                "ON `tbl_symptom` (`group_id`)");
+                database.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_symptom_group_id_order` " +
+                                "ON `tbl_symptom` (`group_id`, `order`)");
+                //заполнить новую таблицу
+                /*database.execSQL("INSERT INTO `tbl_symptom` (`id`, `name`, `group_id`) " +
+                        "VALUES ()");*/
+            }
+
+            //изменить таблицу tbl_user_symptom, Id не может быть пустым
+            {
+                //создать новую таблицу
+                database.execSQL("CREATE TABLE IF NOT EXISTS `tbl_user_symptom_new` (" +
+                        "`incognito_id` TEXT NOT NULL, " +
+                        "`symptom_id` INTEGER NOT NULL, " +
+                        "`timestamp` TEXT NOT NULL, " +
+                        "`latitude` REAL, " +
+                        "`longitude` REAL, " +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "FOREIGN KEY(`symptom_id`) REFERENCES `tbl_symptom`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )");
+                //перенести данные из старой таблицы в новую
+                database.execSQL(
+                        "INSERT INTO `tbl_user_symptom_new` (`id`, `incognito_id`, `symptom_id`, `timestamp`, `latitude`, `longitude`) " +
+                                "SELECT `id`, `incognito_id`, `symptom_id`, `timestamp`, `latitude`, `longitude` " +
+                                "FROM `tbl_user_symptom`"
+                );
+                //удалить старую таблицу
+                database.execSQL("DROP TABLE IF EXISTS `tbl_user_symptom`");
+                //переименовать новую таблицу
+                database.execSQL(
+                        "ALTER TABLE `tbl_user_symptom_new` " +
+                                "RENAME TO `tbl_user_symptom`"
+                );
+                //Добавить индексы
+                database.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_tbl_user_symptom_symptom_id` " +
+                                "ON `tbl_user_symptom` (`symptom_id`)"
+                );
+            }
+
+            //коммит
+            database.execSQL("COMMIT");
+            //включить внешние ключи
+            database.execSQL("PRAGMA foreign_keys = ON");
+        }
+    };
+
     static Migration[] getMigrations () {
         Log.d(TAG, "getMigrations");
         return new Migration[]{
                 MIGRATION_1_2,
                 MIGRATION_2_3,
-                MIGRATION_3_4
+                MIGRATION_3_4,
+                MIGRATION_4_5
         };
     }
 }
