@@ -14,6 +14,7 @@
     <string name="location_providers_disabled_warning">Включите геолокацию.</string>
     <string name="build_type_label"/>
     <string name="action_repeat">Повторить</string>
+    <string name="action_close">Закрыть</string>
     <string name="action_update">Обновить</string>
     <string name="action_finish">Завершить</string>
     <string name="txt_update_available">Доступна новая версия</string>
@@ -37,4 +38,10 @@
     <string name="action_wait">Подождать</string>
     <string name="action_save_symptom">Сохранить</string>
     <string name="error_server_connection">Ошибка связи с сервером</string>
+    <string name="txt_hello">Приветствие!</string>
+    <string name="txt_incognito_id"><u>Анонимный ключ</u></string>
+    <string name="txt_your_incognito_id">Ваш анонимный ключ:</string>
+    <string name="txt_incognito_symptoms">Анонимные ощущения</string>
+    <string name="error_account_not_set">Не задан аккаунт</string>
+    <string name="error_incognito_id_is_missing">Анонимный ключ отсутствует</string>
 </resources>

@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.blagodarie.Repository;
 import org.blagodarie.UnauthorizedException;
@@ -38,7 +39,7 @@ public final class SyncAdapter
             final SyncResult syncResult
     ) {
         Log.d(TAG, "onPerformSync");
-        final String authToken = extras.getString(AccountManager.KEY_AUTHTOKEN, "");
+        final String authToken = extras.getString(AccountManager.KEY_AUTHTOKEN);
         final UUID incognitoId = UUID.fromString(AccountManager.get(getContext()).getUserData(account, AccountGeneral.USER_DATA_INCOGNITO_ID));
         try {
             syncAll(incognitoId, authToken);
@@ -56,7 +57,7 @@ public final class SyncAdapter
 
     private void syncAll (
             @NonNull final UUID incognitoId,
-            @NonNull final String authToken
+            @Nullable final String authToken
     ) throws JSONException, IOException, UnauthorizedException {
         Log.d(TAG, "syncAll");
         final Repository repository = new Repository(getContext());

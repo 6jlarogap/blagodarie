@@ -8,4 +8,6 @@
     <string name="oauth2_client_id" tools:ignore="TypographyDashes">404507462751-5a4j37k4o6nnvlnuof95tl68j30c151p.apps.googleusercontent.com</string>
     <string name="one_account_only">Нельзя добавить больше аккаунтов</string>
     <string name="error_bad_user_id">Неверный идентификатор пользователя</string>
+    <string name="account_name_pattern">Пользователь %d</string>
+    <string name="incognito_account_name">Анонимный пользователь</string>
 </resources>
