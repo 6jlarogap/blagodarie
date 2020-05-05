@@ -56,7 +56,7 @@ public final class SplashActivity
                     mAccountManager.setUserData(accounts[0], AccountGeneral.USER_DATA_USER_ID, accounts[0].name);
                 }
             }
-            toGreetingActivity(accounts[0]);
+            toSymptomsActivity(accounts[0]);
         } else if (accounts.length > 1) {
             showAccountPicker(accounts);
         } else {
@@ -79,7 +79,7 @@ public final class SplashActivity
                         new ArrayAdapter<>(
                                 getBaseContext(),
                                 android.R.layout.simple_list_item_1, names),
-                        (dialog, which) -> toGreetingActivity(accounts[which])
+                        (dialog, which) -> toSymptomsActivity(accounts[which])
                 ).
                 create().
                 show();
@@ -102,9 +102,9 @@ public final class SplashActivity
                 null);
     }
 
-    private void toGreetingActivity (@NonNull final Account account) {
-        Log.d(TAG, "toGreetingActivity account=" + account);
-        startActivity(GreetingActivity.createSelfIntent(this, account));
+    private void toSymptomsActivity (@NonNull final Account account) {
+        Log.d(TAG, "toSymptomsActivity account=" + account);
+        startActivity(SymptomsActivity.createSelfIntent(this, account));
         finish();
     }
 }

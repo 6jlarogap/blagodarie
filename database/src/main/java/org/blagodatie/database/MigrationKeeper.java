@@ -2,6 +2,7 @@ package org.blagodatie.database;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
@@ -257,11 +258,24 @@ final class MigrationKeeper {
         }
     };
 
+    private static final Migration MIGRATION_3_4 = new Migration(3, 4) {
+        @Override
+        public void migrate (@NonNull SupportSQLiteDatabase database) {
+            //добавить симптомы
+            database.execSQL(
+                    "INSERT INTO `tbl_symptom` (`id`, `name`) " +
+                            "VALUES (50, 'Почки'), " +
+                            "(51, 'Лицевой нерв')"
+            );
+        }
+    };
+
     static Migration[] getMigrations () {
         Log.d(TAG, "getMigrations");
         return new Migration[]{
                 MIGRATION_1_2,
-                MIGRATION_2_3
+                MIGRATION_2_3,
+                MIGRATION_3_4
         };
     }
 }

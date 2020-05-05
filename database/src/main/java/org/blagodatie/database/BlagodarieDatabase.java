@@ -19,7 +19,7 @@ import java.util.concurrent.Executors;
                 UserSymptom.class,
                 LastUserSymptom.class
         },
-        version = 3)
+        version = 4)
 @TypeConverters ({Converters.class})
 public abstract class BlagodarieDatabase
         extends RoomDatabase {
