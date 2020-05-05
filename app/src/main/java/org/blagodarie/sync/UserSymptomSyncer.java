@@ -60,6 +60,7 @@ final class UserSymptomSyncer {
             Log.d(TAG, "content=" + content);
 
             final Request request = createRequest(apiBaseUrl, authToken, content);
+            Log.d(TAG, "request=" + request);
 
             final Response response = ServerConnector.sendRequestAndGetRespone(request);
             Log.d(TAG, "response.code=" + response.code());
