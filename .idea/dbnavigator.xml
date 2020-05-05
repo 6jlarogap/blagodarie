@@ -23,65 +23,22 @@
     <autoscroll-to-editor value="false" />
     <autoscroll-from-editor value="true" />
     <show-object-properties value="true" />
-    <loaded-nodes />
+    <loaded-nodes>
+      <connection connection-id="f91f0ff1-0ff7-405d-8941-d801d45b43ed">
+        <schema name="main" object-types="constraint, index, table, view, dataset trigger, column" />
+      </connection>
+    </loaded-nodes>
   </component>
   <component name="DBNavigator.Project.DatabaseConsoleManager">
     <connection id="f91f0ff1-0ff7-405d-8941-d801d45b43ed">
-      <console name="Connection 1" type="STANDARD" schema="main" session="Main"><![CDATA[select strftime('%Y-%m-%d %H:%M:%S.000', datetime(1234,'unixepoch')) from tbl_user_symptom;
+      <console name="Connection 1" type="STANDARD" schema="main" session="Main"><![CDATA[select * from tbl_symptom_group;
+select * from tbl_symptom;
+insert into tbl_symptom_group values('group2', 1, null);
 
-select * from tbl_user_symptom;
+PRAGMA foreign_keys = ON;
+insert into tbl_symptom values('symptom7',3, 2, null);
 
-
-
-SELECT incognito_id,
-    symptom_id,
-    MAX(timestamp)||'asdf',
-    COUNT(*),
-    (SELECT latitude 
-     FROM tbl_user_symptom us1 
-     WHERE us1.incognito_id = us.incognito_id 
-     AND us1.symptom_id = us.symptom_id 
-     AND us1.timestamp = (SELECT MAX(timestamp) 
-                          FROM tbl_user_symptom us2
-                          WHERE us2.incognito_id = us1.incognito_id
-                          AND us2.symptom_id = us1.symptom_id
-                          AND latitude IS NOT null
-                          AND longitude IS NOT null)) AS latitude,
-    (SELECT longitude
-     FROM tbl_user_symptom us1 
-     WHERE us1.incognito_id = us.incognito_id 
-     AND us1.symptom_id = us.symptom_id 
-     AND us1.timestamp = (SELECT MAX(timestamp) 
-                          FROM tbl_user_symptom us2
-                          WHERE us2.incognito_id = us1.incognito_id
-                          AND us2.symptom_id = us1.symptom_id
-                          AND latitude IS NOT null
-                          AND longitude IS NOT null)) AS longitude 
-FROM tbl_user_symptom us
-GROUP BY incognito_id, symptom_id;
-
-WITH last_coords AS (
-SELECT symptom_id, 
-       latitude as last_latitude, 
-       longitude as last_longitude
-FROM tbl_user_symptom us1 
-WHERE us1.timestamp = (SELECT MAX(timestamp) 
-                       FROM tbl_user_symptom us2
-                       WHERE us2.symptom_id = us1.symptom_id
-                       AND latitude IS NOT null
-                       AND longitude IS NOT null)
-)
-SELECT 'null',
-       us.symptom_id,
-       strftime('%Y-%m-%d %H:%M:%S.000', datetime(MAX(us.timestamp) / 1000, 'unixepoch')),
-       --us.timestamp /,
-       COUNT(us.id),
-       lc.last_latitude,
-       lc.last_longitude
-FROM tbl_user_symptom us
-LEFT JOIN last_coords lc ON lc.symptom_id = us.symptom_id
---GROUP BY us.symptom_id
-;]]></console>
+delete from tbl_symptom_group;]]></console>
     </connection>
   </component>
   <component name="DBNavigator.Project.DatabaseFileManager">
@@ -128,7 +85,7 @@ LEFT JOIN last_coords lc ON lc.symptom_id = us.symptom_id
           <port value="1234" />
           <database value="database" />
           <files>
-            <file path="c:\Users\sergeGabrus\Documents\AndroidStudio\DeviceExplorer\xiaomi_6a_API_28 [emulator-5554]\data\data\org.blagodarie\databases\blagodarie.db" schema="main" />
+            <file path="c:\Users\sergeGabrus\Documents\AndroidStudio\DeviceExplorer\xiaomi_6a_API_28 [emulator-5554]\data\data\org.blagodarie.dbg\databases\blagodarie.db" schema="main" />
           </files>
           <type value="NONE" />
           <user value="" />

@@ -1,6 +1,7 @@
 package org.blagodatie.database;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.ForeignKey;
@@ -32,19 +33,19 @@ public final class Symptom
     @ColumnInfo (name = "name")
     private final String Name;
 
-    @NonNull
+    @Nullable
     @ColumnInfo (name = "group_id", typeAffinity = ColumnInfo.INTEGER)
     private final Identifier GroupId;
 
-    @NonNull
+    @Nullable
     @ColumnInfo (name = "order")
     private final Integer Order;
 
     Symptom (
             @NonNull final Identifier Id,
             @NonNull final String Name,
-            @NonNull final Identifier GroupId,
-            @NonNull final Integer Order
+            @Nullable final Identifier GroupId,
+            @Nullable final Integer Order
     ) {
         super(Id);
         this.Name = Name;
@@ -57,12 +58,12 @@ public final class Symptom
         return Name;
     }
 
-    @NonNull
+    @Nullable
     public final Identifier getGroupId () {
         return GroupId;
     }
 
-    @NonNull
+    @Nullable
     public final Integer getOrder () {
         return Order;
     }
