@@ -100,6 +100,8 @@ public final class Symptom
         symptoms.add(new Symptom(47L, "Першит в горле"));
         symptoms.add(new Symptom(48L, "Пасмурно"));
         symptoms.add(new Symptom(49L, "Учащённое сердцебиение"));
+        symptoms.add(new Symptom(50L, "Почки"));
+        symptoms.add(new Symptom(51L, "Лицевой нерв"));
         return symptoms;
     }
 }
