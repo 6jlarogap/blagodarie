@@ -64,11 +64,13 @@
                 android:layout_margin="5dp"
                 android:orientation="vertical">
 
-                <Switch
+                <androidx.appcompat.widget.SwitchCompat
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/location"
-                    android:checked="@={ViewModel.isLocationEnabled()}"/>
+                    android:checked="@={ViewModel.isLocationEnabled()}"
+                    android:theme="@style/LocationSwitchStyle"
+                    />
 
                 <TextView
                     android:id="@+id/tvLatitude"
