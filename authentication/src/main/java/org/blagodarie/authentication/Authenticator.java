@@ -4,7 +4,6 @@ import android.accounts.AbstractAccountAuthenticator;
 import android.accounts.Account;
 import android.accounts.AccountAuthenticatorResponse;
 import android.accounts.AccountManager;
-import android.accounts.NetworkErrorException;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -51,9 +50,9 @@ public final class Authenticator
             final String authTokenType,
             final String[] requiredFeatures,
             final Bundle options
-    ) throws NetworkErrorException {
+    ) {
         Log.d(TAG, "addAccount");
-        if(options.getBoolean(OPTION_IS_INCOGNITO_USER, false)) {
+        if (options.getBoolean(OPTION_IS_INCOGNITO_USER, false)) {
             final String accountName = mContext.getString(R.string.incognito_account_name);
             final AccountManager accountManager = AccountManager.get(mContext);
             final Account account = new Account(accountName, mContext.getString(R.string.account_type));
@@ -64,7 +63,7 @@ public final class Authenticator
         } else {
             final Intent intent = AuthenticationActivity.createSelfIntent(mContext, accountType, response);
             final Bundle bundle = new Bundle();
-                bundle.putAll(options);
+            bundle.putAll(options);
             bundle.putParcelable(AccountManager.KEY_INTENT, intent);
             return bundle;
         }
@@ -72,7 +71,10 @@ public final class Authenticator
 
     @Override
     public Bundle confirmCredentials (
-            final AccountAuthenticatorResponse response, Account account, Bundle options) throws NetworkErrorException {
+            final AccountAuthenticatorResponse response,
+            final Account account,
+            final Bundle options
+    ) {
         Log.d(TAG, "confirmCredentials");
         return null;
     }
@@ -83,15 +85,18 @@ public final class Authenticator
             final Account account,
             final String authTokenType,
             final Bundle options
-    ) throws NetworkErrorException {
+    ) {
         Log.d(TAG, "getAuthToken");
-        final Long userId = Long.valueOf(AccountManager.get(mContext).getUserData(account, AccountGeneral.USER_DATA_USER_ID));
-        final Intent intent = AuthenticationActivity.createSelfIntent(mContext, account.type, userId, response);
         final Bundle bundle = new Bundle();
         if (options != null) {
             bundle.putAll(options);
         }
-        bundle.putParcelable(AccountManager.KEY_INTENT, intent);
+        //если не анонимный аккаунт
+        if (!account.name.equals(mContext.getString(R.string.incognito_account_name))) {
+            final Long userId = Long.valueOf(AccountManager.get(mContext).getUserData(account, AccountGeneral.USER_DATA_USER_ID));
+            final Intent intent = AuthenticationActivity.createSelfIntent(mContext, account.type, userId, response);
+            bundle.putParcelable(AccountManager.KEY_INTENT, intent);
+        }
         return bundle;
     }
 
@@ -107,7 +112,7 @@ public final class Authenticator
             final Account account,
             final String authTokenType,
             final Bundle options
-    ) throws NetworkErrorException {
+    ) {
         Log.d(TAG, "updateCredentials");
         throw new UnsupportedOperationException();
     }
@@ -117,7 +122,7 @@ public final class Authenticator
             final AccountAuthenticatorResponse response,
             final Account account,
             final String[] features
-    ) throws NetworkErrorException {
+    ) {
         Log.d(TAG, "hasFeatures");
         throw new UnsupportedOperationException();
     }
