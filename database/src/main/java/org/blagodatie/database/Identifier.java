@@ -9,14 +9,16 @@ public final class Identifier {
 
     private static final Identifier NULL_ID = new Identifier(null);
 
+    @Nullable
     private final Long mValue;
 
-    private Identifier (final Long value) {
+    private Identifier (@Nullable final Long value) {
         mValue = value;
     }
 
-    static Identifier newInstance(@NonNull final Long value){
-        return new Identifier(value);
+    @NonNull
+    public static Identifier newInstance (@Nullable final Long value) {
+        return value != null ? new Identifier(value) : NULL_ID;
     }
 
     @Nullable
@@ -24,15 +26,11 @@ public final class Identifier {
         return mValue;
     }
 
-    static Identifier getNullId () {
-        return NULL_ID;
-    }
-
     @Override
     public boolean equals (Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Identifier identificator = (Identifier) o;
+        final Identifier identificator = (Identifier) o;
         return Objects.equals(mValue, identificator.mValue);
     }
 

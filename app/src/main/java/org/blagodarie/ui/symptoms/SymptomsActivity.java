@@ -141,6 +141,8 @@ public final class SymptomsActivity
                                 mViewModel.loadLastValues(mIncognitoId)
                         )
         );
+
+        getAuthTokenAndRequestSync();
     }
 
     private void initViewModel () {

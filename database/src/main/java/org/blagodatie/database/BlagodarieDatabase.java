@@ -8,6 +8,7 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 import androidx.room.TypeConverters;
+import androidx.sqlite.db.SimpleSQLiteQuery;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
 import java.util.concurrent.Executors;
@@ -27,6 +28,14 @@ public abstract class BlagodarieDatabase
 
     private static final String TAG = BlagodarieDatabase.class.getSimpleName();
 
+    /**
+     * Запрос для отключения внешних ключей.
+     */
+    private static final SimpleSQLiteQuery QUERY_DEFER_FOREIGN_KEYS = new SimpleSQLiteQuery("PRAGMA defer_foreign_keys = true");
+
+    /**
+     * Название файла базы данных.
+     */
     private static final String DATABASE_NAME = "blagodarie.db";
 
     private static volatile BlagodarieDatabase INSTANCE;
@@ -63,10 +72,15 @@ public abstract class BlagodarieDatabase
                 newSingleThreadExecutor().
                 execute(() ->
                         getDatabase(context).symptomDao().insert(Symptom.getSymptoms())
-
                 );
     }
 
+    /**
+     * Отключает внешние ключи до конца транзакции.
+     */
+    public void deferForeignKeys () {
+        query(QUERY_DEFER_FOREIGN_KEYS);
+    }
 
     public abstract SymptomGroupDao symptomGroupDao ();
 

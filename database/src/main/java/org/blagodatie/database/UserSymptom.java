@@ -76,7 +76,7 @@ public final class UserSymptom
             @Nullable final Double Latitude,
             @Nullable final Double Longitude
     ) {
-        super(Identifier.getNullId());
+        super(Identifier.newInstance(null));
         this.IncognitoId = IncognitoId;
         this.SymptomId = SymptomId;
         this.Timestamp = Timestamp;

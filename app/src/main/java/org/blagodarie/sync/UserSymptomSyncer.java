@@ -38,6 +38,7 @@ final class UserSymptomSyncer {
 
     @NonNull
     static UserSymptomSyncer getInstance () {
+        Log.d(TAG, "getInstance");
         synchronized (UserSymptomSyncer.class) {
             if (INSTANCE == null) {
                 INSTANCE = new UserSymptomSyncer();

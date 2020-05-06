@@ -9,6 +9,7 @@ import androidx.room.Index;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity (
         tableName = "tbl_symptom",
@@ -41,7 +42,7 @@ public final class Symptom
     @ColumnInfo (name = "order")
     private final Integer Order;
 
-    Symptom (
+    public Symptom (
             @NonNull final Identifier Id,
             @NonNull final String Name,
             @Nullable final Identifier GroupId,
@@ -66,6 +67,19 @@ public final class Symptom
     @Nullable
     public final Integer getOrder () {
         return Order;
+    }
+
+    @Override
+    public boolean equals (Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        final Symptom symptom = (Symptom) o;
+        return getId().equals(symptom.getId());
+    }
+
+    @Override
+    public int hashCode () {
+        return Objects.hash(getId());
     }
 
     @NonNull

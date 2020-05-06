@@ -26,6 +26,8 @@ public final class SyncAdapter
 
     private static final String TAG = SyncAdapter.class.getSimpleName();
 
+    private static final String GENERAL_PREFERENCE = "org.blagodarie.ui.symptoms.preference.general";
+
     SyncAdapter (Context context, boolean autoInitialize) {
         super(context, autoInitialize);
     }
@@ -63,6 +65,16 @@ public final class SyncAdapter
         final Repository repository = new Repository(getContext());
         final ServerConnector serverConnector = new ServerConnector(getContext());
 
+        //синхронизировать симптомы
+        SymptomSyncer.
+                getInstance().
+                sync(
+                        serverConnector.getApiBaseUrl(),
+                        repository,
+                        getContext().getSharedPreferences(GENERAL_PREFERENCE, Context.MODE_PRIVATE)
+                );
+
+        //синхронизировать симптомы пользователя
         UserSymptomSyncer.
                 getInstance().
                 sync(
@@ -71,6 +83,7 @@ public final class SyncAdapter
                         serverConnector.getApiBaseUrl(),
                         repository
                 );
+
     }
 
 }

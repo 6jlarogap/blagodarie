@@ -21,7 +21,7 @@ final class Converters {
 
     @TypeConverter
     public Identifier longToIdentifier (final Long o) {
-        return o != null ? Identifier.newInstance(o) : Identifier.getNullId();
+        return Identifier.newInstance(o);
     }
 
     @TypeConverter

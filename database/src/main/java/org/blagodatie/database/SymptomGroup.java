@@ -7,6 +7,8 @@ import androidx.room.Entity;
 import androidx.room.ForeignKey;
 import androidx.room.Index;
 
+import java.util.Objects;
+
 @Entity (
         tableName = "tbl_symptom_group",
         inheritSuperIndices = true,
@@ -33,7 +35,7 @@ public final class SymptomGroup
     @ColumnInfo (name = "parent_id", typeAffinity = ColumnInfo.INTEGER)
     private final Identifier ParentId;
 
-    SymptomGroup (
+    public SymptomGroup (
             @NonNull final Identifier Id,
             @NonNull final String Name,
             @Nullable final Identifier ParentId
@@ -51,6 +53,19 @@ public final class SymptomGroup
     @Nullable
     public final Identifier getParentId () {
         return ParentId;
+    }
+
+    @Override
+    public boolean equals (Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        final SymptomGroup that = (SymptomGroup) o;
+        return getId().equals(that.getId());
+    }
+
+    @Override
+    public int hashCode () {
+        return Objects.hash(getId());
     }
 
     @NonNull

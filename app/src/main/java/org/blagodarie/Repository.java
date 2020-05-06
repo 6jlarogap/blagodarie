@@ -1,14 +1,22 @@
 package org.blagodarie;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
+import androidx.sqlite.db.SimpleSQLiteQuery;
 
+import org.blagodarie.ui.symptoms.SymptomsActivity;
 import org.blagodatie.database.BlagodarieDatabase;
 import org.blagodatie.database.Identifier;
 import org.blagodatie.database.LastUserSymptom;
 import org.blagodatie.database.LastUserSymptomDao;
+import org.blagodatie.database.Symptom;
+import org.blagodatie.database.SymptomDao;
+import org.blagodatie.database.SymptomGroup;
+import org.blagodatie.database.SymptomGroupDao;
+import org.blagodatie.database.SymptomGroupWithSubgroupsAndSymptoms;
 import org.blagodatie.database.UserSymptom;
 import org.blagodatie.database.UserSymptomDao;
 
@@ -20,8 +28,16 @@ import static org.blagodatie.database.BlagodarieDatabase.getDatabase;
 
 public final class Repository {
 
+    private static final String TAG = Repository.class.getSimpleName();
+
     @NonNull
     private final BlagodarieDatabase mBlagodarieDatabase;
+
+    @NonNull
+    private final SymptomGroupDao mSymptomGroupDao;
+
+    @NonNull
+    private final SymptomDao mSymptomDao;
 
     @NonNull
     private final UserSymptomDao mUserSymptomDao;
@@ -31,29 +47,35 @@ public final class Repository {
 
     public Repository (@NonNull final Context context) {
         mBlagodarieDatabase = getDatabase(context);
+        mSymptomGroupDao = mBlagodarieDatabase.symptomGroupDao();
+        mSymptomDao = mBlagodarieDatabase.symptomDao();
         mUserSymptomDao = mBlagodarieDatabase.userSymptomDao();
         mLastUserSymptomDao = mBlagodarieDatabase.lastUserSymptomDao();
     }
 
-    public LiveData<Boolean> isHaveNotSyncedUserSymptoms (
+    public final LiveData<Boolean> isHaveNotSyncedUserSymptoms (
             @NonNull final UUID incognitoId,
             @NonNull final Identifier symptomId
     ) {
+        Log.d(TAG, "isHaveNotSyncedUserSymptoms");
         return mUserSymptomDao.isHaveNotSynced(incognitoId, symptomId);
     }
 
-    public List<UserSymptom> getNotSyncedUserSymptoms (@NonNull final UUID incognitoId) {
+    public final List<UserSymptom> getNotSyncedUserSymptoms (@NonNull final UUID incognitoId) {
+        Log.d(TAG, "getNotSyncedUserSymptoms");
         return mUserSymptomDao.getNotSynced(incognitoId);
     }
 
-    public void setupIncognitoId (@NonNull final UUID incognitoId) {
+    public final void setupIncognitoId (@NonNull final UUID incognitoId) {
+        Log.d(TAG, "setupIncognitoId");
         mBlagodarieDatabase.runInTransaction(() -> {
             mUserSymptomDao.setupIncognitoId(incognitoId);
             mLastUserSymptomDao.setupIncognitoId(incognitoId);
         });
     }
 
-    public void insertUserSymptom (@NonNull final UserSymptom userSymptom) {
+    public final void insertUserSymptom (@NonNull final UserSymptom userSymptom) {
+        Log.d(TAG, "insertUserSymptom");
         //выполнить в транзакции
         mBlagodarieDatabase.runInTransaction(() -> {
             //вставить userSymptom
@@ -85,14 +107,38 @@ public final class Repository {
         });
     }
 
-    public LastUserSymptom getLastUserSymptom (
+    public final LastUserSymptom getLastUserSymptom (
             @NonNull final UUID incognitoId,
             @NonNull final Identifier symptomId
     ) {
+        Log.d(TAG, "getLastUserSymptom");
         return mLastUserSymptomDao.get(incognitoId, symptomId);
     }
 
-    public void deleteUserSymptoms (@NonNull final Collection<UserSymptom> userSymptoms) {
+    public final void deleteUserSymptoms (@NonNull final Collection<UserSymptom> userSymptoms) {
+        Log.d(TAG, "deleteUserSymptoms");
         mUserSymptomDao.delete(userSymptoms);
+    }
+
+    public final void updateSymptoms (
+            @NonNull final Collection<SymptomGroup> newSymptomGroups,
+            @NonNull final Collection<Symptom> newSymptoms
+    ) {
+        Log.d(TAG, "updateSymptoms");
+        mBlagodarieDatabase.runInTransaction(() -> {
+            mBlagodarieDatabase.deferForeignKeys();
+            //удалить все симптомы
+            mSymptomDao.deleteAll();
+            //удалить все группы симптомов
+            mSymptomGroupDao.deleteAll();
+            //вставить новые группы
+            mSymptomGroupDao.insert(newSymptomGroups);
+            //вставить новые симптомы
+            mSymptomDao.insert(newSymptoms);
+        });
+    }
+
+    public final List<SymptomGroupWithSubgroupsAndSymptoms> getGroupWithSubgroupsAndSymptoms () {
+        return mSymptomGroupDao.getAll();
     }
 }
