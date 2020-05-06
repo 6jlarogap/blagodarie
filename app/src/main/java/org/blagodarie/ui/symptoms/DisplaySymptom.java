@@ -3,8 +3,9 @@ package org.blagodarie.ui.symptoms;
 import android.os.Handler;
 
 import androidx.annotation.NonNull;
-import androidx.databinding.ObservableBoolean;
-import androidx.databinding.ObservableField;
+import androidx.annotation.Nullable;
+import androidx.databinding.BaseObservable;
+import androidx.databinding.Bindable;
 import androidx.lifecycle.LiveData;
 
 import org.blagodatie.database.Identifier;
@@ -17,6 +18,7 @@ import java.util.Objects;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class DisplaySymptom
+        extends BaseObservable
         implements Comparable<DisplaySymptom> {
 
     /**
@@ -30,22 +32,20 @@ public final class DisplaySymptom
     @NonNull
     private final String mSymptomName;
 
-    @NonNull
-    private ObservableField<Date> mLastDate = new ObservableField<>();
+    @Nullable
+    private Date mLastDate;
 
-    @NonNull
-    private ObservableField<Double> mLastLatitude = new ObservableField<>();
+    @Nullable
+    private Double mLastLatitude;
 
-    @NonNull
-    private ObservableField<Double> mLastLongitude = new ObservableField<>();
+    @Nullable
+    private Double mLastLongitude;
 
-    @NonNull
-    private ObservableBoolean mHaveNotSynced = new ObservableBoolean(false);
+    private boolean mHaveNotSynced = false;
 
     private volatile long mUserSymptomCount = 0;
 
-    @NonNull
-    private ObservableBoolean mHighlight = new ObservableBoolean(false);
+    private boolean mHighlight = false;
 
     public DisplaySymptom (
             @NonNull final Identifier symptomId,
@@ -54,7 +54,7 @@ public final class DisplaySymptom
     ) {
         mSymptomId = symptomId;
         mSymptomName = symptomName;
-        haveNotSynced.observeForever(input -> mHaveNotSynced.set(input));
+        haveNotSynced.observeForever(this::setHaveNotSynced);
     }
 
     @NonNull
@@ -63,28 +63,52 @@ public final class DisplaySymptom
     }
 
     @NonNull
-    public String getSymptomName () {
+    @Bindable
+    public final String getSymptomName () {
         return mSymptomName;
     }
 
-    @NonNull
-    public final ObservableField<Date> getLastDate () {
+    @Nullable
+    @Bindable
+    public final Date getLastDate () {
         return mLastDate;
     }
 
-    @NonNull
-    public ObservableField<Double> getLastLatitude () {
+    final void setLastDate (@Nullable final Date lastDate) {
+        mLastDate = lastDate;
+        notifyPropertyChanged(org.blagodarie.BR.lastDate);
+    }
+
+    @Nullable
+    @Bindable
+    public Double getLastLatitude () {
         return mLastLatitude;
     }
 
-    @NonNull
-    public ObservableField<Double> getLastLongitude () {
+    final void setLastLatitude (@Nullable final Double lastLatitude) {
+        mLastLatitude = lastLatitude;
+        notifyPropertyChanged(org.blagodarie.BR.lastLatitude);
+    }
+
+    @Nullable
+    @Bindable
+    public Double getLastLongitude () {
         return mLastLongitude;
     }
 
-    @NonNull
-    public ObservableBoolean isHaveNotSynced () {
+    final void setLastLongitude (@Nullable final Double lastLongitude) {
+        mLastLongitude = lastLongitude;
+        notifyPropertyChanged(org.blagodarie.BR.lastLongitude);
+    }
+
+    @Bindable
+    public boolean isHaveNotSynced () {
         return mHaveNotSynced;
+    }
+
+    void setHaveNotSynced (boolean mHaveNotSynced) {
+        this.mHaveNotSynced = mHaveNotSynced;
+        notifyPropertyChanged(org.blagodarie.BR.haveNotSynced);
     }
 
     long getUserSymptomCount () {
@@ -95,14 +119,19 @@ public final class DisplaySymptom
         this.mUserSymptomCount = userSymptomCount;
     }
 
-    @NonNull
-    public ObservableBoolean getHighlight () {
+    @Bindable
+    public boolean getHighlight () {
         return mHighlight;
     }
 
+    private void setHighlight (final boolean mHighlight) {
+        this.mHighlight = mHighlight;
+        notifyPropertyChanged(org.blagodarie.BR.highlight);
+    }
+
     void highlight () {
-        mHighlight.set(true);
-        new Handler().postDelayed(() -> mHighlight.set(false), HIGHLIGHT_TIME);
+        setHighlight(true);
+        new Handler().postDelayed(() -> setHighlight(false), HIGHLIGHT_TIME);
     }
 
     @Override
@@ -135,8 +164,8 @@ public final class DisplaySymptom
         if (this == o) {
             result = 0;
         } else {
-            long thisTimestamp = this.mLastDate.get() == null ? 0 : this.mLastDate.get().getTime();
-            long otherTimestamp = o.mLastDate.get() == null ? 0 : o.mLastDate.get().getTime();
+            long thisTimestamp = this.mLastDate == null ? 0 : this.mLastDate.getTime();
+            long otherTimestamp = o.mLastDate == null ? 0 : o.mLastDate.getTime();
             result = -Long.compare(thisTimestamp, otherTimestamp);
             if (result == 0) {
                 result = this.mSymptomName.compareTo(o.mSymptomName);

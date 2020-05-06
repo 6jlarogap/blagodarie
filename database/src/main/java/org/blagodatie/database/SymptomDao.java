@@ -1,5 +1,6 @@
 package org.blagodatie.database;
 
+import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
 import androidx.room.Delete;
 import androidx.room.Insert;
@@ -20,5 +21,5 @@ public interface SymptomDao {
 
     @Query ("SELECT * " +
             "FROM tbl_symptom")
-    List<Symptom> getAll ();
+    LiveData<List<Symptom>> getAll ();
 }

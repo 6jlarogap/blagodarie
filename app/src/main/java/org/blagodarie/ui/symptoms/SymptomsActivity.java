@@ -45,11 +45,13 @@ import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.ui.update.UpdateActivity;
+import org.blagodatie.database.Symptom;
 import org.blagodatie.database.UserSymptom;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import io.reactivex.Completable;
@@ -142,6 +144,14 @@ public final class SymptomsActivity
                         )
         );
 
+        mViewModel.getSymptoms().observe(
+                this,
+                symptoms -> {
+                    mViewModel.setDisplaySymptoms(createDisplaySymptoms(symptoms));
+                    mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
+                }
+        );
+
         getAuthTokenAndRequestSync();
     }
 
@@ -210,6 +220,14 @@ public final class SymptomsActivity
         Log.d(TAG, "onDestroy");
         super.onDestroy();
         mDisposables.dispose();
+    }
+
+    private List<DisplaySymptom> createDisplaySymptoms (@NonNull final List<Symptom> symptoms) {
+        final List<DisplaySymptom> displaySymptoms = new ArrayList<>();
+        for (Symptom symptom : symptoms){
+            displaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(mIncognitoId, symptom.getId())));
+        }
+        return displaySymptoms;
     }
 
     private void checkLocationPermissionAndStartUpdates () {
@@ -296,13 +314,13 @@ public final class SymptomsActivity
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
         Date currentDate = new Date();
-        displaySymptom.getLastDate().set(currentDate);
+        displaySymptom.setLastDate(currentDate);
 
         final Double latitude = mViewModel.getCurrentLatitude().get();
         final Double longitude = mViewModel.getCurrentLongitude().get();
 
-        displaySymptom.getLastLatitude().set(latitude);
-        displaySymptom.getLastLongitude().set(longitude);
+        displaySymptom.setLastLatitude(latitude);
+        displaySymptom.setLastLongitude(longitude);
         displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
 
         final UserSymptom userSymptom = new UserSymptom(
@@ -320,7 +338,7 @@ public final class SymptomsActivity
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(() -> {
-                            displaySymptom.isHaveNotSynced().set(true);
+                            displaySymptom.setHaveNotSynced(true);
                             displaySymptom.highlight();
                             getAuthTokenAndRequestSync();
                         })

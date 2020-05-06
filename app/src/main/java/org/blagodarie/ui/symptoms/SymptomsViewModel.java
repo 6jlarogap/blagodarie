@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
 import androidx.lifecycle.AndroidViewModel;
+import androidx.lifecycle.LiveData;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -77,6 +78,9 @@ public final class SymptomsViewModel
     @NonNull
     private final CompositeDisposable mDisposables = new CompositeDisposable();
 
+    @NonNull
+    private final LiveData<List<Symptom>> mSymptoms;
+
     public SymptomsViewModel (
             @NonNull final Application application,
             @NonNull final UUID incognitoId,
@@ -84,13 +88,11 @@ public final class SymptomsViewModel
     ) {
         super(application);
 
-        mRepository = new Repository(application.getApplicationContext());
-
         mLocationEnabled = new ObservableBoolean(locationEnabled);
 
-        for (Symptom symptom : Symptom.getSymptoms()) {
-            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(incognitoId, symptom.getId())));
-        }
+        mRepository = new Repository(application.getApplicationContext());
+
+        mSymptoms = mRepository.getSymptoms();
 
         loadLastValues(incognitoId);
     }
@@ -102,6 +104,10 @@ public final class SymptomsViewModel
         super.onCleared();
     }
 
+    final LiveData<List<Symptom>> getSymptoms (){
+        return mSymptoms;
+    }
+
     void loadLastValues (
             @NonNull final UUID incognitoId
     ) {
@@ -110,13 +116,13 @@ public final class SymptomsViewModel
                     for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
                         final LastUserSymptom lastUserSymptom = mRepository.getLastUserSymptom(incognitoId, displaySymptom.getSymptomId());
                         if (lastUserSymptom != null) {
-                            displaySymptom.getLastDate().set(lastUserSymptom.getTimestamp());
+                            displaySymptom.setLastDate(lastUserSymptom.getTimestamp());
                             displaySymptom.setUserSymptomCount(lastUserSymptom.getSymptomsCount());
                             if (lastUserSymptom.getLatitude() != null) {
-                                displaySymptom.getLastLatitude().set(lastUserSymptom.getLatitude());
+                                displaySymptom.setLastLatitude(lastUserSymptom.getLatitude());
                             }
                             if (lastUserSymptom.getLongitude() != null) {
-                                displaySymptom.getLastLongitude().set(lastUserSymptom.getLongitude());
+                                displaySymptom.setLastLongitude(lastUserSymptom.getLongitude());
                             }
                         }
                     }
@@ -128,6 +134,11 @@ public final class SymptomsViewModel
     @NonNull
     final List<DisplaySymptom> getDisplaySymptoms () {
         return mDisplaySymptoms;
+    }
+
+    final void setDisplaySymptoms (@NonNull final List<DisplaySymptom> displaySymptoms) {
+        mDisplaySymptoms.clear();
+        mDisplaySymptoms.addAll(displaySymptoms);
     }
 
     @NonNull

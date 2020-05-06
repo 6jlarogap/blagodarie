@@ -138,7 +138,9 @@ public final class Repository {
         });
     }
 
-    public final List<SymptomGroupWithSubgroupsAndSymptoms> getGroupWithSubgroupsAndSymptoms () {
-        return mSymptomGroupDao.getAll();
+    public final LiveData<List<Symptom>> getSymptoms(){
+        return mSymptomDao.getAll();
     }
+
+
 }
