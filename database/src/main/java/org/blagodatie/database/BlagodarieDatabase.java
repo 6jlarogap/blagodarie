@@ -68,11 +68,13 @@ public abstract class BlagodarieDatabase
 
     private static void prepopulateDatabase (@NonNull final Context context) {
         Log.d(TAG, "prepopulateDatabase");
-        Executors.
+        /*Executors.
                 newSingleThreadExecutor().
                 execute(() ->
                         getDatabase(context).symptomDao().insert(Symptom.getSymptoms())
                 );
+
+         */
     }
 
     /**

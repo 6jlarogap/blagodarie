@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "1ed4d11d123af9bbee96465a24bcb4ce",
+    "identityHash": "bc147e92817564f2f64d4a544c328895",
     "entities": [
       {
         "tableName": "tbl_symptom_group",
@@ -67,7 +67,7 @@
       },
       {
         "tableName": "tbl_symptom",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `group_id` INTEGER, `order` INTEGER, `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, FOREIGN KEY(`group_id`) REFERENCES `tbl_symptom_group`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `group_id` INTEGER NOT NULL, `order` INTEGER, `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, FOREIGN KEY(`group_id`) REFERENCES `tbl_symptom_group`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
         "fields": [
           {
             "fieldPath": "Name",
@@ -79,7 +79,7 @@
             "fieldPath": "GroupId",
             "columnName": "group_id",
             "affinity": "INTEGER",
-            "notNull": false
+            "notNull": true
           },
           {
             "fieldPath": "Order",
@@ -289,7 +289,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1ed4d11d123af9bbee96465a24bcb4ce')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bc147e92817564f2f64d4a544c328895')"
     ]
   }
 }

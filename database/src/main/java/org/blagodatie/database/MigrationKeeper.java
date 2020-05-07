@@ -307,7 +307,7 @@ final class MigrationKeeper {
                 database.execSQL(
                         "CREATE TABLE IF NOT EXISTS `tbl_symptom` (" +
                                 "`name` TEXT NOT NULL, " +
-                                "`group_id` INTEGER, " +
+                                "`group_id` INTEGER NOT NULL, " +
                                 "`order` INTEGER, " +
                                 "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                                 "FOREIGN KEY(`group_id`) REFERENCES `tbl_symptom_group`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )");
