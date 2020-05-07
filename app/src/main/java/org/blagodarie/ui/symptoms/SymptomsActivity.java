@@ -34,6 +34,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.databinding.ObservableBoolean;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import org.blagodarie.BlagodarieApp;
 import org.blagodarie.BuildConfig;
@@ -46,6 +48,7 @@ import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.ui.update.UpdateActivity;
 import org.blagodatie.database.Symptom;
+import org.blagodatie.database.SymptomGroupWithSymptoms;
 import org.blagodatie.database.UserSymptom;
 
 import java.io.IOException;
@@ -103,6 +106,8 @@ public final class SymptomsActivity
 
     private LocationManager mLocationManager;
 
+    private SymptomGroupsAdapter mSymptomGroupsAdapter;
+
     private SymptomsAdapter mSymptomsAdapter;
 
     private SymptomsActivityBinding mActivityBinding;
@@ -124,7 +129,9 @@ public final class SymptomsActivity
 
         initViewModel();
 
-        mSymptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getDisplaySymptoms()), this::checkLocationEnabled);
+        mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
+
+        mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
 
         initBinding();
 
@@ -143,14 +150,39 @@ public final class SymptomsActivity
                                 mViewModel.loadLastValues(mIncognitoId)
                         )
         );
+        /////////////////////////////////
 
-        mViewModel.getSymptoms().observe(
+        mRepository.getSymptomGroups().observe(
+                this,
+                symptomGroupsWithSymptoms -> {
+                    //запомнить выбранную группу
+                    final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
+
+                    //задать новые данные
+                    mViewModel.setDisplaySymptomGroups(createDisplaySymptomGroups(symptomGroupsWithSymptoms));
+                    mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
+
+                    //вернуть выбранную группу
+                    if (mViewModel.getDisplaySymptomGroups().size() > 0) {
+                        //если существует выбранная группа, и она присутствует в новом списке
+                        if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
+                            //выделить ее
+                            showSymptomsForGroup(selectedGroup);
+                        } else {
+                            //иначе выбрать первую
+                            showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                        }
+                    }
+                }
+        );
+/*
+        mRepository.getSymptoms().observe(
                 this,
                 symptoms -> {
                     mViewModel.setDisplaySymptoms(createDisplaySymptoms(symptoms));
                     mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
                 }
-        );
+        );*/
 
         getAuthTokenAndRequestSync();
     }
@@ -191,6 +223,8 @@ public final class SymptomsActivity
         mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
         mActivityBinding.setViewModel(mViewModel);
         mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
+        mActivityBinding.rvSymptomGroups.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
+        mActivityBinding.rvSymptomGroups.setAdapter(mSymptomGroupsAdapter);
     }
 
     @Override
@@ -222,9 +256,29 @@ public final class SymptomsActivity
         mDisposables.dispose();
     }
 
-    private List<DisplaySymptom> createDisplaySymptoms (@NonNull final List<Symptom> symptoms) {
+    private List<DisplaySymptomGroup> createDisplaySymptomGroups (
+            @NonNull final List<SymptomGroupWithSymptoms> symptomGroups
+    ) {
+        Log.d(TAG, "createDisplaySymptomGroups");
+        final List<DisplaySymptomGroup> displaySymptomGroups = new ArrayList<>();
+        for (SymptomGroupWithSymptoms symptomGroupWithSymptoms : symptomGroups) {
+            displaySymptomGroups.add(
+                    new DisplaySymptomGroup(
+                            symptomGroupWithSymptoms.getSymptomGroup().getId(),
+                            symptomGroupWithSymptoms.getSymptomGroup().getName(),
+                            createDisplaySymptoms(symptomGroupWithSymptoms.getSymptoms())
+                    )
+            );
+        }
+        return displaySymptomGroups;
+    }
+
+    private List<DisplaySymptom> createDisplaySymptoms (
+            @NonNull final List<Symptom> symptoms
+    ) {
+        Log.d(TAG, "createDisplaySymptoms");
         final List<DisplaySymptom> displaySymptoms = new ArrayList<>();
-        for (Symptom symptom : symptoms){
+        for (Symptom symptom : symptoms) {
             displaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(mIncognitoId, symptom.getId())));
         }
         return displaySymptoms;
@@ -281,6 +335,14 @@ public final class SymptomsActivity
             mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID, incognitoId);
         }
         mIncognitoId = UUID.fromString(incognitoId);
+    }
+
+    public void showSymptomsForGroup (
+            @NonNull final DisplaySymptomGroup displaySymptomGroup
+    ) {
+        mViewModel.setSelectedDisplaySymptomGroup(displaySymptomGroup);
+        mViewModel.setDisplaySymptoms(displaySymptomGroup.getDisplaySymptoms());
+        mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
     }
 
     public void checkLocationEnabled (

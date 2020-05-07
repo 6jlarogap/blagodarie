@@ -8,7 +8,9 @@ import androidx.databinding.BaseObservable;
 import androidx.databinding.Bindable;
 import androidx.lifecycle.LiveData;
 
+import org.blagodarie.Repository;
 import org.blagodatie.database.Identifier;
+import org.blagodatie.database.Symptom;
 
 import java.util.Date;
 import java.util.Objects;
@@ -124,8 +126,8 @@ public final class DisplaySymptom
         return mHighlight;
     }
 
-    private void setHighlight (final boolean mHighlight) {
-        this.mHighlight = mHighlight;
+    private void setHighlight (final boolean highlight) {
+        mHighlight = highlight;
         notifyPropertyChanged(org.blagodarie.BR.highlight);
     }
 
@@ -173,4 +175,5 @@ public final class DisplaySymptom
         }
         return result;
     }
+
 }

@@ -23,22 +23,18 @@
     <autoscroll-to-editor value="false" />
     <autoscroll-from-editor value="true" />
     <show-object-properties value="true" />
-    <loaded-nodes>
-      <connection connection-id="f91f0ff1-0ff7-405d-8941-d801d45b43ed">
-        <schema name="main" object-types="table, view" />
-      </connection>
-    </loaded-nodes>
+    <loaded-nodes />
   </component>
   <component name="DBNavigator.Project.DatabaseConsoleManager">
     <connection id="f91f0ff1-0ff7-405d-8941-d801d45b43ed">
-      <console name="Connection 1" type="STANDARD" schema="main" session="Main">select * from tbl_symptom_group;
+      <console name="Connection 1" type="STANDARD" schema="main" session="Main"><![CDATA[select * from tbl_symptom_group;
 select * from tbl_symptom;
 insert into tbl_symptom_group values('group2', 1, null);
 
 PRAGMA foreign_keys = ON;
 insert into tbl_symptom values('symptom7',3, 2, null);
 
-delete from tbl_symptom_group;</console>
+delete from tbl_symptom_group;]]></console>
     </connection>
   </component>
   <component name="DBNavigator.Project.DatabaseFileManager">

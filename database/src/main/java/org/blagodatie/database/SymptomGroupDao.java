@@ -1,5 +1,6 @@
 package org.blagodatie.database;
 
+import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
@@ -21,5 +22,5 @@ public interface SymptomGroupDao {
     @Transaction
     @Query ("SELECT * " +
             "FROM tbl_symptom_group")
-    List<SymptomGroupWithSubgroupsAndSymptoms> getAll ();
+    LiveData<List<SymptomGroupWithSymptoms>> getAll ();
 }

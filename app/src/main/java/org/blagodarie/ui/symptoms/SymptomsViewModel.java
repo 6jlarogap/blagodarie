@@ -3,16 +3,15 @@ package org.blagodarie.ui.symptoms;
 import android.app.Application;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
 import androidx.lifecycle.AndroidViewModel;
-import androidx.lifecycle.LiveData;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
 import org.blagodarie.Repository;
 import org.blagodatie.database.LastUserSymptom;
-import org.blagodatie.database.Symptom;
 
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
@@ -70,6 +69,9 @@ public final class SymptomsViewModel
     private final ObservableBoolean mLocationEnabled;
 
     @NonNull
+    private final List<DisplaySymptomGroup> mDisplaySymptomGroups = new ArrayList<>();
+
+    @NonNull
     private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
 
     @NonNull
@@ -78,8 +80,8 @@ public final class SymptomsViewModel
     @NonNull
     private final CompositeDisposable mDisposables = new CompositeDisposable();
 
-    @NonNull
-    private final LiveData<List<Symptom>> mSymptoms;
+    @Nullable
+    private DisplaySymptomGroup mSelectedGroup;
 
     public SymptomsViewModel (
             @NonNull final Application application,
@@ -92,23 +94,17 @@ public final class SymptomsViewModel
 
         mRepository = new Repository(application.getApplicationContext());
 
-        mSymptoms = mRepository.getSymptoms();
-
         loadLastValues(incognitoId);
     }
 
     @Override
-    protected void onCleared () {
+    protected final void onCleared () {
         mDisposables.dispose();
         mCurrentDateTimeUpdateTimer.cancel();
         super.onCleared();
     }
 
-    final LiveData<List<Symptom>> getSymptoms (){
-        return mSymptoms;
-    }
-
-    void loadLastValues (
+    final void loadLastValues (
             @NonNull final UUID incognitoId
     ) {
         Completable.
@@ -136,9 +132,35 @@ public final class SymptomsViewModel
         return mDisplaySymptoms;
     }
 
+    @NonNull
+    final List<DisplaySymptomGroup> getDisplaySymptomGroups () {
+        return mDisplaySymptomGroups;
+    }
+
+    @Nullable
+    final DisplaySymptomGroup getSelectedDisplaySymptomGroup () {
+        for(DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups){
+            if (displaySymptomGroup.isSelected()){
+                return displaySymptomGroup;
+            }
+        }
+        return null;
+    }
+
+    final void setSelectedDisplaySymptomGroup (@Nullable final DisplaySymptomGroup selectedGroup) {
+        for(DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups){
+            displaySymptomGroup.setSelected(displaySymptomGroup.equals(selectedGroup));
+        }
+    }
+
     final void setDisplaySymptoms (@NonNull final List<DisplaySymptom> displaySymptoms) {
         mDisplaySymptoms.clear();
         mDisplaySymptoms.addAll(displaySymptoms);
+    }
+
+    final void setDisplaySymptomGroups (@NonNull final List<DisplaySymptomGroup> displaySymptomGroups) {
+        mDisplaySymptomGroups.clear();
+        mDisplaySymptomGroups.addAll(displaySymptomGroups);
     }
 
     @NonNull

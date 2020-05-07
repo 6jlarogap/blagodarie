@@ -5,9 +5,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
-import androidx.sqlite.db.SimpleSQLiteQuery;
 
-import org.blagodarie.ui.symptoms.SymptomsActivity;
 import org.blagodatie.database.BlagodarieDatabase;
 import org.blagodatie.database.Identifier;
 import org.blagodatie.database.LastUserSymptom;
@@ -16,7 +14,7 @@ import org.blagodatie.database.Symptom;
 import org.blagodatie.database.SymptomDao;
 import org.blagodatie.database.SymptomGroup;
 import org.blagodatie.database.SymptomGroupDao;
-import org.blagodatie.database.SymptomGroupWithSubgroupsAndSymptoms;
+import org.blagodatie.database.SymptomGroupWithSymptoms;
 import org.blagodatie.database.UserSymptom;
 import org.blagodatie.database.UserSymptomDao;
 
@@ -140,6 +138,10 @@ public final class Repository {
 
     public final LiveData<List<Symptom>> getSymptoms(){
         return mSymptomDao.getAll();
+    }
+
+    public final LiveData<List<SymptomGroupWithSymptoms>> getSymptomGroups(){
+        return mSymptomGroupDao.getAll();
     }
 
 

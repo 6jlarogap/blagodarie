@@ -6,19 +6,11 @@ import androidx.room.Relation;
 
 import java.util.List;
 
-public final class SymptomGroupWithSubgroupsAndSymptoms {
+public final class SymptomGroupWithSymptoms {
 
     @NonNull
     @Embedded
     private final SymptomGroup SymptomGroup;
-
-    @NonNull
-    @Relation (
-            parentColumn = "id",
-            entityColumn = "parent_id",
-            entity = SymptomGroup.class
-    )
-    private final List<SymptomGroup> Subgroups;
 
     @NonNull
     @Relation (
@@ -28,13 +20,21 @@ public final class SymptomGroupWithSubgroupsAndSymptoms {
     )
     private final List<Symptom> Symptoms;
 
-    SymptomGroupWithSubgroupsAndSymptoms (
+    SymptomGroupWithSymptoms (
             @NonNull final SymptomGroup SymptomGroup,
-            @NonNull final List<Symptom> Symptoms,
-            @NonNull final List<SymptomGroup> Subgroups
+            @NonNull final List<Symptom> Symptoms
     ) {
         this.SymptomGroup = SymptomGroup;
         this.Symptoms = Symptoms;
-        this.Subgroups = Subgroups;
+    }
+
+    @NonNull
+    public final SymptomGroup getSymptomGroup () {
+        return SymptomGroup;
+    }
+
+    @NonNull
+    public final List<Symptom> getSymptoms () {
+        return Symptoms;
     }
 }
