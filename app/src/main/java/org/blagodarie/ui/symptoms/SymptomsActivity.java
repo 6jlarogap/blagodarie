@@ -155,23 +155,28 @@ public final class SymptomsActivity
         mRepository.getSymptomGroups().observe(
                 this,
                 symptomGroupsWithSymptoms -> {
-                    //запомнить выбранную группу
-                    final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
+                    if(symptomGroupsWithSymptoms != null){
+                    final List<DisplaySymptomGroup> newDisplaySymptomsGroup = createDisplaySymptomGroups(symptomGroupsWithSymptoms);
+                     if (!newDisplaySymptomsGroup.equals(mViewModel.getDisplaySymptomGroups())) {
+                        //запомнить выбранную группу
+                        final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
 
-                    //задать новые данные
-                    mViewModel.setDisplaySymptomGroups(createDisplaySymptomGroups(symptomGroupsWithSymptoms));
-                    mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
+                        //задать новые данные
+                        mViewModel.setDisplaySymptomGroups(createDisplaySymptomGroups(symptomGroupsWithSymptoms));
+                        mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
 
-                    //вернуть выбранную группу
-                    if (mViewModel.getDisplaySymptomGroups().size() > 0) {
-                        //если существует выбранная группа, и она присутствует в новом списке
-                        if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
-                            //выделить ее
-                            showSymptomsForGroup(selectedGroup);
-                        } else {
-                            //иначе выбрать первую
-                            showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                        //вернуть выбранную группу
+                        if (mViewModel.getDisplaySymptomGroups().size() > 0) {
+                            //если существует выбранная группа, и она присутствует в новом списке
+                            if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
+                                //выделить ее
+                                showSymptomsForGroup(selectedGroup);
+                            } else {
+                                //иначе выбрать первую
+                                showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                            }
                         }
+                    }
                     }
                 }
         );
@@ -343,6 +348,7 @@ public final class SymptomsActivity
         mViewModel.setSelectedDisplaySymptomGroup(displaySymptomGroup);
         mViewModel.setDisplaySymptoms(displaySymptomGroup.getDisplaySymptoms());
         mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
+        mSymptomsAdapter.order();
     }
 
     public void checkLocationEnabled (
