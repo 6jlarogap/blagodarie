@@ -13,7 +13,7 @@
             android:layout_gravity="center"
             android:layout_margin="5dp"
             android:gravity="center"
-            android:maxWidth="100dp"
+            android:maxWidth="200dp"
             android:minLines="2"
             android:text="@{DisplaySymptomGroup.symptomGroupName}"
             android:textAppearance="@style/TextAppearance.AppCompat.Medium" />
