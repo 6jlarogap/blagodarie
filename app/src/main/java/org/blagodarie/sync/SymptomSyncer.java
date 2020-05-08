@@ -107,73 +107,7 @@ final class SymptomSyncer {
                                         order
                                 );
                         newSymptoms.add(symptom);
-                    }/*
-                    newSymptomGroups.add(new SymptomGroup(
-                            Identifier.newInstance(1L),
-                            "test group 1",
-                            Identifier.newInstance(null)
-                    ));
-                    newSymptomGroups.add(new SymptomGroup(
-                            Identifier.newInstance(2L),
-                            "test group 2",
-                            Identifier.newInstance(null)
-                    ));
-                    newSymptomGroups.add(new SymptomGroup(
-                            Identifier.newInstance(3L),
-                            "test group 3",
-                            Identifier.newInstance(null)
-                    ));
-                    newSymptomGroups.add(new SymptomGroup(
-                            Identifier.newInstance(4L),
-                            "test group 4",
-                            Identifier.newInstance(null)
-                    ));
-                    newSymptomGroups.add(new SymptomGroup(
-                            Identifier.newInstance(5L),
-                            "test group 5",
-                            Identifier.newInstance(null)
-                    ));
-                    newSymptomGroups.add(new SymptomGroup(
-                            Identifier.newInstance(6L),
-                            "test group 6",
-                            Identifier.newInstance(null)
-                    ));
-                    newSymptoms.add(new Symptom(
-                            Identifier.newInstance(10001L),
-                            "test entity 1",
-                            Identifier.newInstance(1L),
-                            null
-                    ));
-                    newSymptoms.add(new Symptom(
-                            Identifier.newInstance(10002L),
-                            "test entity 2",
-                            Identifier.newInstance(1L),
-                            null
-                    ));
-                    newSymptoms.add(new Symptom(
-                            Identifier.newInstance(10003L),
-                            "test entity 3",
-                            Identifier.newInstance(2L),
-                            null
-                    ));
-                    newSymptoms.add(new Symptom(
-                            Identifier.newInstance(10004L),
-                            "test entity 4",
-                            Identifier.newInstance(2L),
-                            null
-                    ));
-                    newSymptoms.add(new Symptom(
-                            Identifier.newInstance(10005L),
-                            "test entity 5",
-                            Identifier.newInstance(3L),
-                            null
-                    ));
-                    newSymptoms.add(new Symptom(
-                            Identifier.newInstance(10006L),
-                            "test entity 6",
-                            Identifier.newInstance(3L),
-                            null
-                    ));*/
+                    }
                     repository.updateSymptoms(newSymptomGroups, newSymptoms);
                     final String newChecksum = responseJSON.getString("checksum");
                     sharedPreferences.edit().putString(PREF_SYMPTOM_CHECKSUM, newChecksum).apply();
