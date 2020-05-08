@@ -21,6 +21,8 @@ import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.databinding.GreetingActivityBinding;
 import org.blagodarie.ui.symptoms.SymptomsActivity;
 
+import java.util.UUID;
+
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/raw/master/LICENSE License
@@ -41,13 +43,33 @@ public final class GreetingActivity
     /**
      * Анонимный ключ.
      */
-    private String mIncognitoId;
+    private UUID mIncognitoId;
 
     @Override
     protected void onCreate (@Nullable final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.e(TAG, "onCreate");
 
+        //попытаться инициализировать данные пользователя
+        final String initUserDataErrorMessage = tryInitUserData();
+        //если ошибок нет
+        if (initUserDataErrorMessage == null) {
+            //отобразить экран
+            final GreetingActivityBinding activityBinding = DataBindingUtil.setContentView(this, R.layout.greeting_activity);
+            activityBinding.setGreetingUserActionListener(this);
+        } else {
+            //иначе показать сообщение об ошибке и завершить Activity
+            Toast.makeText(this, initUserDataErrorMessage, Toast.LENGTH_SHORT).show();
+            finish();
+        }
+    }
+
+    /**
+     * Инициализирует данные о пользователе.
+     */
+    @Nullable
+    private String tryInitUserData () {
+        String errorMessage = null;
         //если аккаунт передан
         if (getIntent().hasExtra(EXTRA_ACCOUNT)) {
             //получить аккаунт
@@ -55,22 +77,24 @@ public final class GreetingActivity
             Log.d(TAG, "account=" + mAccount);
 
             //получить анонимный ключ
-            mIncognitoId = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
-            //если анонимный ключ существует
-            if (mIncognitoId != null) {
-                //отобразить экран
-                final GreetingActivityBinding activityBinding = DataBindingUtil.setContentView(this, R.layout.greeting_activity);
-                activityBinding.setGreetingUserActionListener(this);
+            final String incognitoId = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
+            //если анонимного ключа не существует
+            if (incognitoId != null) {
+                //попытаться преобразовать строку в UUID
+                try {
+                    mIncognitoId = UUID.fromString(incognitoId);
+                } catch (IllegalArgumentException e) {
+                    errorMessage = getString(R.string.error_incorrect_incognito_id) + e.getLocalizedMessage();
+                }
             } else {
-                //иначе показать сообщение об ошибке и закрыть экран
-                Toast.makeText(this, R.string.error_incognito_id_is_missing, Toast.LENGTH_SHORT).show();
-                finish();
+                //установить сообщение об ошибке
+                errorMessage = getString(R.string.error_incognito_id_is_missing);
             }
         } else {
-            //иначе показать сообщение об ошибке и закрыть экран
-            Toast.makeText(this, R.string.error_account_not_set, Toast.LENGTH_SHORT).show();
-            finish();
+            //иначе установить сообщение об ошибке
+            errorMessage = getString(R.string.error_account_not_set);
         }
+        return errorMessage;
     }
 
     @Override
@@ -86,12 +110,12 @@ public final class GreetingActivity
         new AlertDialog.
                 Builder(this).
                 setTitle(R.string.txt_your_incognito_id).
-                setMessage(mIncognitoId).
+                setMessage(mIncognitoId.toString()).
                 setPositiveButton(
                         R.string.action_to_clipboard,
                         (dialog, which) -> {
                             final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                            final ClipData clip = ClipData.newPlainText(getString(R.string.txt_incognito_id), mIncognitoId);
+                            final ClipData clip = ClipData.newPlainText(getString(R.string.txt_incognito_id), mIncognitoId.toString());
                             clipboard.setPrimaryClip(clip);
                             Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
                         }).

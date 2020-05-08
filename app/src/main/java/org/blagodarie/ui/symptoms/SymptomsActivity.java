@@ -121,75 +121,74 @@ public final class SymptomsActivity
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
-        mRepository = new Repository(this);
+        //попытаться инициализировать данные пользователя
+        final String initUserDataErrorMessage = tryInitUserData();
+        //если ошибок нет
+        if (initUserDataErrorMessage == null) {
+            mRepository = new Repository(this);
 
-        mAccountManager = AccountManager.get(this);
+            mAccountManager = AccountManager.get(this);
 
-        initUserData();
+            initViewModel();
 
-        initViewModel();
+            mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
 
-        mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
+            mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
 
-        mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
+            initBinding();
 
-        initBinding();
+            setupToolbar();
 
-        setupToolbar();
+            mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
-        mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+            //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
+            mDisposables.add(
+                    Completable.
+                            fromAction(() ->
+                                    mRepository.setupIncognitoId(mIncognitoId)
+                            ).
+                            subscribeOn(Schedulers.io()).
+                            subscribe(() ->
+                                    mViewModel.loadLastValues(mIncognitoId)
+                            )
+            );
+            /////////////////////////////////
 
-        //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
-        mDisposables.add(
-                Completable.
-                        fromAction(() ->
-                                mRepository.setupIncognitoId(mIncognitoId)
-                        ).
-                        subscribeOn(Schedulers.io()).
-                        subscribe(() ->
-                                mViewModel.loadLastValues(mIncognitoId)
-                        )
-        );
-        /////////////////////////////////
+            mRepository.getSymptomGroups().observe(
+                    this,
+                    symptomGroupsWithSymptoms -> {
+                        if (symptomGroupsWithSymptoms != null) {
+                            final List<DisplaySymptomGroup> newDisplaySymptomsGroup = createDisplaySymptomGroups(symptomGroupsWithSymptoms);
+                            if (!newDisplaySymptomsGroup.equals(mViewModel.getDisplaySymptomGroups())) {
+                                //запомнить выбранную группу
+                                final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
 
-        mRepository.getSymptomGroups().observe(
-                this,
-                symptomGroupsWithSymptoms -> {
-                    if(symptomGroupsWithSymptoms != null){
-                    final List<DisplaySymptomGroup> newDisplaySymptomsGroup = createDisplaySymptomGroups(symptomGroupsWithSymptoms);
-                     if (!newDisplaySymptomsGroup.equals(mViewModel.getDisplaySymptomGroups())) {
-                        //запомнить выбранную группу
-                        final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
+                                //задать новые данные
+                                mViewModel.setDisplaySymptomGroups(createDisplaySymptomGroups(symptomGroupsWithSymptoms));
+                                mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
 
-                        //задать новые данные
-                        mViewModel.setDisplaySymptomGroups(createDisplaySymptomGroups(symptomGroupsWithSymptoms));
-                        mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
-
-                        //вернуть выбранную группу
-                        if (mViewModel.getDisplaySymptomGroups().size() > 0) {
-                            //если существует выбранная группа, и она присутствует в новом списке
-                            if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
-                                //выделить ее
-                                showSymptomsForGroup(selectedGroup);
-                            } else {
-                                //иначе выбрать первую
-                                showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                                //вернуть выбранную группу
+                                if (mViewModel.getDisplaySymptomGroups().size() > 0) {
+                                    //если существует выбранная группа, и она присутствует в новом списке
+                                    if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
+                                        //выделить ее
+                                        showSymptomsForGroup(selectedGroup);
+                                    } else {
+                                        //иначе выбрать первую
+                                        showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                                    }
+                                }
                             }
                         }
                     }
-                    }
-                }
-        );
-/*
-        mRepository.getSymptoms().observe(
-                this,
-                symptoms -> {
-                    mViewModel.setDisplaySymptoms(createDisplaySymptoms(symptoms));
-                    mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
-                }
-        );*/
+            );
 
-        getAuthTokenAndRequestSync();
+            getAuthTokenAndRequestSync();
+        } else {
+            //иначе показать сообщение об ошибке и завершить Activity
+            Toast.makeText(this, initUserDataErrorMessage, Toast.LENGTH_SHORT).show();
+            finish();
+        }
     }
 
     private void initViewModel () {
@@ -331,15 +330,37 @@ public final class SymptomsActivity
         mLocationManager.removeUpdates(this);
     }
 
-    private void initUserData () {
-        Log.d(TAG, "initUserData");
-        mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
-        String incognitoId = mAccountManager.getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
-        if (incognitoId == null) {
-            incognitoId = UUID.randomUUID().toString();
-            mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID, incognitoId);
+    /**
+     * Инициализирует данные о пользователе.
+     */
+    @Nullable
+    private String tryInitUserData () {
+        String errorMessage = null;
+        //если аккаунт передан
+        if (getIntent().hasExtra(EXTRA_ACCOUNT)) {
+            //получить аккаунт
+            mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
+            Log.d(TAG, "account=" + mAccount);
+
+            //получить анонимный ключ
+            final String incognitoId = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
+            //если анонимного ключа не существует
+            if (incognitoId != null) {
+                //попытаться преобразовать строку в UUID
+                try {
+                    mIncognitoId = UUID.fromString(incognitoId);
+                } catch (IllegalArgumentException e) {
+                    errorMessage = getString(R.string.error_incorrect_incognito_id) + e.getLocalizedMessage();
+                }
+            } else {
+                //установить сообщение об ошибке
+                errorMessage = getString(R.string.error_incognito_id_is_missing);
+            }
+        } else {
+            //иначе установить сообщение об ошибке
+            errorMessage = getString(R.string.error_account_not_set);
         }
-        mIncognitoId = UUID.fromString(incognitoId);
+        return errorMessage;
     }
 
     public void showSymptomsForGroup (
