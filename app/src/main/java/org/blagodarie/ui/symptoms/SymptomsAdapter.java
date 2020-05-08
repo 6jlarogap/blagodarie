@@ -24,7 +24,7 @@ final class SymptomsAdapter
         extends RecyclerView.Adapter<SymptomsAdapter.SymptomViewHolder> {
 
     @NonNull
-    private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
+    private List<DisplaySymptom> mDisplaySymptoms;
 
     @NonNull
     private final DisplaySymptomClickListener mDisplaySymptomClickListener;
@@ -33,7 +33,7 @@ final class SymptomsAdapter
             @NonNull final List<DisplaySymptom> displaySymptoms,
             @NonNull final DisplaySymptomClickListener displaySymptomClickListener
     ) {
-        mDisplaySymptoms.addAll(displaySymptoms);
+        mDisplaySymptoms = displaySymptoms;
         mDisplaySymptomClickListener = displaySymptomClickListener;
     }
 
@@ -62,14 +62,13 @@ final class SymptomsAdapter
         return mDisplaySymptoms.size();
     }
 
-    void setData(@NonNull final List<DisplaySymptom> displaySymptoms){
+    final void setData (@NonNull final List<DisplaySymptom> displaySymptoms) {
         final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomDiffUtilCallBack(displaySymptoms, mDisplaySymptoms));
         diffResult.dispatchUpdatesTo(this);
-        mDisplaySymptoms.clear();
-        mDisplaySymptoms.addAll(displaySymptoms);
+        mDisplaySymptoms = displaySymptoms;
     }
 
-    void order () {
+    final void order () {
         final List<DisplaySymptom> newDisplaySymptoms = new ArrayList<>(mDisplaySymptoms);
         Collections.sort(
                 newDisplaySymptoms,

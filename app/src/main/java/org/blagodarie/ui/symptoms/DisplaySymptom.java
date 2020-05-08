@@ -141,12 +141,17 @@ public final class DisplaySymptom
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         DisplaySymptom that = (DisplaySymptom) o;
-        return mSymptomId.equals(that.mSymptomId);
+        return mUserSymptomCount == that.mUserSymptomCount &&
+                mSymptomId.equals(that.mSymptomId) &&
+                mSymptomName.equals(that.mSymptomName) &&
+                Objects.equals(mLastDate, that.mLastDate) &&
+                Objects.equals(mLastLatitude, that.mLastLatitude) &&
+                Objects.equals(mLastLongitude, that.mLastLongitude);
     }
 
     @Override
     public int hashCode () {
-        return Objects.hash(mSymptomId);
+        return Objects.hash(mSymptomId, mSymptomName, mLastDate, mLastLatitude, mLastLongitude, mUserSymptomCount);
     }
 
     @Override
@@ -157,6 +162,7 @@ public final class DisplaySymptom
                 ", mLastDate=" + mLastDate +
                 ", mLastLatitude=" + mLastLatitude +
                 ", mLastLongitude=" + mLastLongitude +
+                ", mUserSymptomCount=" + mUserSymptomCount +
                 '}';
     }
 

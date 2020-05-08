@@ -21,6 +21,7 @@ public interface SymptomGroupDao {
 
     @Transaction
     @Query ("SELECT * " +
-            "FROM tbl_symptom_group")
+            "FROM tbl_symptom_group " +
+            "ORDER BY name")
     LiveData<List<SymptomGroupWithSymptoms>> getAll ();
 }

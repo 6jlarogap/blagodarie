@@ -58,6 +58,7 @@ import org.blagodatie.database.UserSymptom;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -158,25 +159,13 @@ public final class SymptomsActivity
 
             initBinding();
 
-            //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
-            mDisposables.add(
-                    Completable.
-                            fromAction(() ->
-                                    mRepository.setupIncognitoId(mIncognitoId)
-                            ).
-                            subscribeOn(Schedulers.io()).
-                            subscribe(() ->
-                                    mViewModel.loadLastValues(mIncognitoId)
-                            )
-            );
-            /////////////////////////////////
-
             mRepository.getSymptomGroups().observe(
                     this,
                     symptomGroupsWithSymptoms -> {
                         if (symptomGroupsWithSymptoms != null) {
-                            final List<DisplaySymptomGroup> newDisplaySymptomsGroup = createDisplaySymptomGroups(symptomGroupsWithSymptoms);
-                            if (!newDisplaySymptomsGroup.equals(mViewModel.getDisplaySymptomGroups())) {
+                            final List<DisplaySymptomGroup> newDisplaySymptomGroups = createDisplaySymptomGroups(symptomGroupsWithSymptoms);
+
+                            if (!newDisplaySymptomGroups.equals(mViewModel.getDisplaySymptomGroups())) {
                                 //запомнить выбранную группу
                                 final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
 
@@ -200,6 +189,15 @@ public final class SymptomsActivity
                     }
             );
 
+            //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
+            Completable.
+                    fromAction(() ->
+                            mRepository.setupIncognitoId(mIncognitoId)
+                    ).
+                    subscribeOn(Schedulers.io()).
+                    subscribe();
+            /////////////////////////////////
+
             registerReceiver(mSyncErrorReceiver, new IntentFilter(SyncService.ACTION_SYNC_EXCEPTION));
             getAuthTokenAndRequestSync();
         } else {
@@ -219,7 +217,6 @@ public final class SymptomsActivity
         //создаем фабрику
         final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
                 getApplication(),
-                mIncognitoId,
                 locationEnable
         );
 
@@ -261,6 +258,10 @@ public final class SymptomsActivity
             checkLocationPermissionAndStartUpdates();
         }
 
+        orderSymptoms();
+    }
+
+    private void orderSymptoms () {
         mSymptomsAdapter.order();
         if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
             mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
@@ -290,7 +291,6 @@ public final class SymptomsActivity
         for (SymptomGroupWithSymptoms symptomGroupWithSymptoms : symptomGroups) {
             displaySymptomGroups.add(
                     new DisplaySymptomGroup(
-                            symptomGroupWithSymptoms.getSymptomGroup().getId(),
                             symptomGroupWithSymptoms.getSymptomGroup().getName(),
                             createDisplaySymptoms(symptomGroupWithSymptoms.getSymptoms())
                     )
@@ -391,7 +391,7 @@ public final class SymptomsActivity
         mViewModel.setSelectedDisplaySymptomGroup(displaySymptomGroup);
         mViewModel.setDisplaySymptoms(displaySymptomGroup.getDisplaySymptoms());
         mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
-        mSymptomsAdapter.order();
+        mViewModel.loadLastValues(mIncognitoId, this::orderSymptoms);
     }
 
     public void checkLocationEnabled (

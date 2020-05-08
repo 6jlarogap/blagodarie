@@ -14,8 +14,6 @@ import java.util.Objects;
 public final class DisplaySymptomGroup
         extends BaseObservable {
 
-    @NonNull
-    private final Identifier mSymptomGroupId;
 
     @NonNull
     private final String mSymptomGroupName;
@@ -26,11 +24,9 @@ public final class DisplaySymptomGroup
     private boolean mSelected = false;
 
     DisplaySymptomGroup (
-            @NonNull final Identifier symptomGroupId,
             @NonNull final String symptomGroupName,
             @NonNull final List<DisplaySymptom> displaySymptoms
     ) {
-        mSymptomGroupId = symptomGroupId;
         mSymptomGroupName = symptomGroupName;
         mDisplaySymptoms.addAll(displaySymptoms);
     }
@@ -59,19 +55,20 @@ public final class DisplaySymptomGroup
     public boolean equals (Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        final DisplaySymptomGroup that = (DisplaySymptomGroup) o;
-        return mSymptomGroupId.equals(that.mSymptomGroupId);
+        DisplaySymptomGroup that = (DisplaySymptomGroup) o;
+        return mSelected == that.mSelected &&
+                mSymptomGroupName.equals(that.mSymptomGroupName) &&
+                mDisplaySymptoms.equals(that.mDisplaySymptoms);
     }
 
     @Override
     public int hashCode () {
-        return Objects.hash(mSymptomGroupId);
+        return Objects.hash(mSymptomGroupName, mDisplaySymptoms, mSelected);
     }
 
     @Override
     public String toString () {
         return "DisplaySymptomGroup{" +
-                "mSymptomGroupId=" + mSymptomGroupId +
                 ", mSymptomGroupName='" + mSymptomGroupName + '\'' +
                 ", mDisplaySymptoms=" + mDisplaySymptoms +
                 ", mSelected=" + mSelected +
