@@ -74,41 +74,20 @@ final class SymptomSyncer {
                 Log.d(TAG, "responseBody=" + responseBody);
                 final JSONObject responseJSON = new JSONObject(responseBody);
                 final boolean changed = responseJSON.getBoolean("changed");
+                //если есть изменения
                 if (changed) {
+                    //создать SymptomGroup из JSON
                     final JSONArray symptomGroupJSONArray = responseJSON.getJSONArray("symptom_groups");
-                    final Collection<SymptomGroup> newSymptomGroups = new HashSet<>();
-                    for (int i = 0; i < symptomGroupJSONArray.length(); i++) {
-                        final JSONObject symptomGroupJSONObject = symptomGroupJSONArray.getJSONObject(i);
-                        final long id = symptomGroupJSONObject.getLong("id");
-                        final String name = symptomGroupJSONObject.getString("name");
-                        final Long parentId = getNullableLong(symptomGroupJSONObject, "parent_id");
-                        final SymptomGroup symptomGroup =
-                                new SymptomGroup(
-                                        Identifier.newInstance(id),
-                                        name,
-                                        Identifier.newInstance(parentId)
-                                );
-                        newSymptomGroups.add(symptomGroup);
-                    }
+                    final Collection<SymptomGroup> newSymptomGroups = getSymptomGroupsFromJsonArray(symptomGroupJSONArray);
 
+                    //создать Symptom из JSON
                     final JSONArray symptomJSONArray = responseJSON.getJSONArray("symptoms");
-                    final Collection<Symptom> newSymptoms = new HashSet<>();
-                    for (int i = 0; i < symptomJSONArray.length(); i++) {
-                        final JSONObject symptomJSONObject = symptomJSONArray.getJSONObject(i);
-                        final long id = symptomJSONObject.getLong("id");
-                        final String name = symptomJSONObject.getString("name");
-                        final Long groupId = getNullableLong(symptomJSONObject, "group_id");
-                        final Integer order = getNullableInt(symptomJSONObject, "order");
-                        final Symptom symptom =
-                                new Symptom(
-                                        Identifier.newInstance(id),
-                                        name,
-                                        Identifier.newInstance(groupId),
-                                        order
-                                );
-                        newSymptoms.add(symptom);
-                    }
+                    final Collection<Symptom> newSymptoms = getSymptomsFromJsonArray(symptomJSONArray);
+
+                    //обновить справочник симптомов
                     repository.updateSymptoms(newSymptomGroups, newSymptoms);
+
+                    //сохранить контрольную сумму
                     final String newChecksum = responseJSON.getString("checksum");
                     sharedPreferences.edit().putString(PREF_SYMPTOM_CHECKSUM, newChecksum).apply();
                 }
@@ -155,5 +134,49 @@ final class SymptomSyncer {
         } else {
             return null;
         }
+    }
+
+    @NonNull
+    private Collection<SymptomGroup> getSymptomGroupsFromJsonArray (
+            @NonNull final JSONArray symptomGroupJSONArray
+    ) throws JSONException {
+        final Collection<SymptomGroup> symptomGroups = new HashSet<>();
+        for (int i = 0; i < symptomGroupJSONArray.length(); i++) {
+            final JSONObject symptomGroupJSONObject = symptomGroupJSONArray.getJSONObject(i);
+            final long id = symptomGroupJSONObject.getLong("id");
+            final String name = symptomGroupJSONObject.getString("name");
+            final Long parentId = getNullableLong(symptomGroupJSONObject, "parent_id");
+            final SymptomGroup symptomGroup =
+                    new SymptomGroup(
+                            Identifier.newInstance(id),
+                            name,
+                            Identifier.newInstance(parentId)
+                    );
+            symptomGroups.add(symptomGroup);
+        }
+        return symptomGroups;
+    }
+
+    @NonNull
+    private Collection<Symptom> getSymptomsFromJsonArray (
+            @NonNull final JSONArray symptomJSONArray
+    ) throws JSONException {
+        final Collection<Symptom> symptoms = new HashSet<>();
+        for (int i = 0; i < symptomJSONArray.length(); i++) {
+            final JSONObject symptomJSONObject = symptomJSONArray.getJSONObject(i);
+            final long id = symptomJSONObject.getLong("id");
+            final String name = symptomJSONObject.getString("name");
+            final Long groupId = getNullableLong(symptomJSONObject, "group_id");
+            final Integer order = getNullableInt(symptomJSONObject, "order");
+            final Symptom symptom =
+                    new Symptom(
+                            Identifier.newInstance(id),
+                            name,
+                            Identifier.newInstance(groupId),
+                            order
+                    );
+            symptoms.add(symptom);
+        }
+        return symptoms;
     }
 }

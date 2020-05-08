@@ -10,6 +10,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
@@ -194,7 +195,9 @@ public final class SymptomsActivity
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
 
-        final boolean locationEnable = getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE).getBoolean(PREF_LOCATION_ENABLED, false);//.edit().putString(PREF_LOCATION_ENABLED, contactsOrder.name()).apply();
+        final SharedPreferences userSharedPreferences = getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE);
+
+        final boolean locationEnable = userSharedPreferences.getBoolean(PREF_LOCATION_ENABLED, false);
 
         //создаем фабрику
         final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
@@ -206,12 +209,13 @@ public final class SymptomsActivity
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
 
+        //добавить слушатель включения/выключения местоположения
         mViewModel.isLocationEnabled().addOnPropertyChangedCallback(new androidx.databinding.Observable.OnPropertyChangedCallback() {
             @Override
             public void onPropertyChanged (androidx.databinding.Observable sender, int propertyId) {
                 if (sender == mViewModel.isLocationEnabled()) {
                     final boolean newValue = ((ObservableBoolean) sender).get();
-                    getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE).edit().putBoolean(PREF_LOCATION_ENABLED, newValue).apply();
+                    userSharedPreferences.edit().putBoolean(PREF_LOCATION_ENABLED, newValue).apply();
                     if (newValue) {
                         checkLocationPermissionAndStartUpdates();
                     } else {
