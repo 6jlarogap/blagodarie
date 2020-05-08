@@ -45,4 +45,5 @@
     <string name="error_account_not_set">Не задан аккаунт</string>
     <string name="error_incognito_id_is_missing">Анонимный ключ отсутствует</string>
     <string name="error_incorrect_incognito_id">Некорректный анонимный ключ: </string>
+    <string name="txt_authorization_required">Необходима авторизация</string>
 </resources>

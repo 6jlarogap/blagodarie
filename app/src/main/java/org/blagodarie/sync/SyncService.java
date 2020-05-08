@@ -10,6 +10,9 @@ public final class SyncService
 
     private static final String TAG = SyncService.class.getSimpleName();
 
+    public final static String ACTION_SYNC_EXCEPTION = "org.blagodarie.sync.EXCEPTION";
+    public final static String EXTRA_EXCEPTION = "org.blagodarie.sync.EXCEPTION";
+
     private static SyncAdapter sSyncAdapter = null;
 
     private static final Object sSyncAdapterLock = new Object();
