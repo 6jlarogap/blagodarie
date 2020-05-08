@@ -66,12 +66,11 @@ final class UserSymptomSyncer {
             final Response response = ServerConnector.sendRequestAndGetRespone(request);
             Log.d(TAG, "response.code=" + response.code());
 
-            throw new UnauthorizedException();/*
             if (response.code() == 200) {
                 repository.deleteUserSymptoms(notSyncedUserSymtpoms);
             } else if (response.code() == 401) {
                 throw new UnauthorizedException();
-            }*/
+            }
         }
     }
 

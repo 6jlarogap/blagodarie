@@ -6,12 +6,10 @@ import android.accounts.AccountManager;
 import android.accounts.AuthenticatorException;
 import android.accounts.OperationCanceledException;
 import android.annotation.SuppressLint;
-import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -45,12 +43,10 @@ import org.blagodarie.BuildConfig;
 import org.blagodarie.LogReader;
 import org.blagodarie.R;
 import org.blagodarie.Repository;
-import org.blagodarie.UnauthorizedException;
 import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
-import org.blagodarie.sync.SyncService;
 import org.blagodarie.ui.update.UpdateActivity;
 import org.blagodatie.database.Symptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
@@ -121,24 +117,8 @@ public final class SymptomsActivity
 
     private AccountManager mAccountManager;
 
-    private final BroadcastReceiver mSyncErrorReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive (
-                final Context context,
-                final Intent intent
-        ) {
-            final Throwable throwable = (Throwable) intent.getSerializableExtra(SyncService.EXTRA_EXCEPTION);
-            if (throwable instanceof UnauthorizedException) {
-                Toast.makeText(getApplicationContext(), R.string.txt_authorization_required, Toast.LENGTH_LONG).show();
-                getAuthTokenAndRequestSync();
-            } else {
-                Toast.makeText(getApplicationContext(), throwable.getLocalizedMessage(), Toast.LENGTH_LONG).show();
-            }
-        }
-    };
-
     @Override
-    protected void onCreate (@Nullable final Bundle savedInstanceState) {
+    protected void onCreate (@Nullable Bundle savedInstanceState) {
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
@@ -147,16 +127,20 @@ public final class SymptomsActivity
         //если ошибок нет
         if (initUserDataErrorMessage == null) {
             mRepository = new Repository(this);
+
             mAccountManager = AccountManager.get(this);
-            mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
             initViewModel();
-            setupToolbar();
 
             mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
+
             mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
 
             initBinding();
+
+            setupToolbar();
+
+            mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
             //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
             mDisposables.add(
@@ -200,7 +184,6 @@ public final class SymptomsActivity
                     }
             );
 
-            registerReceiver(mSyncErrorReceiver, new IntentFilter(SyncService.ACTION_SYNC_EXCEPTION));
             getAuthTokenAndRequestSync();
         } else {
             //иначе показать сообщение об ошибке и завершить Activity
@@ -279,7 +262,6 @@ public final class SymptomsActivity
         Log.d(TAG, "onDestroy");
         super.onDestroy();
         mDisposables.dispose();
-        unregisterReceiver(mSyncErrorReceiver);
     }
 
     private List<DisplaySymptomGroup> createDisplaySymptomGroups (
@@ -645,15 +627,14 @@ public final class SymptomsActivity
             @NonNull final Uri latestVersionUri
     ) {
         Log.d(TAG, "showUpdateVersionDialog");
-        new AlertDialog.
-                Builder(this).
-                setTitle(R.string.txt_update_available).
-                setMessage(String.format(getString(R.string.txt_want_load_new_version), versionName)).
-                setPositiveButton(R.string.action_update, (dialog, which) -> toUpdate(versionName, latestVersionUri)).
-                setNegativeButton(R.string.action_finish, (dialog, which) -> finish()).
-                setCancelable(false).
-                create().
-                show();
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.txt_update_available);
+        builder.setMessage(String.format(getString(R.string.txt_want_load_new_version), versionName));
+        builder.setPositiveButton(R.string.action_update, (dialog, which) -> toUpdate(versionName, latestVersionUri));
+        builder.setNegativeButton(R.string.action_finish, (dialog, which) -> finish());
+        builder.setCancelable(false);
+        builder.create();
+        builder.show();
     }
 
     private void toUpdate (

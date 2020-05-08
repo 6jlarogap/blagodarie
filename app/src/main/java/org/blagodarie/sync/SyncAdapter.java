@@ -5,7 +5,6 @@ import android.accounts.AccountManager;
 import android.content.AbstractThreadedSyncAdapter;
 import android.content.ContentProviderClient;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SyncResult;
 import android.os.Bundle;
 import android.util.Log;
@@ -46,16 +45,15 @@ public final class SyncAdapter
         final UUID incognitoId = UUID.fromString(AccountManager.get(getContext()).getUserData(account, AccountGeneral.USER_DATA_INCOGNITO_ID));
         try {
             syncAll(incognitoId, authToken);
-        } catch (JSONException | IOException  e) {
+        } catch (JSONException e) {
             Log.e(TAG, "onPerformSync error=" + e);
             e.printStackTrace();
-            sendBroadcastException(e);
-        } catch (UnauthorizedException e){
+        } catch (IOException e) {
             Log.e(TAG, "onPerformSync error=" + e);
             e.printStackTrace();
-            //очистить токен
+        } catch (UnauthorizedException e) {
+            Log.e(TAG, "onPerformSync error=" + e);
             AccountManager.get(getContext()).invalidateAuthToken(account.type, authToken);
-            sendBroadcastException(e);
         }
     }
 
@@ -65,13 +63,13 @@ public final class SyncAdapter
     ) throws JSONException, IOException, UnauthorizedException {
         Log.d(TAG, "syncAll");
         final Repository repository = new Repository(getContext());
-        final String apiBaseUrl = new ServerConnector(getContext()).getApiBaseUrl();
+        final ServerConnector serverConnector = new ServerConnector(getContext());
 
         //синхронизировать симптомы
         SymptomSyncer.
                 getInstance().
                 sync(
-                        apiBaseUrl,
+                        serverConnector.getApiBaseUrl(),
                         repository,
                         getContext().getSharedPreferences(GENERAL_PREFERENCE, Context.MODE_PRIVATE)
                 );
@@ -82,17 +80,10 @@ public final class SyncAdapter
                 sync(
                         incognitoId,
                         authToken,
-                        apiBaseUrl,
+                        serverConnector.getApiBaseUrl(),
                         repository
                 );
 
-    }
-
-    private void sendBroadcastException(@NonNull final Throwable throwable){
-        Log.d(TAG, "sendBroadcastException");
-        final Intent intent = new Intent(SyncService.ACTION_SYNC_EXCEPTION);
-        intent.putExtra(SyncService.EXTRA_EXCEPTION, throwable);
-        getContext().sendBroadcast(intent);
     }
 
 }
