@@ -34,9 +34,9 @@
     <string name="action_share">Поделится</string>
     <string name="location">Местоположение</string>
     <string name="empty_location_alert">Местоположение еще не определено</string>
-    <string name="add_symptom_without_location">Желаете сохранить симптом без местоположения?</string>
+    <string name="add_symptom_without_location">Желаете отправить сообщение без местоположения?</string>
     <string name="action_wait">Подождать</string>
-    <string name="action_save_symptom">Сохранить</string>
+    <string name="action_save_symptom">Отправить</string>
     <string name="error_server_connection">Ошибка связи с сервером</string>
     <string name="txt_hello">Приветствие!</string>
     <string name="txt_incognito_id"><u>Анонимный ключ</u></string>
