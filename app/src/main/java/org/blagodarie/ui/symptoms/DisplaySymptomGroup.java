@@ -19,7 +19,7 @@ public final class DisplaySymptomGroup
     private final String mSymptomGroupName;
 
     @NonNull
-    private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
+    private final List<DisplaySymptom> mDisplaySymptoms;
 
     private boolean mSelected = false;
 
@@ -28,7 +28,7 @@ public final class DisplaySymptomGroup
             @NonNull final List<DisplaySymptom> displaySymptoms
     ) {
         mSymptomGroupName = symptomGroupName;
-        mDisplaySymptoms.addAll(displaySymptoms);
+        mDisplaySymptoms = displaySymptoms;
     }
 
     @NonNull

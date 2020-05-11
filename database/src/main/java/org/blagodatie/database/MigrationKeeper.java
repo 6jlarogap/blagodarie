@@ -19,7 +19,7 @@ final class MigrationKeeper {
 
     private static final Migration MIGRATION_1_2 = new Migration(1, 2) {
         @Override
-        public void migrate (final SupportSQLiteDatabase database) {
+        public void migrate (@NonNull final SupportSQLiteDatabase database) {
             Log.d(TAG, "Migrate from 1 to 2");
             //выключить внешние ключи
             database.execSQL("PRAGMA foreign_keys = OFF");
@@ -39,8 +39,8 @@ final class MigrationKeeper {
 
             //заполнить таблицу tbl_symptom
             database.execSQL(
-                    "INSERT INTO `tbl_symptom` (`id`, `name`) " +
-                            "VALUES (25, 'Пробуждение'), " +
+                    "INSERT INTO `tbl_symptom` (`id`, `name`) VALUES " +
+                            "(25, 'Пробуждение'), " +
                             "(19, 'Хорошее настроение'), " +
                             "(15, 'Хорошее самочувствие'), " +
                             "(20, 'Плохое настроение'), " +
@@ -127,7 +127,7 @@ final class MigrationKeeper {
 
     private static final Migration MIGRATION_2_3 = new Migration(2, 3) {
         @Override
-        public void migrate (final SupportSQLiteDatabase database) {
+        public void migrate (@NonNull final SupportSQLiteDatabase database) {
             Log.d(TAG, "Migrate from 2 to 3");
             //выключить внешние ключи
             database.execSQL("PRAGMA foreign_keys = OFF");
@@ -260,12 +260,12 @@ final class MigrationKeeper {
 
     private static final Migration MIGRATION_3_4 = new Migration(3, 4) {
         @Override
-        public void migrate (@NonNull SupportSQLiteDatabase database) {
+        public void migrate (@NonNull final SupportSQLiteDatabase database) {
             Log.d(TAG, "Migrate from 3 to 4");
             //добавить симптомы
             database.execSQL(
-                    "INSERT INTO `tbl_symptom` (`id`, `name`) " +
-                            "VALUES (50, 'Почки'), " +
+                    "INSERT INTO `tbl_symptom` (`id`, `name`) VALUES " +
+                            "(50, 'Почки'), " +
                             "(51, 'Лицевой нерв')"
             );
         }
@@ -273,13 +273,11 @@ final class MigrationKeeper {
 
     private static final Migration MIGRATION_4_5 = new Migration(4, 5) {
         @Override
-        public void migrate (@NonNull SupportSQLiteDatabase database) {
+        public void migrate (@NonNull final SupportSQLiteDatabase database) {
             Log.d(TAG, "Migrate from 4 to 5");
 
             //выключить внешние ключи
             database.execSQL("PRAGMA foreign_keys = OFF");
-            //начать транзакцию
-            database.execSQL("BEGIN TRANSACTION");
 
             //создать таблицу tbl_symptom_group
             {
@@ -297,6 +295,11 @@ final class MigrationKeeper {
                 database.execSQL("CREATE INDEX IF NOT EXISTS `index_tbl_symptom_group_parent_id` " +
                         "ON `tbl_symptom_group` (`parent_id`)");
                 //заполнить таблицу
+                database.execSQL(
+                        "INSERT INTO `tbl_symptom_group`(`id`, `name`, `parent_id`) VALUES " +
+                                "(1, 'Ощущения', NULL), " +
+                                "(2, 'Погода', NULL), " +
+                                "(3, 'Упражнения', NULL)");
             }
 
             //изменить таблицу tbl_symptom
@@ -322,8 +325,57 @@ final class MigrationKeeper {
                         "CREATE UNIQUE INDEX IF NOT EXISTS `index_tbl_symptom_group_id_order` " +
                                 "ON `tbl_symptom` (`group_id`, `order`)");
                 //заполнить новую таблицу
-                /*database.execSQL("INSERT INTO `tbl_symptom` (`id`, `name`, `group_id`) " +
-                        "VALUES ()");*/
+                database.execSQL(
+                        "INSERT INTO `tbl_symptom` (`id`, `name`, `order`, `group_id`) VALUES " +
+                                "(1, 'Нехватка питьевой воды', NULL, 1), " +
+                                "(2, 'Нехватка еды', NULL, 1), " +
+                                "(3, 'Нехватка лекарств', NULL, 1), " +
+                                "(4, 'Слабость', NULL, 1), " +
+                                "(5, 'Температура', NULL, 1), " +
+                                "(6, 'Кашель', NULL, 1), " +
+                                "(7, 'Боль в груди при дыхании', NULL, 1), " +
+                                "(8, 'Затруднённое дыхание', NULL, 1), " +
+                                "(9, 'Одышка', NULL, 1), " +
+                                "(10, 'Сухость носа', NULL,  1), " +
+                                "(11, 'Головная боль', NULL,  1), " +
+                                "(12, 'Боль и ломота в мышцах и суставах', NULL,  1), " +
+                                "(13, 'Рвота', NULL,  1), " +
+                                "(14, 'Диарея', NULL,  1), " +
+                                "(15, 'Хорошее самочувствие', NULL,  1), " +
+                                "(16, 'Сердечная боль', NULL,  1), " +
+                                "(17, 'Повышенное давление', NULL,  1), " +
+                                "(18, 'Пониженное давление', NULL,  1), " +
+                                "(19, 'Хорошее настроение', NULL,  1), " +
+                                "(20, 'Плохое настроение', NULL,  1), " +
+                                "(21, 'Зубная боль', NULL,  1), " +
+                                "(22, 'Боль в ушах', NULL,  1), " +
+                                "(23, 'Головокружение', NULL,  1), " +
+                                "(24, 'Аллергия', NULL,  1), " +
+                                "(25, 'Пробуждение', NULL,  3), " +
+                                "(26, 'Заложенность носа', NULL,  1), " +
+                                "(27, 'Насморк', NULL,  1), " +
+                                "(28, 'Озноб', NULL,  1), " +
+                                "(29, 'Плохое самочувствие', NULL,  1), " +
+                                "(30, 'Чувство тревоги', NULL,  1), " +
+                                "(31, 'Холодно', NULL,  2), " +
+                                "(32, 'Потеплело', NULL,  2), " +
+                                "(33, 'Дождь', NULL,  2), " +
+                                "(34, 'Ветер', NULL,  2), " +
+                                "(35, 'Жара', NULL,  2), " +
+                                "(36, 'Астма', NULL,  1), " +
+                                "(37, 'Хорошая погода', NULL,  2), " +
+                                "(40, 'Влажно', NULL,  2), " +
+                                "(41, 'Сухо', NULL,  2), " +
+                                "(42, 'Прохладно', NULL,  2), " +
+                                "(44, 'Прием пищи', NULL,  3), " +
+                                "(45, 'Запор', NULL,  1), " +
+                                "(46, 'Чихание', NULL,  1), " +
+                                "(47, 'Першит в горле', NULL,  1), " +
+                                "(48, 'Пасмурно', NULL,  2), " +
+                                "(49, 'Учащённое сердцебиение', NULL,  1), " +
+                                "(50, 'Почки', NULL,  1), " +
+                                "(51, 'Лицевой нерв', NULL,  1)"
+                );
             }
 
             //изменить таблицу tbl_user_symptom, Id не может быть пустым
@@ -357,8 +409,6 @@ final class MigrationKeeper {
                 );
             }
 
-            //коммит
-            database.execSQL("COMMIT");
             //включить внешние ключи
             database.execSQL("PRAGMA foreign_keys = ON");
         }
