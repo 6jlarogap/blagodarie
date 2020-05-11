@@ -3,6 +3,7 @@ package org.blagodarie.ui.symptoms;
 import android.app.Application;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
 import androidx.lifecycle.AndroidViewModel;
@@ -11,7 +12,6 @@ import androidx.lifecycle.ViewModelProvider;
 
 import org.blagodarie.Repository;
 import org.blagodatie.database.LastUserSymptom;
-import org.blagodatie.database.Symptom;
 
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
@@ -23,7 +23,9 @@ import java.util.TimerTask;
 import java.util.UUID;
 
 import io.reactivex.Completable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.functions.Action;
 import io.reactivex.schedulers.Schedulers;
 
 /**
@@ -69,7 +71,10 @@ public final class SymptomsViewModel
     private final ObservableBoolean mLocationEnabled;
 
     @NonNull
-    private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
+    private List<DisplaySymptomGroup> mDisplaySymptomGroups = new ArrayList<>();
+
+    @NonNull
+    private List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
 
     @NonNull
     private final Repository mRepository;
@@ -79,55 +84,81 @@ public final class SymptomsViewModel
 
     public SymptomsViewModel (
             @NonNull final Application application,
-            @NonNull final UUID incognitoId,
             final boolean locationEnabled
     ) {
         super(application);
 
-        mRepository = new Repository(application.getApplicationContext());
-
         mLocationEnabled = new ObservableBoolean(locationEnabled);
 
-        for (Symptom symptom : Symptom.getSymptoms()) {
-            mDisplaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(incognitoId, symptom.getId())));
-        }
-
-        loadLastValues(incognitoId);
+        mRepository = new Repository(application.getApplicationContext());
     }
 
     @Override
-    protected void onCleared () {
+    protected final void onCleared () {
         mDisposables.dispose();
         mCurrentDateTimeUpdateTimer.cancel();
         super.onCleared();
     }
 
-    void loadLastValues (
-            @NonNull final UUID incognitoId
+    final void loadLastValues (
+            @NonNull final UUID incognitoId,
+            @NonNull final Action action
     ) {
-        Completable.
-                fromAction(() -> {
-                    for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
-                        final LastUserSymptom lastUserSymptom = mRepository.getLastUserSymptom(incognitoId, displaySymptom.getSymptomId());
-                        if (lastUserSymptom != null) {
-                            displaySymptom.getLastDate().set(lastUserSymptom.getTimestamp());
-                            displaySymptom.setUserSymptomCount(lastUserSymptom.getSymptomsCount());
-                            if (lastUserSymptom.getLatitude() != null) {
-                                displaySymptom.getLastLatitude().set(lastUserSymptom.getLatitude());
+        mDisposables.add(
+                Completable.
+                        fromAction(() -> {
+                            for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
+                                final LastUserSymptom lastUserSymptom = mRepository.getLastUserSymptom(incognitoId, displaySymptom.getSymptomId());
+                                if (lastUserSymptom != null) {
+                                    displaySymptom.setLastDate(lastUserSymptom.getTimestamp());
+                                    displaySymptom.setUserSymptomCount(lastUserSymptom.getSymptomsCount());
+                                    if (lastUserSymptom.getLatitude() != null) {
+                                        displaySymptom.setLastLatitude(lastUserSymptom.getLatitude());
+                                    }
+                                    if (lastUserSymptom.getLongitude() != null) {
+                                        displaySymptom.setLastLongitude(lastUserSymptom.getLongitude());
+                                    }
+                                }
                             }
-                            if (lastUserSymptom.getLongitude() != null) {
-                                displaySymptom.getLastLongitude().set(lastUserSymptom.getLongitude());
-                            }
-                        }
-                    }
-                }).
-                subscribeOn(Schedulers.io()).
-                subscribe();
+                        }).
+                        subscribeOn(Schedulers.io()).
+                        observeOn(AndroidSchedulers.mainThread()).
+                        subscribe(action)
+        );
     }
 
     @NonNull
     final List<DisplaySymptom> getDisplaySymptoms () {
         return mDisplaySymptoms;
+    }
+
+    @NonNull
+    final List<DisplaySymptomGroup> getDisplaySymptomGroups () {
+        return mDisplaySymptomGroups;
+    }
+
+    @Nullable
+    final DisplaySymptomGroup getSelectedDisplaySymptomGroup () {
+        for (DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups) {
+            if (displaySymptomGroup.isSelected()) {
+                return displaySymptomGroup;
+            }
+        }
+        return null;
+    }
+
+    final void setSelectedDisplaySymptomGroup (@Nullable final DisplaySymptomGroup selectedGroup) {
+        for (DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups) {
+            displaySymptomGroup.setSelected(displaySymptomGroup.equals(selectedGroup));
+        }
+    }
+
+    final void setDisplaySymptoms (@NonNull final List<DisplaySymptom> displaySymptoms) {
+        mDisplaySymptoms = displaySymptoms;
+    }
+
+    final void setDisplaySymptomGroups (@NonNull final List<DisplaySymptomGroup> displaySymptomGroups) {
+        mDisplaySymptomGroups = displaySymptomGroups;
     }
 
     @NonNull
@@ -175,20 +206,14 @@ public final class SymptomsViewModel
 
         @NonNull
         private final Application mApplication;
-
-        @NonNull
-        private final UUID mIncognitoId;
-
         private final boolean mLocationEnabled;
 
         Factory (
                 @NonNull final Application application,
-                @NonNull final UUID incognitoId,
                 final boolean locationEnabled
         ) {
             super(application);
             mApplication = application;
-            mIncognitoId = incognitoId;
             mLocationEnabled = locationEnabled;
         }
 
@@ -198,7 +223,7 @@ public final class SymptomsViewModel
         public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
             if (AndroidViewModel.class.isAssignableFrom(modelClass)) {
                 try {
-                    return modelClass.getConstructor(Application.class, UUID.class, boolean.class).newInstance(mApplication, mIncognitoId, mLocationEnabled);
+                    return modelClass.getConstructor(Application.class, boolean.class).newInstance(mApplication, mLocationEnabled);
                 } catch (NoSuchMethodException |
                         IllegalAccessException |
                         InstantiationException |

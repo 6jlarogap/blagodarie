@@ -6,10 +6,13 @@ import android.accounts.AccountManager;
 import android.accounts.AuthenticatorException;
 import android.accounts.OperationCanceledException;
 import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
@@ -34,22 +37,29 @@ import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.databinding.ObservableBoolean;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import org.blagodarie.BlagodarieApp;
 import org.blagodarie.BuildConfig;
 import org.blagodarie.LogReader;
 import org.blagodarie.R;
 import org.blagodarie.Repository;
+import org.blagodarie.UnauthorizedException;
 import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
+import org.blagodarie.sync.SyncService;
 import org.blagodarie.ui.update.UpdateActivity;
+import org.blagodatie.database.Symptom;
+import org.blagodatie.database.SymptomGroupWithSymptoms;
 import org.blagodatie.database.UserSymptom;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import io.reactivex.Completable;
@@ -101,6 +111,8 @@ public final class SymptomsActivity
 
     private LocationManager mLocationManager;
 
+    private SymptomGroupsAdapter mSymptomGroupsAdapter;
+
     private SymptomsAdapter mSymptomsAdapter;
 
     private SymptomsActivityBinding mActivityBinding;
@@ -109,61 +121,115 @@ public final class SymptomsActivity
 
     private AccountManager mAccountManager;
 
+    private final BroadcastReceiver mSyncErrorReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive (
+                final Context context,
+                final Intent intent
+        ) {
+            final Throwable throwable = (Throwable) intent.getSerializableExtra(SyncService.EXTRA_EXCEPTION);
+            if (throwable instanceof UnauthorizedException) {
+                Toast.makeText(getApplicationContext(), R.string.txt_authorization_required, Toast.LENGTH_LONG).show();
+                getAuthTokenAndRequestSync();
+            } else {
+                Toast.makeText(getApplicationContext(), throwable.getLocalizedMessage(), Toast.LENGTH_LONG).show();
+            }
+        }
+    };
+
     @Override
-    protected void onCreate (@Nullable Bundle savedInstanceState) {
+    protected void onCreate (@Nullable final Bundle savedInstanceState) {
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
-        mRepository = new Repository(this);
+        //попытаться инициализировать данные пользователя
+        final String initUserDataErrorMessage = tryInitUserData();
+        //если ошибок нет
+        if (initUserDataErrorMessage == null) {
+            mRepository = new Repository(this);
+            mAccountManager = AccountManager.get(this);
+            mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
-        mAccountManager = AccountManager.get(this);
+            initViewModel();
 
-        initUserData();
+            mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
+            mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
 
-        initViewModel();
+            initBinding();
+            
+            setupToolbar();
 
-        mSymptomsAdapter = new SymptomsAdapter(new ArrayList<>(mViewModel.getDisplaySymptoms()), this::checkLocationEnabled);
+            mRepository.getSymptomGroups().observe(
+                    this,
+                    symptomGroupsWithSymptoms -> {
+                        if (symptomGroupsWithSymptoms != null) {
+                            final List<DisplaySymptomGroup> newDisplaySymptomGroups = createDisplaySymptomGroups(symptomGroupsWithSymptoms);
 
-        initBinding();
+                            if (!newDisplaySymptomGroups.equals(mViewModel.getDisplaySymptomGroups())) {
+                                //запомнить выбранную группу
+                                final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
 
-        setupToolbar();
+                                //задать новые данные
+                                mViewModel.setDisplaySymptomGroups(createDisplaySymptomGroups(symptomGroupsWithSymptoms));
+                                mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
 
-        mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                                //вернуть выбранную группу
+                                if (mViewModel.getDisplaySymptomGroups().size() > 0) {
+                                    //если существует выбранная группа, и она присутствует в новом списке
+                                    if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
+                                        //выделить ее
+                                        showSymptomsForGroup(selectedGroup);
+                                    } else {
+                                        //иначе выбрать первую
+                                        showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                                    }
+                                }
+                            }
+                        }
+                    }
+            );
 
-        //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
-        mDisposables.add(
-                Completable.
-                        fromAction(() ->
-                                mRepository.setupIncognitoId(mIncognitoId)
-                        ).
-                        subscribeOn(Schedulers.io()).
-                        subscribe(() ->
-                                mViewModel.loadLastValues(mIncognitoId)
-                        )
-        );
+            //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
+            Completable.
+                    fromAction(() ->
+                            mRepository.setupIncognitoId(mIncognitoId)
+                    ).
+                    subscribeOn(Schedulers.io()).
+                    subscribe();
+            /////////////////////////////////
+
+            registerReceiver(mSyncErrorReceiver, new IntentFilter(SyncService.ACTION_SYNC_EXCEPTION));
+            getAuthTokenAndRequestSync();
+        } else {
+            //иначе показать сообщение об ошибке и завершить Activity
+            Toast.makeText(this, initUserDataErrorMessage, Toast.LENGTH_SHORT).show();
+            finish();
+        }
     }
 
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
 
-        final boolean locationEnable = getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE).getBoolean(PREF_LOCATION_ENABLED, false);//.edit().putString(PREF_LOCATION_ENABLED, contactsOrder.name()).apply();
+        final SharedPreferences userSharedPreferences = getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE);
+
+        final boolean locationEnable = userSharedPreferences.getBoolean(PREF_LOCATION_ENABLED, false);
 
         //создаем фабрику
         final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
                 getApplication(),
-                mIncognitoId,
                 locationEnable
         );
 
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
 
+        //добавить слушатель включения/выключения местоположения
         mViewModel.isLocationEnabled().addOnPropertyChangedCallback(new androidx.databinding.Observable.OnPropertyChangedCallback() {
             @Override
             public void onPropertyChanged (androidx.databinding.Observable sender, int propertyId) {
                 if (sender == mViewModel.isLocationEnabled()) {
                     final boolean newValue = ((ObservableBoolean) sender).get();
-                    getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE).edit().putBoolean(PREF_LOCATION_ENABLED, newValue).apply();
+                    userSharedPreferences.edit().putBoolean(PREF_LOCATION_ENABLED, newValue).apply();
                     if (newValue) {
                         checkLocationPermissionAndStartUpdates();
                     } else {
@@ -179,6 +245,8 @@ public final class SymptomsActivity
         mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
         mActivityBinding.setViewModel(mViewModel);
         mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
+        mActivityBinding.rvSymptomGroups.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
+        mActivityBinding.rvSymptomGroups.setAdapter(mSymptomGroupsAdapter);
     }
 
     @Override
@@ -190,6 +258,10 @@ public final class SymptomsActivity
             checkLocationPermissionAndStartUpdates();
         }
 
+        orderSymptoms();
+    }
+
+    private void orderSymptoms () {
         mSymptomsAdapter.order();
         if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
             mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
@@ -208,6 +280,34 @@ public final class SymptomsActivity
         Log.d(TAG, "onDestroy");
         super.onDestroy();
         mDisposables.dispose();
+        unregisterReceiver(mSyncErrorReceiver);
+    }
+
+    private List<DisplaySymptomGroup> createDisplaySymptomGroups (
+            @NonNull final List<SymptomGroupWithSymptoms> symptomGroups
+    ) {
+        Log.d(TAG, "createDisplaySymptomGroups");
+        final List<DisplaySymptomGroup> displaySymptomGroups = new ArrayList<>();
+        for (SymptomGroupWithSymptoms symptomGroupWithSymptoms : symptomGroups) {
+            displaySymptomGroups.add(
+                    new DisplaySymptomGroup(
+                            symptomGroupWithSymptoms.getSymptomGroup().getName(),
+                            createDisplaySymptoms(symptomGroupWithSymptoms.getSymptoms())
+                    )
+            );
+        }
+        return displaySymptomGroups;
+    }
+
+    private List<DisplaySymptom> createDisplaySymptoms (
+            @NonNull final List<Symptom> symptoms
+    ) {
+        Log.d(TAG, "createDisplaySymptoms");
+        final List<DisplaySymptom> displaySymptoms = new ArrayList<>();
+        for (Symptom symptom : symptoms) {
+            displaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(mIncognitoId, symptom.getId())));
+        }
+        return displaySymptoms;
     }
 
     private void checkLocationPermissionAndStartUpdates () {
@@ -252,15 +352,46 @@ public final class SymptomsActivity
         mLocationManager.removeUpdates(this);
     }
 
-    private void initUserData () {
-        Log.d(TAG, "initUserData");
-        mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
-        String incognitoId = mAccountManager.getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
-        if (incognitoId == null) {
-            incognitoId = UUID.randomUUID().toString();
-            mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID, incognitoId);
+    /**
+     * Инициализирует данные о пользователе.
+     */
+    @Nullable
+    private String tryInitUserData () {
+        String errorMessage = null;
+        //если аккаунт передан
+        if (getIntent().hasExtra(EXTRA_ACCOUNT)) {
+            //получить аккаунт
+            mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
+            Log.d(TAG, "account=" + mAccount);
+
+            //получить анонимный ключ
+            final String incognitoId = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
+            //если анонимного ключа не существует
+            if (incognitoId != null) {
+                //попытаться преобразовать строку в UUID
+                try {
+                    mIncognitoId = UUID.fromString(incognitoId);
+                } catch (IllegalArgumentException e) {
+                    errorMessage = getString(R.string.error_incorrect_incognito_id) + e.getLocalizedMessage();
+                }
+            } else {
+                //установить сообщение об ошибке
+                errorMessage = getString(R.string.error_incognito_id_is_missing);
+            }
+        } else {
+            //иначе установить сообщение об ошибке
+            errorMessage = getString(R.string.error_account_not_set);
         }
-        mIncognitoId = UUID.fromString(incognitoId);
+        return errorMessage;
+    }
+
+    public void showSymptomsForGroup (
+            @NonNull final DisplaySymptomGroup displaySymptomGroup
+    ) {
+        mViewModel.setSelectedDisplaySymptomGroup(displaySymptomGroup);
+        mViewModel.setDisplaySymptoms(displaySymptomGroup.getDisplaySymptoms());
+        mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
+        mViewModel.loadLastValues(mIncognitoId, this::orderSymptoms);
     }
 
     public void checkLocationEnabled (
@@ -294,13 +425,13 @@ public final class SymptomsActivity
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
         Date currentDate = new Date();
-        displaySymptom.getLastDate().set(currentDate);
+        displaySymptom.setLastDate(currentDate);
 
         final Double latitude = mViewModel.getCurrentLatitude().get();
         final Double longitude = mViewModel.getCurrentLongitude().get();
 
-        displaySymptom.getLastLatitude().set(latitude);
-        displaySymptom.getLastLongitude().set(longitude);
+        displaySymptom.setLastLatitude(latitude);
+        displaySymptom.setLastLongitude(longitude);
         displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
 
         final UserSymptom userSymptom = new UserSymptom(
@@ -318,7 +449,7 @@ public final class SymptomsActivity
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(() -> {
-                            displaySymptom.isHaveNotSynced().set(true);
+                            displaySymptom.setHaveNotSynced(true);
                             displaySymptom.highlight();
                             getAuthTokenAndRequestSync();
                         })
@@ -514,14 +645,15 @@ public final class SymptomsActivity
             @NonNull final Uri latestVersionUri
     ) {
         Log.d(TAG, "showUpdateVersionDialog");
-        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.txt_update_available);
-        builder.setMessage(String.format(getString(R.string.txt_want_load_new_version), versionName));
-        builder.setPositiveButton(R.string.action_update, (dialog, which) -> toUpdate(versionName, latestVersionUri));
-        builder.setNegativeButton(R.string.action_finish, (dialog, which) -> finish());
-        builder.setCancelable(false);
-        builder.create();
-        builder.show();
+        new AlertDialog.
+                Builder(this).
+                setTitle(R.string.txt_update_available).
+                setMessage(String.format(getString(R.string.txt_want_load_new_version), versionName)).
+                setPositiveButton(R.string.action_update, (dialog, which) -> toUpdate(versionName, latestVersionUri)).
+                setNegativeButton(R.string.action_finish, (dialog, which) -> finish()).
+                setCancelable(false).
+                create().
+                show();
     }
 
     private void toUpdate (

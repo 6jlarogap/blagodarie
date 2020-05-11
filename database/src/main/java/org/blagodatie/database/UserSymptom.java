@@ -37,8 +37,8 @@ public final class UserSymptom
     private final UUID IncognitoId;
 
     @NonNull
-    @ColumnInfo (name = "symptom_id")
-    private final Long SymptomId;
+    @ColumnInfo (name = "symptom_id", typeAffinity = ColumnInfo.INTEGER)
+    private final Identifier SymptomId;
 
     @NonNull
     @ColumnInfo (name = "timestamp", typeAffinity = ColumnInfo.TEXT)
@@ -53,9 +53,9 @@ public final class UserSymptom
     private final Double Longitude;
 
     UserSymptom (
-            @NonNull final Long Id,
+            @NonNull final Identifier Id,
             @NonNull final UUID IncognitoId,
-            @NonNull final Long SymptomId,
+            @NonNull final Identifier SymptomId,
             @NonNull final Date Timestamp,
             @Nullable final Double Latitude,
             @Nullable final Double Longitude
@@ -71,12 +71,12 @@ public final class UserSymptom
     @Ignore
     public UserSymptom (
             @NonNull final UUID IncognitoId,
-            @NonNull final Long SymptomId,
+            @NonNull final Identifier SymptomId,
             @NonNull final Date Timestamp,
             @Nullable final Double Latitude,
             @Nullable final Double Longitude
     ) {
-        super(null);
+        super(Identifier.newInstance(null));
         this.IncognitoId = IncognitoId;
         this.SymptomId = SymptomId;
         this.Timestamp = Timestamp;
@@ -85,8 +85,8 @@ public final class UserSymptom
     }
 
     @Override
-    @Nullable
-    public Long getId(){
+    @NonNull
+    public Identifier getId(){
         return super.getId();
     }
 
@@ -96,7 +96,7 @@ public final class UserSymptom
     }
 
     @NonNull
-    public final Long getSymptomId () {
+    public final Identifier getSymptomId () {
         return SymptomId;
     }
 

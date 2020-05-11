@@ -1,6 +1,8 @@
 package org.blagodatie.database;
 
+import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
+import androidx.room.Delete;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
@@ -9,12 +11,15 @@ import java.util.Collection;
 import java.util.List;
 
 @Dao
-abstract class SymptomDao {
+public interface SymptomDao {
 
     @Insert (onConflict = OnConflictStrategy.IGNORE)
-    abstract void insert (final Collection<Symptom> symptoms);
+    void insert (final Collection<Symptom> symptoms);
+
+    @Query ("DELETE FROM tbl_symptom")
+    void deleteAll ();
 
     @Query ("SELECT * " +
             "FROM tbl_symptom")
-    public abstract List<Symptom> getAll ();
+    LiveData<List<Symptom>> getAll ();
 }

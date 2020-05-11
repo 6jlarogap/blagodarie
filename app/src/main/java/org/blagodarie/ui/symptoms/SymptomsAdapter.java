@@ -50,7 +50,7 @@ final class SymptomsAdapter
         final DisplaySymptom displaySymptom = mDisplaySymptoms.get(position);
         if (displaySymptom != null) {
             holder.bind(displaySymptom, v -> {
-                if (!displaySymptom.getHighlight().get()) {
+                if (!displaySymptom.getHighlight()) {
                     mDisplaySymptomClickListener.onClick(displaySymptom);
                 }
             });
@@ -62,7 +62,13 @@ final class SymptomsAdapter
         return mDisplaySymptoms.size();
     }
 
-    void order () {
+    final void setData (@NonNull final List<DisplaySymptom> displaySymptoms) {
+        final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomDiffUtilCallBack(displaySymptoms, mDisplaySymptoms));
+        diffResult.dispatchUpdatesTo(this);
+        mDisplaySymptoms = displaySymptoms;
+    }
+
+    final void order () {
         final List<DisplaySymptom> newDisplaySymptoms = new ArrayList<>(mDisplaySymptoms);
         Collections.sort(
                 newDisplaySymptoms,
@@ -78,7 +84,8 @@ final class SymptomsAdapter
                 });
         final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomDiffUtilCallBack(newDisplaySymptoms, mDisplaySymptoms));
         diffResult.dispatchUpdatesTo(this);
-        mDisplaySymptoms = newDisplaySymptoms;
+        mDisplaySymptoms.clear();
+        mDisplaySymptoms.addAll(newDisplaySymptoms);
     }
 
     static final class SymptomViewHolder
@@ -137,9 +144,9 @@ final class SymptomsAdapter
             return newItem.getSymptomId().equals(oldItem.getSymptomId()) &&
                     newItem.getSymptomName().equals(oldItem.getSymptomName()) &&
                     newItem.getUserSymptomCount() == oldItem.getUserSymptomCount() &&
-                    (newItem.getLastDate().get() == null ? oldItem.getLastDate().get() == null : newItem.getLastDate().get().equals(oldItem.getLastDate().get())) &&
-                    (newItem.getLastLatitude().get() == null ? oldItem.getLastLatitude().get() == null : newItem.getLastLatitude().get().equals(oldItem.getLastLatitude().get())) &&
-                    (newItem.getLastLongitude().get() == null ? oldItem.getLastLongitude().get() == null : newItem.getLastLongitude().get().equals(oldItem.getLastLongitude().get()));
+                    (newItem.getLastDate() == null ? oldItem.getLastDate() == null : newItem.getLastDate().equals(oldItem.getLastDate())) &&
+                    (newItem.getLastLatitude() == null ? oldItem.getLastLatitude() == null : newItem.getLastLatitude().equals(oldItem.getLastLatitude())) &&
+                    (newItem.getLastLongitude() == null ? oldItem.getLastLongitude() == null : newItem.getLastLongitude().equals(oldItem.getLastLongitude()));
         }
     }
 }

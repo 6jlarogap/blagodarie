@@ -40,4 +40,22 @@ public class MigrationTest {
 
         db = helper.runMigrationsAndValidate(TEST_DB, 3, true, MigrationKeeper.getMigrations()[1]);
     }
+
+    @Test
+    public void migrate3To4() throws IOException {
+        SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 3);
+
+        db.close();
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 4, true, MigrationKeeper.getMigrations()[2]);
+    }
+
+    @Test
+    public void migrate4To5() throws IOException {
+        SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 4);
+
+        db.close();
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 5, true, MigrationKeeper.getMigrations()[3]);
+    }
 }

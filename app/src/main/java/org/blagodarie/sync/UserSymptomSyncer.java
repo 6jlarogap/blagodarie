@@ -29,7 +29,7 @@ final class UserSymptomSyncer {
 
     private static final String TAG = UserSymptomSyncer.class.getSimpleName();
 
-    private static final String USER_SYMPTOM_JSON_PATTERN = "{\"symptom_id\":%d,\"timestamp\":%d,\"timezone\":\"%s\",\"latitude\":%f,\"longitude\":%f}";
+    private static final String USER_SYMPTOM_JSON_PATTERN = "{\"symptom_id\":%s,\"timestamp\":%d,\"timezone\":\"%s\",\"latitude\":%f,\"longitude\":%f}";
 
     private static volatile UserSymptomSyncer INSTANCE;
 
@@ -38,6 +38,7 @@ final class UserSymptomSyncer {
 
     @NonNull
     static UserSymptomSyncer getInstance () {
+        Log.d(TAG, "getInstance");
         synchronized (UserSymptomSyncer.class) {
             if (INSTANCE == null) {
                 INSTANCE = new UserSymptomSyncer();

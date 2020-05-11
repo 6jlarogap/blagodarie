@@ -1,7 +1,6 @@
 package org.blagodatie.database;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
@@ -20,12 +19,12 @@ public abstract class BaseEntity {
      * Первичный ключ для всех сущностей, генерируется автоматически.
      * Название столбца таблицы - id.
      */
-    @Nullable
+    @NonNull
     @PrimaryKey (autoGenerate = true)
-    @ColumnInfo (name = "id")
-    private Long Id;
+    @ColumnInfo (name = "id", typeAffinity = ColumnInfo.INTEGER)
+    private Identifier Id;
 
-    BaseEntity (@Nullable final Long id) {
+    BaseEntity (@NonNull final Identifier id) {
         this.Id = id;
     }
 
@@ -34,8 +33,8 @@ public abstract class BaseEntity {
      *
      * @return Идентификатор сущности
      */
-    @Nullable
-    protected Long getId () {
+    @NonNull
+    public Identifier getId () {
         return this.Id;
     }
 

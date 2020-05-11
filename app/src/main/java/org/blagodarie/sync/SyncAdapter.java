@@ -5,6 +5,7 @@ import android.accounts.AccountManager;
 import android.content.AbstractThreadedSyncAdapter;
 import android.content.ContentProviderClient;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SyncResult;
 import android.os.Bundle;
 import android.util.Log;
@@ -26,6 +27,8 @@ public final class SyncAdapter
 
     private static final String TAG = SyncAdapter.class.getSimpleName();
 
+    private static final String GENERAL_PREFERENCE = "org.blagodarie.ui.symptoms.preference.general";
+
     SyncAdapter (Context context, boolean autoInitialize) {
         super(context, autoInitialize);
     }
@@ -43,15 +46,16 @@ public final class SyncAdapter
         final UUID incognitoId = UUID.fromString(AccountManager.get(getContext()).getUserData(account, AccountGeneral.USER_DATA_INCOGNITO_ID));
         try {
             syncAll(incognitoId, authToken);
-        } catch (JSONException e) {
+        } catch (JSONException | IOException  e) {
             Log.e(TAG, "onPerformSync error=" + e);
             e.printStackTrace();
-        } catch (IOException e) {
+            sendBroadcastException(e);
+        } catch (UnauthorizedException e){
             Log.e(TAG, "onPerformSync error=" + e);
             e.printStackTrace();
-        } catch (UnauthorizedException e) {
-            Log.e(TAG, "onPerformSync error=" + e);
+            //очистить токен
             AccountManager.get(getContext()).invalidateAuthToken(account.type, authToken);
+            sendBroadcastException(e);
         }
     }
 
@@ -61,16 +65,34 @@ public final class SyncAdapter
     ) throws JSONException, IOException, UnauthorizedException {
         Log.d(TAG, "syncAll");
         final Repository repository = new Repository(getContext());
-        final ServerConnector serverConnector = new ServerConnector(getContext());
+        final String apiBaseUrl = new ServerConnector(getContext()).getApiBaseUrl();
 
+        //синхронизировать симптомы
+        SymptomSyncer.
+                getInstance().
+                sync(
+                        apiBaseUrl,
+                        repository,
+                        getContext().getSharedPreferences(GENERAL_PREFERENCE, Context.MODE_PRIVATE)
+                );
+
+        //синхронизировать симптомы пользователя
         UserSymptomSyncer.
                 getInstance().
                 sync(
                         incognitoId,
                         authToken,
-                        serverConnector.getApiBaseUrl(),
+                        apiBaseUrl,
                         repository
                 );
+
+    }
+
+    private void sendBroadcastException(@NonNull final Throwable throwable){
+        Log.d(TAG, "sendBroadcastException");
+        final Intent intent = new Intent(SyncService.ACTION_SYNC_EXCEPTION);
+        intent.putExtra(SyncService.EXTRA_EXCEPTION, throwable);
+        getContext().sendBroadcast(intent);
     }
 
 }

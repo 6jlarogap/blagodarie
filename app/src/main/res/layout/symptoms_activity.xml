@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -53,7 +54,7 @@
                     android:text="@string/action_log"
                     android:textAppearance="@style/TextAppearance.AppCompat.Small"
                     android:textColor="@color/colorAccent"
-                    android:visibility="@{BuildConfig.DEBUG ? View.VISIBLE : View.GONE}"/>
+                    android:visibility="@{BuildConfig.DEBUG ? View.VISIBLE : View.GONE}" />
 
             </LinearLayout>
 
@@ -67,10 +68,9 @@
                 <androidx.appcompat.widget.SwitchCompat
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/location"
                     android:checked="@={ViewModel.isLocationEnabled()}"
-                    android:theme="@style/LocationSwitchStyle"
-                    />
+                    android:text="@string/location"
+                    android:theme="@style/LocationSwitchStyle" />
 
                 <TextView
                     android:id="@+id/tvLatitude"
@@ -92,13 +92,29 @@
 
         </FrameLayout>
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvSymptoms"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:scrollbars="vertical"
-            android:fadeScrollbars="false"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSymptoms"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fadeScrollbars="false"
+                android:scrollbars="vertical"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSymptomGroups"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:fadeScrollbars="false"
+                android:scrollbars="horizontal" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
