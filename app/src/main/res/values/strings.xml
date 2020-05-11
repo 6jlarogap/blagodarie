@@ -12,7 +12,6 @@
     <string name="location_disabled">Для улучшения работы включите геолокацию.</string>
     <string name="location_enable">Включить</string>
     <string name="location_providers_disabled_warning">Включите геолокацию.</string>
-    <string name="build_type_label"/>
     <string name="action_repeat">Повторить</string>
     <string name="action_close">Закрыть</string>
     <string name="action_update">Обновить</string>

@@ -35,7 +35,8 @@ public final class BlagodarieApp
 
     public static void requestSync (
             @NonNull final Account account,
-            @Nullable final String authToken
+            @Nullable final String authToken,
+            @Nullable final String authority
     ) {
         Log.d(TAG, "requestSync account=" + account);
         final Bundle settingsBundle = new Bundle();
@@ -43,6 +44,6 @@ public final class BlagodarieApp
         settingsBundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
         settingsBundle.putString(AccountManager.KEY_AUTHTOKEN, authToken);
 
-        ContentResolver.requestSync(account, "org.blagodarie.datasync.provider", settingsBundle);
+        ContentResolver.requestSync(account, authority, settingsBundle);
     }
 }

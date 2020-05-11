@@ -1,5 +1,4 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name">authentication</string>
     <string name="account_type">org.blagodarie</string>
     <string name="token_type">token_type</string>
     <string name="txt_greeting">Здравствуйте!</string>

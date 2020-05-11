@@ -4,9 +4,10 @@ android {
 
     compileSdkVersion 28
 
+    def APPLICATION_ID = "org.blagodarie"
 
     defaultConfig {
-        applicationId "org.blagodarie"
+        applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
         versionCode 27
@@ -16,9 +17,13 @@ android {
     }
 
     buildTypes {
+        def CONTENT_PROVIDER_AUTHORITIES = ".content.provider"
+        def FILE_PROVIDER_AUTHORITIES = ".file.provider"
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            resValue "string", "content_provider_authorities", "${APPLICATION_ID}${CONTENT_PROVIDER_AUTHORITIES}"
+            resValue "string", "file_provider_authorities", "${APPLICATION_ID}${FILE_PROVIDER_AUTHORITIES}"
         }
         latest {
             initWith release
@@ -26,13 +31,16 @@ android {
         debug {
             debuggable true
             applicationIdSuffix ".dbg"
+            versionNameSuffix "-dbg"
+            resValue "string", "content_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${CONTENT_PROVIDER_AUTHORITIES}"
+            resValue "string", "file_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${FILE_PROVIDER_AUTHORITIES}"
         }
     }
 
     applicationVariants.all { variant ->
         variant.outputs.all {
             if (buildType.name == "latest") {
-                outputFileName = "../latest/blagodarie-latest.apk"
+                outputFileName = "../latest/blagodarie-" + buildType.name + ".apk"
             } else {
                 outputFileName = "blagodarie-" + versionName + "-" + buildType.name + ".apk"
             }

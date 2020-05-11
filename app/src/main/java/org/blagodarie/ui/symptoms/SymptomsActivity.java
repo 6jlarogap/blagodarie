@@ -325,7 +325,7 @@ public final class SymptomsActivity
         final ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             final String title = getString(R.string.toolbar_title);
-            final SpannableString spannableTitle = new SpannableString(title + " " + BuildConfig.VERSION_NAME + getString(R.string.build_type_label));
+            final SpannableString spannableTitle = new SpannableString(title + " " + BuildConfig.VERSION_NAME);
             spannableTitle.setSpan(new UnderlineSpan(), 0, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             actionBar.setTitle(spannableTitle);
         }
@@ -468,7 +468,7 @@ public final class SymptomsActivity
                         Bundle bundle = future.getResult();
                         if (bundle != null) {
                             final String authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN);
-                            BlagodarieApp.requestSync(mAccount, authToken);
+                            BlagodarieApp.requestSync(mAccount, authToken, getString(R.string.content_provider_authorities));
                         }
                     } catch (AuthenticatorException | IOException | OperationCanceledException e) {
                         e.printStackTrace();
