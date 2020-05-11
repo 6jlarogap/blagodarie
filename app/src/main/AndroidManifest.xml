@@ -40,7 +40,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".ui.symptoms.SymptomsActivity" />
+        <activity
+            android:name=".ui.symptoms.SymptomsActivity"
+            android:screenOrientation="portrait" />
         <activity android:name=".ui.update.UpdateActivity" />
         <activity android:name=".ui.greeting.GreetingActivity" />
 
@@ -57,9 +59,10 @@
             android:name=".sync.SyncService"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.content.SyncAdapter"/>
+                <action android:name="android.content.SyncAdapter" />
             </intent-filter>
-            <meta-data android:name="android.content.SyncAdapter"
+            <meta-data
+                android:name="android.content.SyncAdapter"
                 android:resource="@xml/syncadapter" />
         </service>
 
@@ -77,7 +80,7 @@
             android:name="org.blagodarie.sync.StubProvider"
             android:authorities="@string/content_provider_authorities"
             android:exported="false"
-            android:syncable="true"/>
+            android:syncable="true" />
 
     </application>
 </manifest>
