@@ -151,12 +151,13 @@ public final class SymptomsActivity
             mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
             initViewModel();
-            setupToolbar();
 
             mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
             mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
 
             initBinding();
+            
+            setupToolbar();
 
             mRepository.getSymptomGroups().observe(
                     this,
