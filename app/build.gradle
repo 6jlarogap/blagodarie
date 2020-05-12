@@ -4,40 +4,76 @@ android {
 
     compileSdkVersion 28
 
+    def APPLICATION_ID = "org.blagodarie"
 
     defaultConfig {
-        applicationId "org.blagodarie"
+        applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 27
-        versionName "0.3.4"
+        versionCode 28
+        versionName "0.3.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
     }
 
     buildTypes {
+        def CONTENT_PROVIDER_AUTHORITIES = ".content.provider"
+        def FILE_PROVIDER_AUTHORITIES = ".file.provider"
+
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-        latest {
-            initWith release
+            resValue "string", "content_provider_authorities", "${APPLICATION_ID}${CONTENT_PROVIDER_AUTHORITIES}"
+            resValue "string", "file_provider_authorities", "${APPLICATION_ID}${FILE_PROVIDER_AUTHORITIES}"
         }
         debug {
             debuggable true
             applicationIdSuffix ".dbg"
+            versionNameSuffix "-dbg"
+            resValue "string", "content_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${CONTENT_PROVIDER_AUTHORITIES}"
+            resValue "string", "file_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${FILE_PROVIDER_AUTHORITIES}"
         }
     }
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            if (buildType.name == "latest") {
-                outputFileName = "../latest/blagodarie-latest.apk"
-            } else {
-                outputFileName = "blagodarie-" + versionName + "-" + buildType.name + ".apk"
+            outputFileName = "blagodarie-" + versionName + "-" + buildType.name + ".apk"
+        }
+        variant.getAssembleProvider().configure() {
+            it.doLast {
+                variant.outputs.all {
+                    println("copy apk to latest")
+                    println("${projectDir}\\${buildType.name}\\output.json")
+
+                    def distDir = "/latest"
+
+                    def dbgSuffix = ""
+                    if(buildType.name == "debug") {
+                        dbgSuffix = "-dbg"
+                    }
+
+                    //скопировать apk в latest
+                    copy {
+                        from (outputFile){
+                            rename '.*', "blagodarie${dbgSuffix}-latest.apk"
+                        }
+                        into "${distDir}${dbgSuffix}"
+                    }
+
+                    //скопировать output.json в latest
+                    copy {
+                        from ("${projectDir}\\${buildType.name}\\output.json"){
+                            rename '.*', "output.json"
+                        }
+                        into "${distDir}${dbgSuffix}"
+                    }
+
+                }
             }
         }
     }
+
+    applicationVariants
 
     dataBinding {
         enabled = true
