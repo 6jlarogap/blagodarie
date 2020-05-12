@@ -199,7 +199,6 @@ public final class SymptomsActivity
             /////////////////////////////////
 
             registerReceiver(mSyncErrorReceiver, new IntentFilter(SyncService.ACTION_SYNC_EXCEPTION));
-            getAuthTokenAndRequestSync();
         } else {
             //иначе показать сообщение об ошибке и завершить Activity
             Toast.makeText(this, initUserDataErrorMessage, Toast.LENGTH_SHORT).show();
@@ -254,6 +253,7 @@ public final class SymptomsActivity
         Log.d(TAG, "onResume");
         super.onResume();
         checkLatestVersion();
+        getAuthTokenAndRequestSync();
         if (mViewModel.isLocationEnabled().get()) {
             checkLocationPermissionAndStartUpdates();
         }
