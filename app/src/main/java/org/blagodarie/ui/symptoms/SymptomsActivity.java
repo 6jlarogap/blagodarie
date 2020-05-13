@@ -257,7 +257,8 @@ public final class SymptomsActivity
         new AlertDialog.Builder(this).
                 setTitle(R.string.location).
                 setMessage(R.string.location_explanation).
-                setPositiveButton(R.string.ok, (dialog, which) -> tryTurnOnLocation()).
+                setPositiveButton(R.string.btn_next, (dialog, which) -> tryTurnOnLocation()).
+                setNegativeButton(R.string.btn_cancel, (dialog, which) -> mViewModel.isLocationEnabled().set(false)).
                 create().
                 show();
     }

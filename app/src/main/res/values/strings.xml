@@ -39,5 +39,7 @@
     <string name="error_incorrect_incognito_id">Некорректный анонимный ключ: </string>
     <string name="txt_authorization_required">Необходима авторизация</string>
     <string name="no_internet_connection">Отсутствует соединение с интернетом</string>
-    <string name="location_explanation">Местоположение покажет какой стороной в момент ощущения Земля повёрнута к Солнцу, Луне и другим планетам. Для анонимности кооринаты смещаются в случайном направлении в радиусе от 200 до 600 метров.</string>
+    <string name="location_explanation">Местоположение покажет какой стороной в момент ощущения Земля повёрнута к Солнцу, Луне и другим планетам. Для анонимности кооринаты смещаются в случайном направлении в радиусе до 600 метров.</string>
+    <string name="btn_next">Далее</string>
+    <string name="btn_cancel">Отмена</string>
 </resources>
