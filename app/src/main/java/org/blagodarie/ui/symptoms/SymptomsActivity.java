@@ -80,6 +80,7 @@ public final class SymptomsActivity
 
     private static final String USER_PREFERENCE_PATTERN = "org.blagodarie.ui.symptoms.preference.%s";
     private static final String PREF_LOCATION_ENABLED = "locationEnabled";
+    private static final String PREF_LOCATION_EXPLANATION_SHOWED = "locationExplanationShowed";
     private static final String EXTRA_ACCOUNT = "org.blagodarie.ui.symptoms.ACCOUNT";
 
     /**
@@ -121,6 +122,8 @@ public final class SymptomsActivity
 
     private AccountManager mAccountManager;
 
+    private boolean mShouldProvideRationaleBeforeRequest = false;
+
     private final BroadcastReceiver mSyncErrorReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive (
@@ -160,7 +163,7 @@ public final class SymptomsActivity
             mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
 
             initBinding();
-            
+
             setupToolbar();
 
             mRepository.getSymptomGroups().observe(
@@ -215,12 +218,12 @@ public final class SymptomsActivity
 
         final SharedPreferences userSharedPreferences = getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE);
 
-        final boolean locationEnable = userSharedPreferences.getBoolean(PREF_LOCATION_ENABLED, false);
+        final boolean prefLocationEnable = userSharedPreferences.getBoolean(PREF_LOCATION_ENABLED, false);
 
         //создаем фабрику
         final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
                 getApplication(),
-                locationEnable
+                prefLocationEnable
         );
 
         //создаем UpdateViewModel
@@ -231,10 +234,16 @@ public final class SymptomsActivity
             @Override
             public void onPropertyChanged (androidx.databinding.Observable sender, int propertyId) {
                 if (sender == mViewModel.isLocationEnabled()) {
-                    final boolean newValue = ((ObservableBoolean) sender).get();
-                    userSharedPreferences.edit().putBoolean(PREF_LOCATION_ENABLED, newValue).apply();
-                    if (newValue) {
-                        checkLocationPermissionAndStartUpdates();
+                    final boolean locationEnable = ((ObservableBoolean) sender).get();
+                    userSharedPreferences.edit().putBoolean(PREF_LOCATION_ENABLED, locationEnable).apply();
+                    if (locationEnable) {
+                        final boolean locationExplanationShowed = userSharedPreferences.getBoolean(PREF_LOCATION_EXPLANATION_SHOWED, false);
+                        if (!locationExplanationShowed) {
+                            showLocationExplanationDialog();
+                            userSharedPreferences.edit().putBoolean(PREF_LOCATION_EXPLANATION_SHOWED, true).apply();
+                        } else {
+                            tryTurnOnLocation();
+                        }
                     } else {
                         mViewModel.getCurrentLatitude().set(null);
                         mViewModel.getCurrentLongitude().set(null);
@@ -242,6 +251,27 @@ public final class SymptomsActivity
                 }
             }
         });
+    }
+
+    private void showLocationExplanationDialog () {
+        new AlertDialog.Builder(this).
+                setTitle(R.string.location).
+                setMessage(R.string.location_explanation).
+                setPositiveButton(R.string.ok, (dialog, which) -> tryTurnOnLocation()).
+                create().
+                show();
+    }
+
+    private void tryTurnOnLocation () {
+        if (checkLocationPermission()) {
+            if (isHaveEnabledLocationProvider()) {
+                startLocationUpdates();
+            } else {
+                startLocationSettingsActivity();
+            }
+        } else {
+            requestLocationPermission();
+        }
     }
 
     private void initBinding () {
@@ -258,8 +288,11 @@ public final class SymptomsActivity
         super.onResume();
         checkLatestVersion();
         getAuthTokenAndRequestSync();
-        if (mViewModel.isLocationEnabled().get()) {
-            checkLocationPermissionAndStartUpdates();
+
+        boolean isLocationPossible = checkLocationPermission() && isHaveEnabledLocationProvider();
+        mViewModel.isLocationEnabled().set(isLocationPossible);
+        if (isLocationPossible) {
+            startLocationUpdates();
         }
 
         orderSymptoms();
@@ -312,15 +345,6 @@ public final class SymptomsActivity
             displaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(mIncognitoId, symptom.getId())));
         }
         return displaySymptoms;
-    }
-
-    private void checkLocationPermissionAndStartUpdates () {
-        Log.d(TAG, "checkLocationPermissionAndStartUpdates");
-        if (checkLocationPermission()) {
-            startLocationUpdates();
-        } else {
-            attemptRequestLocationPermissions();
-        }
     }
 
     private void setupToolbar () {
@@ -487,49 +511,23 @@ public final class SymptomsActivity
         return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void attemptRequestLocationPermissions () {
-        Log.d(TAG, "attemptRequestLocationPermissions");
-        boolean shouldProvideRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
-        if (shouldProvideRationale) {
-            mViewModel.isShowLocationPermissionDeniedExplanation().set(false);
-            mViewModel.isShowLocationPermissionRationale().set(true);
-        } else {
-            if (!mViewModel.isShowLocationPermissionDeniedExplanation().get()) {
-                requestLocationPermission();
-            }
-        }
-    }
-
     @Override
     public void onRequestPermissionsResult (final int requestCode, @NonNull final String[] permissions, @NonNull final int[] grantResults) {
         Log.d(TAG, "onRequestPermissionsResult");
         if (requestCode == PERM_REQ_ACCESS_FINE_LOCATION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startLocationUpdates();
+                if (isHaveEnabledLocationProvider()) {
+                    startLocationUpdates();
+                } else {
+                    startLocationSettingsActivity();
+                }
             } else {
-                if (!mViewModel.isShowLocationPermissionDeniedExplanation().get()) {
-                    mViewModel.isShowLocationPermissionRationale().set(false);
-                    mViewModel.isShowLocationPermissionDeniedExplanation().set(true);
+                boolean shouldProvideRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
+                if (!shouldProvideRationale && !mShouldProvideRationaleBeforeRequest) {
+                    startApplicationDetailSettingsActivity();
                 }
             }
         }
-    }
-
-    public void onLocationPermissionRationaleClick (final View view) {
-        Log.d(TAG, "onLocationPermissionRationaleClick");
-        mViewModel.isShowLocationPermissionRationale().set(false);
-        requestLocationPermission();
-    }
-
-    public void onLocationPermissionDeniedExplanationClick (final View view) {
-        Log.d(TAG, "onLocationPermissionDeniedExplanationClick");
-        mViewModel.isShowLocationPermissionDeniedExplanation().set(false);
-        final Intent intent = new Intent();
-        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-        final Uri uri = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null);
-        intent.setData(uri);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
     }
 
     public void onLinkClick (final View view) {
@@ -537,6 +535,21 @@ public final class SymptomsActivity
         final Intent i = new Intent(Intent.ACTION_VIEW);
         i.setData(Uri.parse(getString(R.string.website_url)));
         startActivity(i);
+    }
+
+    private void startLocationSettingsActivity () {
+        Log.d(TAG, "startLocationSettingsActivity");
+        final Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+        startActivity(intent);
+    }
+
+    private void startApplicationDetailSettingsActivity () {
+        final Intent intent = new Intent();
+        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        final Uri uri = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null);
+        intent.setData(uri);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
 
     public void showLog (final View view) {
@@ -573,14 +586,9 @@ public final class SymptomsActivity
         builder.show();
     }
 
-    public void onLocationProvidersDisabledWarningClick (final View view) {
-        Log.d(TAG, "onLocationProvidersDisabledWarningClick");
-        final Intent viewIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-        startActivity(viewIntent);
-    }
-
     public void requestLocationPermission () {
         Log.d(TAG, "requestLocationPermission");
+        mShouldProvideRationaleBeforeRequest = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
         ActivityCompat.requestPermissions(SymptomsActivity.this,
                 new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                 PERM_REQ_ACCESS_FINE_LOCATION);
@@ -589,7 +597,6 @@ public final class SymptomsActivity
     @Override
     public void onLocationChanged (Location location) {
         Log.d(TAG, "onLocationChanged location=" + location);
-        checkHaveEnabledLocationProvider();
         if (location != null) {
             mViewModel.getCurrentLatitude().set(location.getLatitude());
             mViewModel.getCurrentLongitude().set(location.getLongitude());
@@ -604,21 +611,19 @@ public final class SymptomsActivity
     @Override
     public void onProviderEnabled (String provider) {
         Log.d(TAG, "onProviderEnabled");
-        checkHaveEnabledLocationProvider();
     }
 
     @Override
     public void onProviderDisabled (String provider) {
         Log.d(TAG, "onProviderDisabled provider=" + provider);
-        checkHaveEnabledLocationProvider();
     }
 
-    private void checkHaveEnabledLocationProvider () {
-        boolean isHaveEnabledLocationProvider = !(mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
-                mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-        );
+    private boolean isHaveEnabledLocationProvider () {
+        boolean isHaveEnabledLocationProvider = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER
+                );
         Log.d(TAG, "checkHaveEnabledLocationProvider isHaveEnabledLocationProvider=" + isHaveEnabledLocationProvider);
-        mViewModel.isShowLocationProvidersDisabledWarning().set(isHaveEnabledLocationProvider);
+        return isHaveEnabledLocationProvider;
     }
 
 

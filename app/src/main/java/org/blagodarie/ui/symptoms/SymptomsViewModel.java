@@ -60,15 +60,6 @@ public final class SymptomsViewModel
     private final ObservableField<Double> mCurrentLongitude = new ObservableField<>();
 
     @NonNull
-    private final ObservableBoolean mShowLocationPermissionRationale = new ObservableBoolean(false);
-
-    @NonNull
-    private final ObservableBoolean mShowLocationPermissionDeniedExplanation = new ObservableBoolean(false);
-
-    @NonNull
-    private final ObservableBoolean mShowLocationProvidersDisabledWarning = new ObservableBoolean(false);
-
-    @NonNull
     private final ObservableBoolean mLocationEnabled;
 
     @NonNull
@@ -175,21 +166,6 @@ public final class SymptomsViewModel
     @NonNull
     public final ObservableField<Double> getCurrentLongitude () {
         return mCurrentLongitude;
-    }
-
-    @NonNull
-    public final ObservableBoolean isShowLocationPermissionRationale () {
-        return mShowLocationPermissionRationale;
-    }
-
-    @NonNull
-    public final ObservableBoolean isShowLocationPermissionDeniedExplanation () {
-        return mShowLocationPermissionDeniedExplanation;
-    }
-
-    @NonNull
-    public final ObservableBoolean isShowLocationProvidersDisabledWarning () {
-        return mShowLocationProvidersDisabledWarning;
     }
 
     @NonNull
