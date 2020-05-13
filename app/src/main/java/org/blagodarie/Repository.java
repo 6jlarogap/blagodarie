@@ -77,14 +77,6 @@ public final class Repository {
         return mUserSymptomDao.getNotSynced(incognitoId);
     }
 
-    public final void setupIncognitoId (@NonNull final UUID incognitoId) {
-        Log.d(TAG, "setupIncognitoId");
-        mBlagodarieDatabase.runInTransaction(() -> {
-            mUserSymptomDao.setupIncognitoId(incognitoId);
-            mLastUserSymptomDao.setupIncognitoId(incognitoId);
-        });
-    }
-
     public final void insertUserSymptom (@NonNull final UserSymptom userSymptom) {
         Log.d(TAG, "insertUserSymptom");
         //выполнить в транзакции
