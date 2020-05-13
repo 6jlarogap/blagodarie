@@ -54,7 +54,7 @@ android {
 
                     //скопировать apk в latest
                     copy {
-                        from (outputFile){
+                        from ("${projectDir}\\${buildType.name}\\${outputFileName}"){
                             rename '.*', "blagodarie${dbgSuffix}-latest.apk"
                         }
                         into "${distDir}${dbgSuffix}"
@@ -72,8 +72,6 @@ android {
             }
         }
     }
-
-    applicationVariants
 
     dataBinding {
         enabled = true
