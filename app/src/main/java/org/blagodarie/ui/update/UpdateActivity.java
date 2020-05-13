@@ -15,7 +15,6 @@ import androidx.core.content.FileProvider;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
 
-import org.blagodarie.BuildConfig;
 import org.blagodarie.R;
 import org.blagodarie.databinding.UpdateActivityBinding;
 
@@ -32,7 +31,6 @@ public final class UpdateActivity
         implements UpdateManager.ProgressListener {
 
     private static final String FILE_BASE_PATH = "file://";
-    private static final String PROVIDER_PATH = ".provider";
 
     private static final String EXTRA_LATEST_VERSION_NAME = "org.blagodarie.ui.update.LATEST_VERSION_NAME";
     private static final String EXTRA_LATEST_VERSION_URI = "org.blagodarie.ui.update.LATEST_VERSION_URI";
@@ -94,7 +92,7 @@ public final class UpdateActivity
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             Uri contentUri = FileProvider.getUriForFile(
                     this,
-                    BuildConfig.APPLICATION_ID + PROVIDER_PATH,
+                    getString(R.string.file_provider_authorities),
                     new File(destination)
             );
             final Intent install = new Intent(Intent.ACTION_VIEW);
