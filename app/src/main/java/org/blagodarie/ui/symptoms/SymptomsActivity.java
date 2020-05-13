@@ -153,7 +153,7 @@ public final class SymptomsActivity
         final String initUserDataErrorMessage = tryInitUserData();
         //если ошибок нет
         if (initUserDataErrorMessage == null) {
-            mRepository = new Repository(this);
+            mRepository = Repository.getInstance(this);
             mAccountManager = AccountManager.get(this);
             mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
@@ -166,7 +166,7 @@ public final class SymptomsActivity
 
             setupToolbar();
 
-            mRepository.getSymptomGroups().observe(
+            mRepository.getSymptomGroupsWithSymptoms().observe(
                     this,
                     symptomGroupsWithSymptoms -> {
                         if (symptomGroupsWithSymptoms != null) {

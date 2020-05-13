@@ -64,7 +64,7 @@ public final class SyncAdapter
             @Nullable final String authToken
     ) throws JSONException, IOException, UnauthorizedException {
         Log.d(TAG, "syncAll");
-        final Repository repository = new Repository(getContext());
+        final Repository repository = Repository.getInstance(getContext());
         final String apiBaseUrl = new ServerConnector(getContext()).getApiBaseUrl();
 
         //синхронизировать симптомы

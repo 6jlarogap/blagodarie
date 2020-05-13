@@ -82,7 +82,7 @@ public final class SymptomsViewModel
 
         mLocationEnabled = new ObservableBoolean(locationEnabled);
 
-        mRepository = new Repository(application.getApplicationContext());
+        mRepository = Repository.getInstance(application.getApplicationContext());
     }
 
     @Override
