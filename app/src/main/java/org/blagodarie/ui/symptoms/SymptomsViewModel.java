@@ -18,6 +18,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -57,15 +58,6 @@ public final class SymptomsViewModel
 
     @NonNull
     private final ObservableField<Double> mCurrentLongitude = new ObservableField<>();
-
-    @NonNull
-    private final ObservableBoolean mShowLocationPermissionRationale = new ObservableBoolean(false);
-
-    @NonNull
-    private final ObservableBoolean mShowLocationPermissionDeniedExplanation = new ObservableBoolean(false);
-
-    @NonNull
-    private final ObservableBoolean mShowLocationProvidersDisabledWarning = new ObservableBoolean(false);
 
     @NonNull
     private final ObservableBoolean mLocationEnabled;
@@ -177,28 +169,14 @@ public final class SymptomsViewModel
     }
 
     @NonNull
-    public final ObservableBoolean isShowLocationPermissionRationale () {
-        return mShowLocationPermissionRationale;
-    }
-
-    @NonNull
-    public final ObservableBoolean isShowLocationPermissionDeniedExplanation () {
-        return mShowLocationPermissionDeniedExplanation;
-    }
-
-    @NonNull
-    public final ObservableBoolean isShowLocationProvidersDisabledWarning () {
-        return mShowLocationProvidersDisabledWarning;
-    }
-
-    @NonNull
     public final ObservableBoolean isLocationEnabled () {
         return mLocationEnabled;
     }
 
     @NonNull
     private static String getCurrentDateTimeString () {
-        return SimpleDateFormat.getDateTimeInstance().format(new Date());
+        final SimpleDateFormat currentDateTimeFormat = new SimpleDateFormat("dd MMM yyyy\nHH:mm:ss", Locale.getDefault());
+        return currentDateTimeFormat.format(new Date());
     }
 
     static final class Factory

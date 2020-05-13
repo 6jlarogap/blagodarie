@@ -127,7 +127,7 @@ public final class SignInFragment
             final Bundle savedInstanceState
     ) {
         Log.d(TAG, "onCreateView");
-        final View view = inflater.inflate(R.layout.sign_up_fragment, container, false);
+        final View view = inflater.inflate(R.layout.sign_in_fragment, container, false);
         initViews(view);
         return view;
     }
