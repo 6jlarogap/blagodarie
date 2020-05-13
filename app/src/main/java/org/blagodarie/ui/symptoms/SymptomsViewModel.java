@@ -18,6 +18,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -198,7 +199,8 @@ public final class SymptomsViewModel
 
     @NonNull
     private static String getCurrentDateTimeString () {
-        return SimpleDateFormat.getDateTimeInstance().format(new Date());
+        final SimpleDateFormat currentDateTimeFormat = new SimpleDateFormat("dd MMM yyyy\nHH:mm:ss", Locale.getDefault());
+        return currentDateTimeFormat.format(new Date());
     }
 
     static final class Factory
