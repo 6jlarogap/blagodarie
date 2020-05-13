@@ -84,15 +84,15 @@ public final class GreetingActivity
                 try {
                     mIncognitoId = UUID.fromString(incognitoId);
                 } catch (IllegalArgumentException e) {
-                    errorMessage = getString(R.string.error_incorrect_incognito_id) + e.getLocalizedMessage();
+                    errorMessage = getString(R.string.err_msg_incorrect_incognito_id) + e.getLocalizedMessage();
                 }
             } else {
                 //установить сообщение об ошибке
-                errorMessage = getString(R.string.error_incognito_id_is_missing);
+                errorMessage = getString(R.string.err_msg_incognito_id_is_missing);
             }
         } else {
             //иначе установить сообщение об ошибке
-            errorMessage = getString(R.string.error_account_not_set);
+            errorMessage = getString(R.string.err_msg_account_not_set);
         }
         return errorMessage;
     }
@@ -112,14 +112,14 @@ public final class GreetingActivity
                 setTitle(R.string.txt_your_incognito_id).
                 setMessage(mIncognitoId.toString()).
                 setPositiveButton(
-                        R.string.action_to_clipboard,
+                        R.string.btn_copy,
                         (dialog, which) -> {
                             final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                             final ClipData clip = ClipData.newPlainText(getString(R.string.txt_incognito_id), mIncognitoId.toString());
                             clipboard.setPrimaryClip(clip);
                             Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
                         }).
-                setNegativeButton(R.string.action_close, null).
+                setNegativeButton(R.string.btn_close, null).
                 create().
                 show();
     }

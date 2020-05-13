@@ -135,7 +135,7 @@ public final class SymptomsActivity
                 Toast.makeText(getApplicationContext(), R.string.txt_authorization_required, Toast.LENGTH_LONG).show();
                 getAuthTokenAndRequestSync();
             } else {
-                String message = getString(R.string.no_internet_connection);
+                String message = getString(R.string.err_msg_no_internet_connection);
                 if (BuildConfig.DEBUG) {
                     message = throwable.getLocalizedMessage();
                 }
@@ -401,15 +401,15 @@ public final class SymptomsActivity
                 try {
                     mIncognitoId = UUID.fromString(incognitoId);
                 } catch (IllegalArgumentException e) {
-                    errorMessage = getString(R.string.error_incorrect_incognito_id) + e.getLocalizedMessage();
+                    errorMessage = getString(R.string.err_msg_incorrect_incognito_id) + e.getLocalizedMessage();
                 }
             } else {
                 //установить сообщение об ошибке
-                errorMessage = getString(R.string.error_incognito_id_is_missing);
+                errorMessage = getString(R.string.err_msg_incognito_id_is_missing);
             }
         } else {
             //иначе установить сообщение об ошибке
-            errorMessage = getString(R.string.error_account_not_set);
+            errorMessage = getString(R.string.err_msg_account_not_set);
         }
         return errorMessage;
     }
@@ -442,9 +442,9 @@ public final class SymptomsActivity
         builder.setTitle(R.string.empty_location_alert);
         builder.setMessage(R.string.add_symptom_without_location);
         builder.setPositiveButton(
-                R.string.action_save_symptom,
+                R.string.btn_send,
                 (dialog, which) -> createUserSymptom(displaySymptom));
-        builder.setNegativeButton(R.string.action_wait, null);
+        builder.setNegativeButton(R.string.btn_wait, null);
         builder.create();
         builder.show();
     }
@@ -566,7 +566,7 @@ public final class SymptomsActivity
         builder.setTitle(R.string.txt_log);
         builder.setView(logDialogBinding.getRoot());
         builder.setPositiveButton(
-                R.string.action_to_clipboard,
+                R.string.btn_copy,
                 (dialog, which) -> {
                     final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                     final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), log);
@@ -574,14 +574,14 @@ public final class SymptomsActivity
                     Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
                 });
         builder.setNeutralButton(
-                R.string.action_share,
+                R.string.btn_share,
                 (dialog, which) -> {
                     final Intent sendIntent = new Intent();
                     sendIntent.setAction(Intent.ACTION_SEND);
                     sendIntent.putExtra(Intent.EXTRA_TEXT, (CharSequence) log);
                     sendIntent.putExtra(Intent.EXTRA_SUBJECT, "Благодарие журнал");
                     sendIntent.setType("text/plain");
-                    startActivity(Intent.createChooser(sendIntent, getString(R.string.action_share)));
+                    startActivity(Intent.createChooser(sendIntent, getString(R.string.btn_share)));
                 });
         builder.create();
         builder.show();
@@ -657,10 +657,10 @@ public final class SymptomsActivity
         Log.d(TAG, "showUpdateVersionDialog");
         new AlertDialog.
                 Builder(this).
-                setTitle(R.string.txt_update_available).
-                setMessage(String.format(getString(R.string.txt_want_load_new_version), versionName)).
-                setPositiveButton(R.string.action_update, (dialog, which) -> toUpdate(versionName, latestVersionUri)).
-                setNegativeButton(R.string.action_finish, (dialog, which) -> finish()).
+                setTitle(R.string.info_msg_update_available).
+                setMessage(String.format(getString(R.string.qstn_want_load_new_version), versionName)).
+                setPositiveButton(R.string.btn_update, (dialog, which) -> toUpdate(versionName, latestVersionUri)).
+                setNegativeButton(R.string.btn_finish, (dialog, which) -> finish()).
                 setCancelable(false).
                 create().
                 show();
