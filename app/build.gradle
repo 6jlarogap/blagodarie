@@ -10,8 +10,8 @@ android {
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 28
-        versionName "0.3.5"
+        versionCode 29
+        versionName "0.3.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
     }
