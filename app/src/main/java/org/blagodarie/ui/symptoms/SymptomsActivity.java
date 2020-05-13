@@ -196,15 +196,6 @@ public final class SymptomsActivity
                     }
             );
 
-            //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
-            Completable.
-                    fromAction(() ->
-                            mRepository.setupIncognitoId(mIncognitoId)
-                    ).
-                    subscribeOn(Schedulers.io()).
-                    subscribe();
-            /////////////////////////////////
-
             registerReceiver(mSyncErrorReceiver, new IntentFilter(SyncService.ACTION_SYNC_EXCEPTION));
         } else {
             //иначе показать сообщение об ошибке и завершить Activity
