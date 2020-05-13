@@ -45,4 +45,5 @@
     <string name="error_incognito_id_is_missing">Анонимный ключ отсутствует</string>
     <string name="error_incorrect_incognito_id">Некорректный анонимный ключ: </string>
     <string name="txt_authorization_required">Необходима авторизация</string>
+    <string name="no_internet_connection">Отсутствует соединение с интернетом</string>
 </resources>

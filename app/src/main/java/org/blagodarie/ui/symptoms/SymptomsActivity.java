@@ -132,7 +132,11 @@ public final class SymptomsActivity
                 Toast.makeText(getApplicationContext(), R.string.txt_authorization_required, Toast.LENGTH_LONG).show();
                 getAuthTokenAndRequestSync();
             } else {
-                Toast.makeText(getApplicationContext(), throwable.getLocalizedMessage(), Toast.LENGTH_LONG).show();
+                String message = getString(R.string.no_internet_connection);
+                if (BuildConfig.DEBUG) {
+                    message = throwable.getLocalizedMessage();
+                }
+                Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
             }
         }
     };
