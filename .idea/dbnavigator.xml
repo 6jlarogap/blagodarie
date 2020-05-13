@@ -23,18 +23,31 @@
     <autoscroll-to-editor value="false" />
     <autoscroll-from-editor value="true" />
     <show-object-properties value="true" />
-    <loaded-nodes />
+    <loaded-nodes>
+      <connection connection-id="f91f0ff1-0ff7-405d-8941-d801d45b43ed">
+        <schema name="main" object-types="table, column, view" />
+      </connection>
+    </loaded-nodes>
   </component>
   <component name="DBNavigator.Project.DatabaseConsoleManager">
     <connection id="f91f0ff1-0ff7-405d-8941-d801d45b43ed">
-      <console name="Connection 1" type="STANDARD" schema="main" session="Main"><![CDATA[select * from tbl_symptom_group;
-select * from tbl_symptom;
-insert into tbl_symptom_group values('group2', 1, null);
+      <console name="Connection 1" type="STANDARD" schema="main" session="Main"><![CDATA[SELECT * 
+FROM tbl_symptom_group sg
+WHERE EXISTS (SELECT * 
+              FROM tbl_symptom s 
+              WHERE s.group_id = sg.id)
+ORDER BY (SELECT SUM(lus.symptoms_count) 
+          FROM tbl_last_user_symptom lus 
+          LEFT JOIN tbl_symptom s ON s.id = lus.symptom_id
+          WHERE s.group_id = sg.id) DESC, name;
 
-PRAGMA foreign_keys = ON;
-insert into tbl_symptom values('symptom7',3, 2, null);
 
-delete from tbl_symptom_group;]]></console>
+SELECT SUM(lus.symptoms_count) 
+          FROM tbl_last_user_symptom lus 
+          LEFT JOIN tbl_symptom s ON s.id = lus.symptom_id
+          WHERE s.group_id = 1;
+
+select * from tbl_last_user_symptom ;]]></console>
     </connection>
   </component>
   <component name="DBNavigator.Project.DatabaseFileManager">
