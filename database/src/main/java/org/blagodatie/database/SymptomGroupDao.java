@@ -25,10 +25,7 @@ public interface SymptomGroupDao {
             "WHERE EXISTS (SELECT * " +
             "              FROM tbl_symptom s " +
             "              WHERE s.group_id = sg.id) " +
-            "ORDER BY /*(SELECT SUM(lus.symptoms_count) " +
-            "          FROM tbl_last_user_symptom lus " +
-            "          LEFT JOIN tbl_symptom s ON s.id = lus.symptom_id " +
-            "          WHERE s.group_id = sg.id) DESC,*/ " +
-            "          name")
-    LiveData<List<SymptomGroupWithSymptoms>> getAll ();
+            "ORDER BY id")
+    LiveData<List<SymptomGroupWithSymptoms>> getSymptomCatalog ();
+
 }

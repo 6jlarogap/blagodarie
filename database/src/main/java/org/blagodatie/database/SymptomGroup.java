@@ -60,12 +60,14 @@ public final class SymptomGroup
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         final SymptomGroup that = (SymptomGroup) o;
-        return getId().equals(that.getId());
+        return getId().equals(that.getId()) &&
+                Name.equals(that.Name) &&
+                Objects.equals(ParentId, that.ParentId);
     }
 
     @Override
     public int hashCode () {
-        return Objects.hash(getId());
+        return Objects.hash(getId(), Name, ParentId);
     }
 
     @NonNull

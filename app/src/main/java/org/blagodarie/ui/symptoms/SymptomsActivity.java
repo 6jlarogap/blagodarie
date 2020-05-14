@@ -1,25 +1,17 @@
 package org.blagodarie.ui.symptoms;
 
-import android.Manifest;
 import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.accounts.AuthenticatorException;
 import android.accounts.OperationCanceledException;
-import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.UnderlineSpan;
@@ -33,9 +25,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
-import androidx.databinding.ObservableBoolean;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -73,34 +63,11 @@ import io.reactivex.schedulers.Schedulers;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class SymptomsActivity
-        extends AppCompatActivity
-        implements LocationListener {
+        extends AppCompatActivity {
 
     private static final String TAG = SymptomsActivity.class.getSimpleName();
 
-    private static final String USER_PREFERENCE_PATTERN = "org.blagodarie.ui.symptoms.preference.%s";
-    private static final String PREF_LOCATION_ENABLED = "locationEnabled";
-    private static final String PREF_LOCATION_EXPLANATION_SHOWED = "locationExplanationShowed";
     private static final String EXTRA_ACCOUNT = "org.blagodarie.ui.symptoms.ACCOUNT";
-
-    /**
-     * Минимальное время между обновлениями местоположения (в миллисекундах).
-     *
-     * @see LocationManager#requestLocationUpdates
-     */
-    private static final long MIN_TIME_LOCATION_UPDATE = 180000L;
-
-    /**
-     * Минимальная дистанция между обновлениями местоположения (в метрах).
-     *
-     * @see LocationManager#requestLocationUpdates
-     */
-    private static final float MIN_DISTANCE_LOCATION_UPDATE = 100.0F;
-
-    /**
-     * Идентификатор запроса на разрешение использования определения местоположения.
-     */
-    private static final int PERM_REQ_ACCESS_FINE_LOCATION = 1;
 
     private Account mAccount;
 
@@ -109,8 +76,6 @@ public final class SymptomsActivity
     private SymptomsViewModel mViewModel;
 
     private CompositeDisposable mDisposables = new CompositeDisposable();
-
-    private LocationManager mLocationManager;
 
     private SymptomGroupsAdapter mSymptomGroupsAdapter;
 
@@ -121,8 +86,6 @@ public final class SymptomsActivity
     private Repository mRepository;
 
     private AccountManager mAccountManager;
-
-    private boolean mShouldProvideRationaleBeforeRequest = false;
 
     private final BroadcastReceiver mSyncErrorReceiver = new BroadcastReceiver() {
         @Override
@@ -135,7 +98,7 @@ public final class SymptomsActivity
                 Toast.makeText(getApplicationContext(), R.string.txt_authorization_required, Toast.LENGTH_LONG).show();
                 getAuthTokenAndRequestSync();
             } else {
-                String message = getString(R.string.no_internet_connection);
+                String message = getString(R.string.err_msg_no_internet_connection);
                 if (BuildConfig.DEBUG) {
                     message = throwable.getLocalizedMessage();
                 }
@@ -153,57 +116,19 @@ public final class SymptomsActivity
         final String initUserDataErrorMessage = tryInitUserData();
         //если ошибок нет
         if (initUserDataErrorMessage == null) {
-            mRepository = new Repository(this);
+            mRepository = Repository.getInstance(this);
             mAccountManager = AccountManager.get(this);
-            mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
             initViewModel();
-
-            mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
-            mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
 
             initBinding();
 
             setupToolbar();
 
-            mRepository.getSymptomGroups().observe(
+            mRepository.getSymptomGroupsWithSymptoms().observe(
                     this,
-                    symptomGroupsWithSymptoms -> {
-                        if (symptomGroupsWithSymptoms != null) {
-                            final List<DisplaySymptomGroup> newDisplaySymptomGroups = createDisplaySymptomGroups(symptomGroupsWithSymptoms);
-
-                            if (!newDisplaySymptomGroups.equals(mViewModel.getDisplaySymptomGroups())) {
-                                //запомнить выбранную группу
-                                final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
-
-                                //задать новые данные
-                                mViewModel.setDisplaySymptomGroups(createDisplaySymptomGroups(symptomGroupsWithSymptoms));
-                                mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
-
-                                //вернуть выбранную группу
-                                if (mViewModel.getDisplaySymptomGroups().size() > 0) {
-                                    //если существует выбранная группа, и она присутствует в новом списке
-                                    if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
-                                        //выделить ее
-                                        showSymptomsForGroup(selectedGroup);
-                                    } else {
-                                        //иначе выбрать первую
-                                        showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    this::updateSymptomCatalogIfNeed
             );
-
-            //!!!УБРАТЬ КОГДА НА СЕРВЕРЕ У ВСЕХ БУДЕТ user_id = null
-            Completable.
-                    fromAction(() ->
-                            mRepository.setupIncognitoId(mIncognitoId)
-                    ).
-                    subscribeOn(Schedulers.io()).
-                    subscribe();
-            /////////////////////////////////
 
             registerReceiver(mSyncErrorReceiver, new IntentFilter(SyncService.ACTION_SYNC_EXCEPTION));
         } else {
@@ -213,73 +138,57 @@ public final class SymptomsActivity
         }
     }
 
+    private void updateSymptomCatalogIfNeed (
+            @Nullable final List<SymptomGroupWithSymptoms> newSymptomCatalog
+    ) {
+        if (newSymptomCatalog != null) {
+            if (!mViewModel.getSymptomCatalog().equals(newSymptomCatalog)) {
+                mViewModel.setSymptomCatalog(newSymptomCatalog);
+                //создать отображаемые группы
+                final List<DisplaySymptomGroup> newDisplaySymptomGroups = createDisplaySymptomGroups(newSymptomCatalog);
+
+                //запомнить выбранную группу
+                final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
+
+                //задать новые данные
+                mViewModel.setDisplaySymptomGroups(newDisplaySymptomGroups);
+
+                //загрузить последние пользовательские данные о симптомах
+                mViewModel.loadLastValues(mIncognitoId, () -> {
+                    //восстановить выбранную группу
+                    if (mViewModel.getDisplaySymptomGroups().size() > 0) {
+                        //если существует выбранная группа, и она присутствует в новом списке
+                        if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
+                            //выделить ее
+                            showSymptomsForGroup(selectedGroup);
+                        } else {
+                            //иначе выбрать первую
+                            showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                        }
+                    }
+                    orderSymptomCatalog();
+                });
+            }
+        }
+    }
+
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
 
-        final SharedPreferences userSharedPreferences = getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE);
-
-        final boolean prefLocationEnable = userSharedPreferences.getBoolean(PREF_LOCATION_ENABLED, false);
-
         //создаем фабрику
         final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
-                getApplication(),
-                prefLocationEnable
+                getApplication()
         );
 
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
 
-        //добавить слушатель включения/выключения местоположения
-        mViewModel.isLocationEnabled().addOnPropertyChangedCallback(new androidx.databinding.Observable.OnPropertyChangedCallback() {
-            @Override
-            public void onPropertyChanged (androidx.databinding.Observable sender, int propertyId) {
-                if (sender == mViewModel.isLocationEnabled()) {
-                    final boolean locationEnable = ((ObservableBoolean) sender).get();
-                    userSharedPreferences.edit().putBoolean(PREF_LOCATION_ENABLED, locationEnable).apply();
-                    if (locationEnable) {
-                        final boolean locationExplanationShowed = userSharedPreferences.getBoolean(PREF_LOCATION_EXPLANATION_SHOWED, false);
-                        if (!locationExplanationShowed) {
-                            showLocationExplanationDialog();
-                            userSharedPreferences.edit().putBoolean(PREF_LOCATION_EXPLANATION_SHOWED, true).apply();
-                        } else {
-                            tryTurnOnLocation();
-                        }
-                    } else {
-                        mViewModel.getCurrentLatitude().set(null);
-                        mViewModel.getCurrentLongitude().set(null);
-                    }
-                }
-            }
-        });
-    }
-
-    private void showLocationExplanationDialog () {
-        new AlertDialog.Builder(this).
-                setTitle(R.string.location).
-                setMessage(R.string.location_explanation).
-                setPositiveButton(R.string.ok, (dialog, which) -> tryTurnOnLocation()).
-                create().
-                show();
-    }
-
-    private void tryTurnOnLocation () {
-        if (checkLocationPermission()) {
-            if (isHaveEnabledLocationProvider()) {
-                startLocationUpdates();
-            } else {
-                startLocationSettingsActivity();
-            }
-        } else {
-            requestLocationPermission();
-        }
     }
 
     private void initBinding () {
         mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
         mActivityBinding.setViewModel(mViewModel);
-        mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
         mActivityBinding.rvSymptomGroups.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
-        mActivityBinding.rvSymptomGroups.setAdapter(mSymptomGroupsAdapter);
     }
 
     @Override
@@ -289,17 +198,27 @@ public final class SymptomsActivity
         checkLatestVersion();
         getAuthTokenAndRequestSync();
 
-        boolean isLocationPossible = checkLocationPermission() && isHaveEnabledLocationProvider();
-        mViewModel.isLocationEnabled().set(isLocationPossible);
-        if (isLocationPossible) {
-            startLocationUpdates();
-        }
+        orderSymptomCatalog();
+    }
 
+    private void orderSymptomCatalog () {
+        orderSymptomGroups();
         orderSymptoms();
     }
 
+    private void orderSymptomGroups () {
+        if (mSymptomGroupsAdapter != null) {
+            mSymptomGroupsAdapter.order();
+        }
+        if (mActivityBinding.rvSymptomGroups.getLayoutManager() != null) {
+            mActivityBinding.rvSymptomGroups.getLayoutManager().scrollToPosition(0);
+        }
+    }
+
     private void orderSymptoms () {
-        mSymptomsAdapter.order();
+        if (mSymptomsAdapter != null) {
+            mSymptomsAdapter.order();
+        }
         if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
             mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
         }
@@ -309,7 +228,6 @@ public final class SymptomsActivity
     protected void onPause () {
         Log.d(TAG, "onPause");
         super.onPause();
-        stopLocationUpdates();
     }
 
     @Override
@@ -328,6 +246,7 @@ public final class SymptomsActivity
         for (SymptomGroupWithSymptoms symptomGroupWithSymptoms : symptomGroups) {
             displaySymptomGroups.add(
                     new DisplaySymptomGroup(
+                            symptomGroupWithSymptoms.getSymptomGroup().getId(),
                             symptomGroupWithSymptoms.getSymptomGroup().getName(),
                             createDisplaySymptoms(symptomGroupWithSymptoms.getSymptoms())
                     )
@@ -359,27 +278,6 @@ public final class SymptomsActivity
         }
     }
 
-    @SuppressLint ("MissingPermission")
-    private void startLocationUpdates () {
-        Log.d(TAG, "startLocationUpdates");
-        Location lastLocation = mLocationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-        if (lastLocation == null) {
-            lastLocation = mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-        }
-        if (lastLocation != null) {
-            mViewModel.getCurrentLatitude().set(lastLocation.getLatitude());
-            mViewModel.getCurrentLongitude().set(lastLocation.getLongitude());
-        }
-
-        mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, MIN_TIME_LOCATION_UPDATE, MIN_DISTANCE_LOCATION_UPDATE, this);
-        mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_TIME_LOCATION_UPDATE, MIN_DISTANCE_LOCATION_UPDATE, this);
-    }
-
-    private void stopLocationUpdates () {
-        Log.d(TAG, "stopLocationUpdates");
-        mLocationManager.removeUpdates(this);
-    }
-
     /**
      * Инициализирует данные о пользователе.
      */
@@ -400,15 +298,15 @@ public final class SymptomsActivity
                 try {
                     mIncognitoId = UUID.fromString(incognitoId);
                 } catch (IllegalArgumentException e) {
-                    errorMessage = getString(R.string.error_incorrect_incognito_id) + e.getLocalizedMessage();
+                    errorMessage = getString(R.string.err_msg_incorrect_incognito_id) + e.getLocalizedMessage();
                 }
             } else {
                 //установить сообщение об ошибке
-                errorMessage = getString(R.string.error_incognito_id_is_missing);
+                errorMessage = getString(R.string.err_msg_incognito_id_is_missing);
             }
         } else {
             //иначе установить сообщение об ошибке
-            errorMessage = getString(R.string.error_account_not_set);
+            errorMessage = getString(R.string.err_msg_account_not_set);
         }
         return errorMessage;
     }
@@ -418,49 +316,30 @@ public final class SymptomsActivity
     ) {
         mViewModel.setSelectedDisplaySymptomGroup(displaySymptomGroup);
         mViewModel.setDisplaySymptoms(displaySymptomGroup.getDisplaySymptoms());
-        mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
-        mViewModel.loadLastValues(mIncognitoId, this::orderSymptoms);
-    }
 
-    public void checkLocationEnabled (
-            @NonNull final DisplaySymptom displaySymptom
-    ) {
-        if (mViewModel.isLocationEnabled().get() &&
-                (mViewModel.getCurrentLatitude().get() == null ||
-                        mViewModel.getCurrentLongitude().get() == null)) {
-            showEmptyLocationAlertDialog(displaySymptom);
+        if (mSymptomGroupsAdapter == null) {
+            mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
+            mActivityBinding.rvSymptomGroups.setAdapter(mSymptomGroupsAdapter);
         } else {
-            createUserSymptom(displaySymptom);
+            mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
         }
-    }
+        if (mSymptomsAdapter == null) {
+            mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::createUserSymptom);
+            mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
+        } else {
+            mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
+        }
 
-    private void showEmptyLocationAlertDialog (
-            @NonNull final DisplaySymptom displaySymptom
-    ) {
-        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.empty_location_alert);
-        builder.setMessage(R.string.add_symptom_without_location);
-        builder.setPositiveButton(
-                R.string.action_save_symptom,
-                (dialog, which) -> createUserSymptom(displaySymptom));
-        builder.setNegativeButton(R.string.action_wait, null);
-        builder.create();
-        builder.show();
+        orderSymptoms();
     }
 
     public void createUserSymptom (
             @NonNull final DisplaySymptom displaySymptom
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
-        Date currentDate = new Date();
-        displaySymptom.setLastDate(currentDate);
-
+        final Date currentDate = new Date();
         final Double latitude = mViewModel.getCurrentLatitude().get();
         final Double longitude = mViewModel.getCurrentLongitude().get();
-
-        displaySymptom.setLastLatitude(latitude);
-        displaySymptom.setLastLongitude(longitude);
-        displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
 
         final UserSymptom userSymptom = new UserSymptom(
                 mIncognitoId,
@@ -477,8 +356,11 @@ public final class SymptomsActivity
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(() -> {
+                            displaySymptom.setLastDate(currentDate);
+                            displaySymptom.setLastLatitude(latitude);
+                            displaySymptom.setLastLongitude(longitude);
+                            displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
                             displaySymptom.setHaveNotSynced(true);
-                            displaySymptom.highlight();
                             getAuthTokenAndRequestSync();
                         })
         );
@@ -506,50 +388,11 @@ public final class SymptomsActivity
         );
     }
 
-    private boolean checkLocationPermission () {
-        Log.d(TAG, "checkLocationPermission");
-        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    @Override
-    public void onRequestPermissionsResult (final int requestCode, @NonNull final String[] permissions, @NonNull final int[] grantResults) {
-        Log.d(TAG, "onRequestPermissionsResult");
-        if (requestCode == PERM_REQ_ACCESS_FINE_LOCATION) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                if (isHaveEnabledLocationProvider()) {
-                    startLocationUpdates();
-                } else {
-                    startLocationSettingsActivity();
-                }
-            } else {
-                boolean shouldProvideRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
-                if (!shouldProvideRationale && !mShouldProvideRationaleBeforeRequest) {
-                    startApplicationDetailSettingsActivity();
-                }
-            }
-        }
-    }
-
     public void onLinkClick (final View view) {
         Log.d(TAG, "onLinkClick");
         final Intent i = new Intent(Intent.ACTION_VIEW);
         i.setData(Uri.parse(getString(R.string.website_url)));
         startActivity(i);
-    }
-
-    private void startLocationSettingsActivity () {
-        Log.d(TAG, "startLocationSettingsActivity");
-        final Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-        startActivity(intent);
-    }
-
-    private void startApplicationDetailSettingsActivity () {
-        final Intent intent = new Intent();
-        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-        final Uri uri = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null);
-        intent.setData(uri);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
     }
 
     public void showLog (final View view) {
@@ -565,7 +408,7 @@ public final class SymptomsActivity
         builder.setTitle(R.string.txt_log);
         builder.setView(logDialogBinding.getRoot());
         builder.setPositiveButton(
-                R.string.action_to_clipboard,
+                R.string.btn_copy,
                 (dialog, which) -> {
                     final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                     final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), log);
@@ -573,59 +416,18 @@ public final class SymptomsActivity
                     Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
                 });
         builder.setNeutralButton(
-                R.string.action_share,
+                R.string.btn_share,
                 (dialog, which) -> {
                     final Intent sendIntent = new Intent();
                     sendIntent.setAction(Intent.ACTION_SEND);
                     sendIntent.putExtra(Intent.EXTRA_TEXT, (CharSequence) log);
                     sendIntent.putExtra(Intent.EXTRA_SUBJECT, "Благодарие журнал");
                     sendIntent.setType("text/plain");
-                    startActivity(Intent.createChooser(sendIntent, getString(R.string.action_share)));
+                    startActivity(Intent.createChooser(sendIntent, getString(R.string.btn_share)));
                 });
         builder.create();
         builder.show();
     }
-
-    public void requestLocationPermission () {
-        Log.d(TAG, "requestLocationPermission");
-        mShouldProvideRationaleBeforeRequest = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
-        ActivityCompat.requestPermissions(SymptomsActivity.this,
-                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                PERM_REQ_ACCESS_FINE_LOCATION);
-    }
-
-    @Override
-    public void onLocationChanged (Location location) {
-        Log.d(TAG, "onLocationChanged location=" + location);
-        if (location != null) {
-            mViewModel.getCurrentLatitude().set(location.getLatitude());
-            mViewModel.getCurrentLongitude().set(location.getLongitude());
-        }
-    }
-
-    @Override
-    public void onStatusChanged (String provider, int status, Bundle extras) {
-        Log.d(TAG, "onStatusChanged");
-    }
-
-    @Override
-    public void onProviderEnabled (String provider) {
-        Log.d(TAG, "onProviderEnabled");
-    }
-
-    @Override
-    public void onProviderDisabled (String provider) {
-        Log.d(TAG, "onProviderDisabled provider=" + provider);
-    }
-
-    private boolean isHaveEnabledLocationProvider () {
-        boolean isHaveEnabledLocationProvider = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
-                mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER
-                );
-        Log.d(TAG, "checkHaveEnabledLocationProvider isHaveEnabledLocationProvider=" + isHaveEnabledLocationProvider);
-        return isHaveEnabledLocationProvider;
-    }
-
 
     private void checkLatestVersion () {
         Log.d(TAG, "checkLatestVersion");
@@ -656,10 +458,14 @@ public final class SymptomsActivity
         Log.d(TAG, "showUpdateVersionDialog");
         new AlertDialog.
                 Builder(this).
-                setTitle(R.string.txt_update_available).
-                setMessage(String.format(getString(R.string.txt_want_load_new_version), versionName)).
-                setPositiveButton(R.string.action_update, (dialog, which) -> toUpdate(versionName, latestVersionUri)).
-                setNegativeButton(R.string.action_finish, (dialog, which) -> finish()).
+                setTitle(R.string.info_msg_update_available).
+                setMessage(String.format(getString(R.string.qstn_want_load_new_version), versionName)).
+                setPositiveButton(R.string.btn_update, (dialog, which) -> toUpdate(versionName, latestVersionUri)).
+                setNegativeButton(R.string.btn_finish, (dialog, which) -> {
+                    if (!BuildConfig.DEBUG) {
+                        finish();
+                    }
+                }).
                 setCancelable(false).
                 create().
                 show();

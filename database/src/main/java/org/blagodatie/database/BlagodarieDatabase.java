@@ -11,9 +11,6 @@ import androidx.room.TypeConverters;
 import androidx.sqlite.db.SimpleSQLiteQuery;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-import java.util.concurrent.Executors;
-
-
 @Database (
         entities = {
                 SymptomGroup.class,

@@ -116,14 +116,14 @@ public final class UpdateActivity
 
     private void showRepeatDialog () {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.txt_download_failed);
-        builder.setMessage(getString(R.string.txt_want_repeat));
-        builder.setPositiveButton(R.string.action_repeat, (dialog, which) -> UpdateManager.getInstance().startDownload(
+        builder.setTitle(R.string.info_msg_download_failed);
+        builder.setMessage(getString(R.string.qstn_want_repeat));
+        builder.setPositiveButton(R.string.btn_repeat, (dialog, which) -> UpdateManager.getInstance().startDownload(
                 getApplicationContext(),
                 mFile,
                 mLatestVersionUri
         ));
-        builder.setNegativeButton(R.string.action_finish, (dialog, which) -> finish());
+        builder.setNegativeButton(R.string.btn_finish, (dialog, which) -> finish());
         builder.create();
         builder.show();
     }

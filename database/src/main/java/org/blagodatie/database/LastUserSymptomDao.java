@@ -23,9 +23,4 @@ public interface LastUserSymptomDao {
             "AND symptom_id = :symptomId")
     LastUserSymptom get (final UUID incognitoId, final Identifier symptomId);
 
-    @Query ("UPDATE tbl_last_user_symptom " +
-            "SET incognito_id = :incognitoId " +
-            "WHERE incognito_id = 'null'")
-    void setupIncognitoId (final UUID incognitoId);
-
 }

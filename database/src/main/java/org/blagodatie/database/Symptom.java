@@ -7,8 +7,6 @@ import androidx.room.Entity;
 import androidx.room.ForeignKey;
 import androidx.room.Index;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 
 @Entity (
@@ -74,12 +72,15 @@ public final class Symptom
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         final Symptom symptom = (Symptom) o;
-        return getId().equals(symptom.getId());
+        return getId().equals(symptom.getId()) &&
+                Name.equals(symptom.Name) &&
+                GroupId.equals(symptom.GroupId) &&
+                Objects.equals(Order, symptom.Order);
     }
 
     @Override
     public int hashCode () {
-        return Objects.hash(getId());
+        return Objects.hash(getId(), Name, GroupId, Order);
     }
 
     @NonNull

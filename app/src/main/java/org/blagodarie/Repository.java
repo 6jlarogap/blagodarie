@@ -22,11 +22,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-import static org.blagodatie.database.BlagodarieDatabase.getDatabase;
-
 public final class Repository {
 
     private static final String TAG = Repository.class.getSimpleName();
+
+    private static volatile Repository INSTANCE;
 
     @NonNull
     private final BlagodarieDatabase mBlagodarieDatabase;
@@ -43,12 +43,25 @@ public final class Repository {
     @NonNull
     private final LastUserSymptomDao mLastUserSymptomDao;
 
-    public Repository (@NonNull final Context context) {
-        mBlagodarieDatabase = getDatabase(context);
+    private LiveData<List<SymptomGroupWithSymptoms>> mSymptomGroupsWithSymptoms;
+
+    private Repository (@NonNull final Context context) {
+        mBlagodarieDatabase = BlagodarieDatabase.getDatabase(context);
         mSymptomGroupDao = mBlagodarieDatabase.symptomGroupDao();
         mSymptomDao = mBlagodarieDatabase.symptomDao();
         mUserSymptomDao = mBlagodarieDatabase.userSymptomDao();
         mLastUserSymptomDao = mBlagodarieDatabase.lastUserSymptomDao();
+    }
+
+    public static Repository getInstance (@NonNull final Context context) {
+        if (INSTANCE == null) {
+            synchronized (Repository.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = new Repository(context);
+                }
+            }
+        }
+        return INSTANCE;
     }
 
     public final LiveData<Boolean> isHaveNotSyncedUserSymptoms (
@@ -64,14 +77,6 @@ public final class Repository {
         return mUserSymptomDao.getNotSynced(incognitoId);
     }
 
-    public final void setupIncognitoId (@NonNull final UUID incognitoId) {
-        Log.d(TAG, "setupIncognitoId");
-        mBlagodarieDatabase.runInTransaction(() -> {
-            mUserSymptomDao.setupIncognitoId(incognitoId);
-            mLastUserSymptomDao.setupIncognitoId(incognitoId);
-        });
-    }
-
     public final void insertUserSymptom (@NonNull final UserSymptom userSymptom) {
         Log.d(TAG, "insertUserSymptom");
         //выполнить в транзакции
@@ -84,11 +89,11 @@ public final class Repository {
             if (lastUserSymptom != null) {
                 //обновить данные
                 lastUserSymptom.setTimestamp(userSymptom.getTimestamp());
+                lastUserSymptom.setSymptomsCount(lastUserSymptom.getSymptomsCount() + 1);
                 if (userSymptom.getLatitude() != null &&
                         userSymptom.getLongitude() != null) {
                     lastUserSymptom.setLatitude(userSymptom.getLatitude());
                     lastUserSymptom.setLongitude(userSymptom.getLongitude());
-                    lastUserSymptom.setSymptomsCount(lastUserSymptom.getSymptomsCount() + 1);
                 }
                 mLastUserSymptomDao.update(lastUserSymptom);
             } else {
@@ -136,13 +141,12 @@ public final class Repository {
         });
     }
 
-    public final LiveData<List<Symptom>> getSymptoms(){
-        return mSymptomDao.getAll();
+    public final LiveData<List<SymptomGroupWithSymptoms>> getSymptomGroupsWithSymptoms () {
+        Log.d(TAG, "getSymptomGroupsWithSymptoms");
+        if (mSymptomGroupsWithSymptoms == null) {
+            mSymptomGroupsWithSymptoms = mSymptomGroupDao.getSymptomCatalog();
+        }
+        return mSymptomGroupsWithSymptoms;
     }
-
-    public final LiveData<List<SymptomGroupWithSymptoms>> getSymptomGroups(){
-        return mSymptomGroupDao.getAll();
-    }
-
 
 }

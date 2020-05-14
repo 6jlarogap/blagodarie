@@ -5,14 +5,36 @@
     <string name="latitude">Широта: %f</string>
     <string name="longitude">Долгота: %f</string>
 
-    <string name="action_repeat">Повторить</string>
-    <string name="action_close">Закрыть</string>
-    <string name="action_update">Обновить</string>
-    <string name="action_finish">Завершить</string>
-    <string name="txt_update_available">Доступна новая версия</string>
-    <string name="txt_download_failed">Не удалось загрузить файл</string>
-    <string name="txt_want_load_new_version">Желаете загрузить новую версию %s?</string>
-    <string name="txt_want_repeat">Желаете повторить?</string>
+    <!-- Buttons: prefix="btn_" -->
+    <string name="btn_repeat">Повторить</string>
+    <string name="btn_close">Закрыть</string>
+    <string name="btn_update">Обновить</string>
+    <string name="btn_finish">Завершить</string>
+    <string name="btn_next">Далее</string>
+    <string name="btn_cancel">Отмена</string>
+    <string name="btn_wait">Подождать</string>
+    <string name="btn_send">Отправить</string>
+    <string name="btn_copy">Скопировать</string>
+    <string name="btn_share">Поделится</string>
+    <!---->
+
+    <!-- Error Messages: prefix="err_msg_" -->
+    <string name="err_msg_account_not_set">Не задан аккаунт</string>
+    <string name="err_msg_incognito_id_is_missing">Анонимный ключ отсутствует</string>
+    <string name="err_msg_incorrect_incognito_id">Некорректный анонимный ключ: </string>
+    <string name="err_msg_no_internet_connection">Отсутствует соединение с интернетом</string>
+    <!---->
+
+    <!-- Info Messages: prefix="info_msg_" -->
+    <string name="info_msg_update_available">Доступна новая версия</string>
+    <string name="info_msg_download_failed">Не удалось загрузить файл</string>
+    <!---->
+
+    <!-- Questions: prefix="qstn_" -->
+    <string name="qstn_want_load_new_version">Желаете загрузить новую версию %s?</string>
+    <string name="qstn_want_repeat">Желаете повторить?</string>
+    <!---->
+
     <string name="txt_new_version_download">Идет загрузка новой версии приложения: %s</string>
     <string name="update_progress_percent">%d %%</string>
     <string name="downloaded_mb">Загружено %.2f mb</string>
@@ -21,23 +43,15 @@
     <string name="choose_account">Выберите аккаунт</string>
     <string name="action_log"><u>Журнал</u></string>
     <string name="txt_log">Журнал</string>
-    <string name="action_to_clipboard">Скопировать</string>
     <string name="copied_to_clipboard">Скопировано в буффер обмена</string>
-    <string name="action_share">Поделится</string>
     <string name="location">Местоположение</string>
     <string name="empty_location_alert">Местоположение еще не определено</string>
     <string name="add_symptom_without_location">Желаете отправить сообщение без местоположения?</string>
-    <string name="action_wait">Подождать</string>
-    <string name="action_save_symptom">Отправить</string>
     <string name="error_server_connection">Ошибка связи с сервером</string>
     <string name="txt_hello">Приветствие!</string>
     <string name="txt_incognito_id"><u>Анонимный ключ</u></string>
     <string name="txt_your_incognito_id">Ваш анонимный ключ:</string>
     <string name="txt_incognito_symptoms">Анонимные ощущения</string>
-    <string name="error_account_not_set">Не задан аккаунт</string>
-    <string name="error_incognito_id_is_missing">Анонимный ключ отсутствует</string>
-    <string name="error_incorrect_incognito_id">Некорректный анонимный ключ: </string>
     <string name="txt_authorization_required">Необходима авторизация</string>
-    <string name="no_internet_connection">Отсутствует соединение с интернетом</string>
-    <string name="location_explanation">Местоположение покажет какой стороной в момент ощущения Земля повёрнута к Солнцу, Луне и другим планетам. Для анонимности кооринаты смещаются в случайном направлении в радиусе от 200 до 600 метров.</string>
+    <string name="location_explanation">Местоположение покажет какой стороной в момент ощущения Земля повёрнута к Солнцу, Луне и другим планетам. Для анонимности кооринаты смещаются в случайном направлении в радиусе до 600 метров.</string>
 </resources>

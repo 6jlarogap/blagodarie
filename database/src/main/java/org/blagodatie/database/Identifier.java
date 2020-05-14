@@ -5,14 +5,15 @@ import androidx.annotation.Nullable;
 
 import java.util.Objects;
 
-public final class Identifier {
+public final class Identifier
+        implements Comparable<Identifier> {
 
     private static final Identifier NULL_ID = new Identifier(null);
 
     @Nullable
     private final Long mValue;
 
-    private Identifier (@Nullable final Long value) {
+    Identifier (@Nullable final Long value) {
         mValue = value;
     }
 
@@ -44,4 +45,22 @@ public final class Identifier {
     public String toString () {
         return mValue != null ? mValue.toString() : "null";
     }
+
+    @Override
+    public int compareTo (@NonNull final Identifier o) {
+        if (this.mValue != null) {
+            if (o.mValue != null) {
+                return this.mValue.compareTo(o.mValue);
+            } else {
+                return 1;
+            }
+        } else {
+            if (o.mValue != null) {
+                return -1;
+            } else {
+                return 0;
+            }
+        }
+    }
+
 }
