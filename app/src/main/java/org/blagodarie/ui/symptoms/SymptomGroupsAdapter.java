@@ -13,13 +13,14 @@ import org.blagodarie.R;
 import org.blagodarie.databinding.SymptomGroupItemBinding;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class SymptomGroupsAdapter
         extends RecyclerView.Adapter<SymptomGroupsAdapter.SymptomGroupViewHolder> {
 
     @NonNull
-    private final List<DisplaySymptomGroup> mDisplaySymptomGroups = new ArrayList<>();
+    private List<DisplaySymptomGroup> mDisplaySymptomGroups;
 
     @NonNull
     private final SymptomGroupClickListener mSymptomGroupClickListener;
@@ -28,7 +29,7 @@ public class SymptomGroupsAdapter
             @NonNull final List<DisplaySymptomGroup> displaySymptomGroups,
             @NonNull final SymptomGroupClickListener symptomGroupClickListener
     ) {
-        mDisplaySymptomGroups.addAll(displaySymptomGroups);
+        mDisplaySymptomGroups = displaySymptomGroups;
         mSymptomGroupClickListener = symptomGroupClickListener;
     }
 
@@ -64,9 +65,29 @@ public class SymptomGroupsAdapter
     }
 
     void setData (@NonNull final List<DisplaySymptomGroup> displaySymptomGroups) {
+        final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomGroupDiffUtilCallBack(displaySymptomGroups, mDisplaySymptomGroups));
+        diffResult.dispatchUpdatesTo(this);
+        mDisplaySymptomGroups = displaySymptomGroups;
+    }
+
+    final void order () {
+        final List<DisplaySymptomGroup> newDisplaySymptomGroups = new ArrayList<>(mDisplaySymptomGroups);
+        Collections.sort(
+                newDisplaySymptomGroups,
+                (o1, o2) -> {
+                    long difference = o2.getUserSymptomCount() - o1.getUserSymptomCount();
+                    if (difference < 0) {
+                        return -1;
+                    } else if (difference > 0) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                });
+        final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomGroupDiffUtilCallBack(newDisplaySymptomGroups, mDisplaySymptomGroups));
+        diffResult.dispatchUpdatesTo(this);
         mDisplaySymptomGroups.clear();
-        mDisplaySymptomGroups.addAll(displaySymptomGroups);
-        notifyDataSetChanged();
+        mDisplaySymptomGroups.addAll(newDisplaySymptomGroups);
     }
 
     static final class SymptomGroupViewHolder
@@ -86,6 +107,45 @@ public class SymptomGroupsAdapter
         ) {
             itemView.setOnClickListener(onClickListener);
             mBinding.setDisplaySymptomGroup(displaySymptomGroup);
+        }
+    }
+
+    private static final class DisplaySymptomGroupDiffUtilCallBack
+            extends DiffUtil.Callback {
+
+        final List<DisplaySymptomGroup> mNewList;
+        final List<DisplaySymptomGroup> mOldList;
+
+        DisplaySymptomGroupDiffUtilCallBack (
+                final List<DisplaySymptomGroup> newList,
+                final List<DisplaySymptomGroup> oldList
+        ) {
+            this.mNewList = newList;
+            this.mOldList = oldList;
+        }
+
+        @Override
+        public int getOldListSize () {
+            return mOldList != null ? mOldList.size() : 0;
+        }
+
+        @Override
+        public int getNewListSize () {
+            return mNewList != null ? mNewList.size() : 0;
+        }
+
+        @Override
+        public boolean areItemsTheSame (int oldItemPosition, int newItemPosition) {
+            return mNewList.get(newItemPosition).getSymptomGroupId().equals(mOldList.get(oldItemPosition).getSymptomGroupId());
+        }
+
+        @Override
+        public boolean areContentsTheSame (int oldItemPosition, int newItemPosition) {
+            final DisplaySymptomGroup newItem = mNewList.get(newItemPosition);
+            final DisplaySymptomGroup oldItem = mOldList.get(newItemPosition);
+            return newItem.getSymptomGroupId().equals(oldItem.getSymptomGroupId()) &&
+                    newItem.getSymptomGroupName().equals(oldItem.getSymptomGroupName()) &&
+                    newItem.getUserSymptomCount() == oldItem.getUserSymptomCount();
         }
     }
 }

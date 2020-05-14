@@ -1,14 +1,11 @@
 package org.blagodatie.database;
 
-import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
-import androidx.room.Delete;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
 
 import java.util.Collection;
-import java.util.List;
 
 @Dao
 public interface SymptomDao {
@@ -19,7 +16,4 @@ public interface SymptomDao {
     @Query ("DELETE FROM tbl_symptom")
     void deleteAll ();
 
-    @Query ("SELECT * " +
-            "FROM tbl_symptom")
-    LiveData<List<Symptom>> getAll ();
 }

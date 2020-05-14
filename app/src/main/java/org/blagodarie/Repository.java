@@ -144,10 +144,9 @@ public final class Repository {
     public final LiveData<List<SymptomGroupWithSymptoms>> getSymptomGroupsWithSymptoms () {
         Log.d(TAG, "getSymptomGroupsWithSymptoms");
         if (mSymptomGroupsWithSymptoms == null) {
-            mSymptomGroupsWithSymptoms = mSymptomGroupDao.getAll();
+            mSymptomGroupsWithSymptoms = mSymptomGroupDao.getSymptomCatalog();
         }
         return mSymptomGroupsWithSymptoms;
     }
-
 
 }

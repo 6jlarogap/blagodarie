@@ -159,41 +159,13 @@ public final class SymptomsActivity
 
             initViewModel();
 
-            mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
-            mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
-
             initBinding();
 
             setupToolbar();
 
             mRepository.getSymptomGroupsWithSymptoms().observe(
                     this,
-                    symptomGroupsWithSymptoms -> {
-                        if (symptomGroupsWithSymptoms != null) {
-                            final List<DisplaySymptomGroup> newDisplaySymptomGroups = createDisplaySymptomGroups(symptomGroupsWithSymptoms);
-
-                            if (!newDisplaySymptomGroups.equals(mViewModel.getDisplaySymptomGroups())) {
-                                //запомнить выбранную группу
-                                final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
-
-                                //задать новые данные
-                                mViewModel.setDisplaySymptomGroups(createDisplaySymptomGroups(symptomGroupsWithSymptoms));
-                                mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
-
-                                //вернуть выбранную группу
-                                if (mViewModel.getDisplaySymptomGroups().size() > 0) {
-                                    //если существует выбранная группа, и она присутствует в новом списке
-                                    if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
-                                        //выделить ее
-                                        showSymptomsForGroup(selectedGroup);
-                                    } else {
-                                        //иначе выбрать первую
-                                        showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    this::updateSymptomCatalogIfNeed
             );
 
             registerReceiver(mSyncErrorReceiver, new IntentFilter(SyncService.ACTION_SYNC_EXCEPTION));
@@ -201,6 +173,40 @@ public final class SymptomsActivity
             //иначе показать сообщение об ошибке и завершить Activity
             Toast.makeText(this, initUserDataErrorMessage, Toast.LENGTH_SHORT).show();
             finish();
+        }
+    }
+
+    private void updateSymptomCatalogIfNeed (
+            @Nullable final List<SymptomGroupWithSymptoms> newSymptomCatalog
+    ) {
+        if (newSymptomCatalog != null) {
+            if (!mViewModel.getSymptomCatalog().equals(newSymptomCatalog)) {
+                mViewModel.setSymptomCatalog(newSymptomCatalog);
+                //создать отображаемые группы
+                final List<DisplaySymptomGroup> newDisplaySymptomGroups = createDisplaySymptomGroups(newSymptomCatalog);
+
+                //запомнить выбранную группу
+                final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
+
+                //задать новые данные
+                mViewModel.setDisplaySymptomGroups(newDisplaySymptomGroups);
+
+                //загрузить последние пользовательские данные о симптомах
+                mViewModel.loadLastValues(mIncognitoId, () -> {
+                    //восстановить выбранную группу
+                    if (mViewModel.getDisplaySymptomGroups().size() > 0) {
+                        //если существует выбранная группа, и она присутствует в новом списке
+                        if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
+                            //выделить ее
+                            showSymptomsForGroup(selectedGroup);
+                        } else {
+                            //иначе выбрать первую
+                            showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                        }
+                    }
+                    orderSymptomCatalog();
+                });
+            }
         }
     }
 
@@ -269,9 +275,7 @@ public final class SymptomsActivity
     private void initBinding () {
         mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
         mActivityBinding.setViewModel(mViewModel);
-        mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
         mActivityBinding.rvSymptomGroups.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
-        mActivityBinding.rvSymptomGroups.setAdapter(mSymptomGroupsAdapter);
     }
 
     @Override
@@ -287,11 +291,27 @@ public final class SymptomsActivity
             startLocationUpdates();
         }
 
+        orderSymptomCatalog();
+    }
+
+    private void orderSymptomCatalog () {
+        orderSymptomGroups();
         orderSymptoms();
     }
 
+    private void orderSymptomGroups () {
+        if (mSymptomGroupsAdapter != null) {
+            mSymptomGroupsAdapter.order();
+        }
+        if (mActivityBinding.rvSymptomGroups.getLayoutManager() != null) {
+            mActivityBinding.rvSymptomGroups.getLayoutManager().scrollToPosition(0);
+        }
+    }
+
     private void orderSymptoms () {
-        mSymptomsAdapter.order();
+        if (mSymptomsAdapter != null) {
+            mSymptomsAdapter.order();
+        }
         if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
             mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
         }
@@ -320,6 +340,7 @@ public final class SymptomsActivity
         for (SymptomGroupWithSymptoms symptomGroupWithSymptoms : symptomGroups) {
             displaySymptomGroups.add(
                     new DisplaySymptomGroup(
+                            symptomGroupWithSymptoms.getSymptomGroup().getId(),
                             symptomGroupWithSymptoms.getSymptomGroup().getName(),
                             createDisplaySymptoms(symptomGroupWithSymptoms.getSymptoms())
                     )
@@ -384,7 +405,7 @@ public final class SymptomsActivity
             mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
             Log.d(TAG, "account=" + mAccount);
 
-            //получить анонимный ключ
+//получить анонимный ключ
             final String incognitoId = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
             //если анонимного ключа не существует
             if (incognitoId != null) {
@@ -410,8 +431,21 @@ public final class SymptomsActivity
     ) {
         mViewModel.setSelectedDisplaySymptomGroup(displaySymptomGroup);
         mViewModel.setDisplaySymptoms(displaySymptomGroup.getDisplaySymptoms());
-        mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
-        mViewModel.loadLastValues(mIncognitoId, this::orderSymptoms);
+
+        if (mSymptomGroupsAdapter == null) {
+            mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
+            mActivityBinding.rvSymptomGroups.setAdapter(mSymptomGroupsAdapter);
+        } else {
+            mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
+        }
+        if (mSymptomsAdapter == null) {
+            mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
+            mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
+        } else {
+            mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
+        }
+
+        orderSymptoms();
     }
 
     public void checkLocationEnabled (
@@ -444,15 +478,9 @@ public final class SymptomsActivity
             @NonNull final DisplaySymptom displaySymptom
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
-        Date currentDate = new Date();
-        displaySymptom.setLastDate(currentDate);
-
+        final Date currentDate = new Date();
         final Double latitude = mViewModel.getCurrentLatitude().get();
         final Double longitude = mViewModel.getCurrentLongitude().get();
-
-        displaySymptom.setLastLatitude(latitude);
-        displaySymptom.setLastLongitude(longitude);
-        displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
 
         final UserSymptom userSymptom = new UserSymptom(
                 mIncognitoId,
@@ -469,8 +497,11 @@ public final class SymptomsActivity
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(() -> {
+                            displaySymptom.setLastDate(currentDate);
+                            displaySymptom.setLastLatitude(latitude);
+                            displaySymptom.setLastLongitude(longitude);
+                            displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
                             displaySymptom.setHaveNotSynced(true);
-                            displaySymptom.highlight();
                             getAuthTokenAndRequestSync();
                         })
         );

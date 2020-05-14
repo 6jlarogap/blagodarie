@@ -8,9 +8,7 @@ import androidx.databinding.BaseObservable;
 import androidx.databinding.Bindable;
 import androidx.lifecycle.LiveData;
 
-import org.blagodarie.Repository;
 import org.blagodatie.database.Identifier;
-import org.blagodatie.database.Symptom;
 
 import java.util.Date;
 import java.util.Objects;
@@ -26,7 +24,7 @@ public final class DisplaySymptom
     /**
      * Время подсветки в миллисекундах.
      */
-    private static final long HIGHLIGHT_TIME = 60000;
+    private static final long HIGHLIGHT_TIME = 30000;
 
     @NonNull
     private final Identifier mSymptomId;
@@ -76,9 +74,13 @@ public final class DisplaySymptom
         return mLastDate;
     }
 
-    final void setLastDate (@Nullable final Date lastDate) {
+    final void setLastDate (@NonNull final Date lastDate) {
         mLastDate = lastDate;
         notifyPropertyChanged(org.blagodarie.BR.lastDate);
+        final long howLongAgo = System.currentTimeMillis() - mLastDate.getTime();
+        if (howLongAgo < HIGHLIGHT_TIME) {
+            highlight(HIGHLIGHT_TIME - howLongAgo);
+        }
     }
 
     @Nullable
@@ -131,9 +133,9 @@ public final class DisplaySymptom
         notifyPropertyChanged(org.blagodarie.BR.highlight);
     }
 
-    void highlight () {
+    private void highlight (final long highlightTime) {
         setHighlight(true);
-        new Handler().postDelayed(() -> setHighlight(false), HIGHLIGHT_TIME);
+        new Handler().postDelayed(() -> setHighlight(false), highlightTime);
     }
 
     @Override

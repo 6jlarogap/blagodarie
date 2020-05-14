@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.room.Embedded;
 import androidx.room.Relation;
 
+import java.util.Collections;
 import java.util.List;
 
 public final class SymptomGroupWithSymptoms {
@@ -26,6 +27,8 @@ public final class SymptomGroupWithSymptoms {
     ) {
         this.SymptomGroup = SymptomGroup;
         this.Symptoms = Symptoms;
+        //сортировать по Id
+        Collections.sort(this.Symptoms, (s1, s2) -> s1.getId().compareTo(s2.getId()));
     }
 
     @NonNull

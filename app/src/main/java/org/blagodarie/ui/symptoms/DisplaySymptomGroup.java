@@ -4,16 +4,16 @@ import androidx.annotation.NonNull;
 import androidx.databinding.BaseObservable;
 import androidx.databinding.Bindable;
 
-import org.blagodarie.BR;
 import org.blagodatie.database.Identifier;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 public final class DisplaySymptomGroup
         extends BaseObservable {
 
+    @NonNull
+    private final Identifier mSymptomGroupId;
 
     @NonNull
     private final String mSymptomGroupName;
@@ -24,11 +24,18 @@ public final class DisplaySymptomGroup
     private boolean mSelected = false;
 
     DisplaySymptomGroup (
+            @NonNull final Identifier symptomGroupId,
             @NonNull final String symptomGroupName,
             @NonNull final List<DisplaySymptom> displaySymptoms
     ) {
+        mSymptomGroupId = symptomGroupId;
         mSymptomGroupName = symptomGroupName;
         mDisplaySymptoms = displaySymptoms;
+    }
+
+    @NonNull
+    Identifier getSymptomGroupId () {
+        return mSymptomGroupId;
     }
 
     @NonNull
@@ -49,6 +56,14 @@ public final class DisplaySymptomGroup
     void setSelected (final boolean selected) {
         mSelected = selected;
         notifyPropertyChanged(org.blagodarie.BR.selected);
+    }
+
+    long getUserSymptomCount () {
+        long userSymptomCount = 0;
+        for(DisplaySymptom displaySymptom : mDisplaySymptoms){
+            userSymptomCount += displaySymptom.getUserSymptomCount();
+        }
+        return userSymptomCount;
     }
 
     @Override
