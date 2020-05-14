@@ -5,7 +5,6 @@ import android.app.Application;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.util.Pair;
-import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.ViewModel;
@@ -16,14 +15,9 @@ import org.blagodatie.database.LastUserSymptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
 
 import java.lang.reflect.InvocationTargetException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.UUID;
 
 import io.reactivex.Observable;
@@ -39,31 +33,11 @@ import io.reactivex.schedulers.Schedulers;
 public final class SymptomsViewModel
         extends AndroidViewModel {
 
-    private static final long CURRENT_DATE_TIME_UPDATE_PERIOD = 1000L;
-
-    @NonNull
-    private final ObservableField<String> mCurrentDateTime = new ObservableField<>(getCurrentDateTimeString());
-
-    @NonNull
-    private final Timer mCurrentDateTimeUpdateTimer = new Timer();
-
-    {
-        mCurrentDateTimeUpdateTimer.schedule(new TimerTask() {
-            @Override
-            public void run () {
-                mCurrentDateTime.set(getCurrentDateTimeString());
-            }
-        }, 0, CURRENT_DATE_TIME_UPDATE_PERIOD);
-    }
-
     @NonNull
     private final ObservableField<Double> mCurrentLatitude = new ObservableField<>();
 
     @NonNull
     private final ObservableField<Double> mCurrentLongitude = new ObservableField<>();
-
-    @NonNull
-    private final ObservableBoolean mLocationEnabled;
 
     @NonNull
     private List<DisplaySymptomGroup> mDisplaySymptomGroups = new ArrayList<>();
@@ -81,12 +55,9 @@ public final class SymptomsViewModel
     private List<SymptomGroupWithSymptoms> mSymptomCatalog = new ArrayList<>();
 
     public SymptomsViewModel (
-            @NonNull final Application application,
-            final boolean locationEnabled
+            @NonNull final Application application
     ) {
         super(application);
-
-        mLocationEnabled = new ObservableBoolean(locationEnabled);
 
         mRepository = Repository.getInstance(application.getApplicationContext());
     }
@@ -94,7 +65,6 @@ public final class SymptomsViewModel
     @Override
     protected final void onCleared () {
         mDisposables.dispose();
-        mCurrentDateTimeUpdateTimer.cancel();
         super.onCleared();
     }
 
@@ -120,12 +90,6 @@ public final class SymptomsViewModel
                                     if (displaySymptom != null && lastUserSymptom != null) {
                                         displaySymptom.setLastDate(lastUserSymptom.getTimestamp());
                                         displaySymptom.setUserSymptomCount(lastUserSymptom.getSymptomsCount());
-                                        if (lastUserSymptom.getLatitude() != null) {
-                                            displaySymptom.setLastLatitude(lastUserSymptom.getLatitude());
-                                        }
-                                        if (lastUserSymptom.getLongitude() != null) {
-                                            displaySymptom.setLastLongitude(lastUserSymptom.getLongitude());
-                                        }
                                     }
                                 },
                                 throwable -> {
@@ -169,11 +133,6 @@ public final class SymptomsViewModel
     }
 
     @NonNull
-    public final ObservableField<String> getCurrentDatetime () {
-        return mCurrentDateTime;
-    }
-
-    @NonNull
     public final ObservableField<Double> getCurrentLatitude () {
         return mCurrentLatitude;
     }
@@ -181,17 +140,6 @@ public final class SymptomsViewModel
     @NonNull
     public final ObservableField<Double> getCurrentLongitude () {
         return mCurrentLongitude;
-    }
-
-    @NonNull
-    public final ObservableBoolean isLocationEnabled () {
-        return mLocationEnabled;
-    }
-
-    @NonNull
-    private static String getCurrentDateTimeString () {
-        final SimpleDateFormat currentDateTimeFormat = new SimpleDateFormat("dd MMM yyyy\nHH:mm:ss", Locale.getDefault());
-        return currentDateTimeFormat.format(new Date());
     }
 
     @NonNull
@@ -208,15 +156,12 @@ public final class SymptomsViewModel
 
         @NonNull
         private final Application mApplication;
-        private final boolean mLocationEnabled;
 
         Factory (
-                @NonNull final Application application,
-                final boolean locationEnabled
+                @NonNull final Application application
         ) {
             super(application);
             mApplication = application;
-            mLocationEnabled = locationEnabled;
         }
 
 
@@ -225,7 +170,7 @@ public final class SymptomsViewModel
         public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
             if (AndroidViewModel.class.isAssignableFrom(modelClass)) {
                 try {
-                    return modelClass.getConstructor(Application.class, boolean.class).newInstance(mApplication, mLocationEnabled);
+                    return modelClass.getConstructor(Application.class).newInstance(mApplication);
                 } catch (NoSuchMethodException |
                         IllegalAccessException |
                         InstantiationException |

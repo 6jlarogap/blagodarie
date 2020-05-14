@@ -1,25 +1,17 @@
 package org.blagodarie.ui.symptoms;
 
-import android.Manifest;
 import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.accounts.AuthenticatorException;
 import android.accounts.OperationCanceledException;
-import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.UnderlineSpan;
@@ -33,9 +25,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.databinding.DataBindingUtil;
-import androidx.databinding.ObservableBoolean;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -73,34 +63,11 @@ import io.reactivex.schedulers.Schedulers;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class SymptomsActivity
-        extends AppCompatActivity
-        implements LocationListener {
+        extends AppCompatActivity {
 
     private static final String TAG = SymptomsActivity.class.getSimpleName();
 
-    private static final String USER_PREFERENCE_PATTERN = "org.blagodarie.ui.symptoms.preference.%s";
-    private static final String PREF_LOCATION_ENABLED = "locationEnabled";
-    private static final String PREF_LOCATION_EXPLANATION_SHOWED = "locationExplanationShowed";
     private static final String EXTRA_ACCOUNT = "org.blagodarie.ui.symptoms.ACCOUNT";
-
-    /**
-     * Минимальное время между обновлениями местоположения (в миллисекундах).
-     *
-     * @see LocationManager#requestLocationUpdates
-     */
-    private static final long MIN_TIME_LOCATION_UPDATE = 180000L;
-
-    /**
-     * Минимальная дистанция между обновлениями местоположения (в метрах).
-     *
-     * @see LocationManager#requestLocationUpdates
-     */
-    private static final float MIN_DISTANCE_LOCATION_UPDATE = 100.0F;
-
-    /**
-     * Идентификатор запроса на разрешение использования определения местоположения.
-     */
-    private static final int PERM_REQ_ACCESS_FINE_LOCATION = 1;
 
     private Account mAccount;
 
@@ -109,8 +76,6 @@ public final class SymptomsActivity
     private SymptomsViewModel mViewModel;
 
     private CompositeDisposable mDisposables = new CompositeDisposable();
-
-    private LocationManager mLocationManager;
 
     private SymptomGroupsAdapter mSymptomGroupsAdapter;
 
@@ -121,8 +86,6 @@ public final class SymptomsActivity
     private Repository mRepository;
 
     private AccountManager mAccountManager;
-
-    private boolean mShouldProvideRationaleBeforeRequest = false;
 
     private final BroadcastReceiver mSyncErrorReceiver = new BroadcastReceiver() {
         @Override
@@ -155,7 +118,6 @@ public final class SymptomsActivity
         if (initUserDataErrorMessage == null) {
             mRepository = Repository.getInstance(this);
             mAccountManager = AccountManager.get(this);
-            mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
             initViewModel();
 
@@ -213,63 +175,14 @@ public final class SymptomsActivity
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
 
-        final SharedPreferences userSharedPreferences = getSharedPreferences(String.format(USER_PREFERENCE_PATTERN, mAccount.name), MODE_PRIVATE);
-
-        final boolean prefLocationEnable = userSharedPreferences.getBoolean(PREF_LOCATION_ENABLED, false);
-
         //создаем фабрику
         final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
-                getApplication(),
-                prefLocationEnable
+                getApplication()
         );
 
         //создаем UpdateViewModel
         mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
 
-        //добавить слушатель включения/выключения местоположения
-        mViewModel.isLocationEnabled().addOnPropertyChangedCallback(new androidx.databinding.Observable.OnPropertyChangedCallback() {
-            @Override
-            public void onPropertyChanged (androidx.databinding.Observable sender, int propertyId) {
-                if (sender == mViewModel.isLocationEnabled()) {
-                    final boolean locationEnable = ((ObservableBoolean) sender).get();
-                    userSharedPreferences.edit().putBoolean(PREF_LOCATION_ENABLED, locationEnable).apply();
-                    if (locationEnable) {
-                        final boolean locationExplanationShowed = userSharedPreferences.getBoolean(PREF_LOCATION_EXPLANATION_SHOWED, false);
-                        if (!locationExplanationShowed) {
-                            showLocationExplanationDialog();
-                            userSharedPreferences.edit().putBoolean(PREF_LOCATION_EXPLANATION_SHOWED, true).apply();
-                        } else {
-                            tryTurnOnLocation();
-                        }
-                    } else {
-                        mViewModel.getCurrentLatitude().set(null);
-                        mViewModel.getCurrentLongitude().set(null);
-                    }
-                }
-            }
-        });
-    }
-
-    private void showLocationExplanationDialog () {
-        new AlertDialog.Builder(this).
-                setTitle(R.string.location).
-                setMessage(R.string.location_explanation).
-                setPositiveButton(R.string.btn_next, (dialog, which) -> tryTurnOnLocation()).
-                setNegativeButton(R.string.btn_cancel, (dialog, which) -> mViewModel.isLocationEnabled().set(false)).
-                create().
-                show();
-    }
-
-    private void tryTurnOnLocation () {
-        if (checkLocationPermission()) {
-            if (isHaveEnabledLocationProvider()) {
-                startLocationUpdates();
-            } else {
-                startLocationSettingsActivity();
-            }
-        } else {
-            requestLocationPermission();
-        }
     }
 
     private void initBinding () {
@@ -284,12 +197,6 @@ public final class SymptomsActivity
         super.onResume();
         checkLatestVersion();
         getAuthTokenAndRequestSync();
-
-        boolean isLocationPossible = checkLocationPermission() && isHaveEnabledLocationProvider();
-        mViewModel.isLocationEnabled().set(isLocationPossible);
-        if (isLocationPossible) {
-            startLocationUpdates();
-        }
 
         orderSymptomCatalog();
     }
@@ -321,7 +228,6 @@ public final class SymptomsActivity
     protected void onPause () {
         Log.d(TAG, "onPause");
         super.onPause();
-        stopLocationUpdates();
     }
 
     @Override
@@ -372,27 +278,6 @@ public final class SymptomsActivity
         }
     }
 
-    @SuppressLint ("MissingPermission")
-    private void startLocationUpdates () {
-        Log.d(TAG, "startLocationUpdates");
-        Location lastLocation = mLocationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-        if (lastLocation == null) {
-            lastLocation = mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-        }
-        if (lastLocation != null) {
-            mViewModel.getCurrentLatitude().set(lastLocation.getLatitude());
-            mViewModel.getCurrentLongitude().set(lastLocation.getLongitude());
-        }
-
-        mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, MIN_TIME_LOCATION_UPDATE, MIN_DISTANCE_LOCATION_UPDATE, this);
-        mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_TIME_LOCATION_UPDATE, MIN_DISTANCE_LOCATION_UPDATE, this);
-    }
-
-    private void stopLocationUpdates () {
-        Log.d(TAG, "stopLocationUpdates");
-        mLocationManager.removeUpdates(this);
-    }
-
     /**
      * Инициализирует данные о пользователе.
      */
@@ -405,7 +290,7 @@ public final class SymptomsActivity
             mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
             Log.d(TAG, "account=" + mAccount);
 
-//получить анонимный ключ
+            //получить анонимный ключ
             final String incognitoId = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
             //если анонимного ключа не существует
             if (incognitoId != null) {
@@ -439,39 +324,13 @@ public final class SymptomsActivity
             mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
         }
         if (mSymptomsAdapter == null) {
-            mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::checkLocationEnabled);
+            mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::createUserSymptom);
             mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
         } else {
             mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
         }
 
         orderSymptoms();
-    }
-
-    public void checkLocationEnabled (
-            @NonNull final DisplaySymptom displaySymptom
-    ) {
-        if (mViewModel.isLocationEnabled().get() &&
-                (mViewModel.getCurrentLatitude().get() == null ||
-                        mViewModel.getCurrentLongitude().get() == null)) {
-            showEmptyLocationAlertDialog(displaySymptom);
-        } else {
-            createUserSymptom(displaySymptom);
-        }
-    }
-
-    private void showEmptyLocationAlertDialog (
-            @NonNull final DisplaySymptom displaySymptom
-    ) {
-        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.empty_location_alert);
-        builder.setMessage(R.string.add_symptom_without_location);
-        builder.setPositiveButton(
-                R.string.btn_send,
-                (dialog, which) -> createUserSymptom(displaySymptom));
-        builder.setNegativeButton(R.string.btn_wait, null);
-        builder.create();
-        builder.show();
     }
 
     public void createUserSymptom (
@@ -529,50 +388,11 @@ public final class SymptomsActivity
         );
     }
 
-    private boolean checkLocationPermission () {
-        Log.d(TAG, "checkLocationPermission");
-        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    @Override
-    public void onRequestPermissionsResult (final int requestCode, @NonNull final String[] permissions, @NonNull final int[] grantResults) {
-        Log.d(TAG, "onRequestPermissionsResult");
-        if (requestCode == PERM_REQ_ACCESS_FINE_LOCATION) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                if (isHaveEnabledLocationProvider()) {
-                    startLocationUpdates();
-                } else {
-                    startLocationSettingsActivity();
-                }
-            } else {
-                boolean shouldProvideRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
-                if (!shouldProvideRationale && !mShouldProvideRationaleBeforeRequest) {
-                    startApplicationDetailSettingsActivity();
-                }
-            }
-        }
-    }
-
     public void onLinkClick (final View view) {
         Log.d(TAG, "onLinkClick");
         final Intent i = new Intent(Intent.ACTION_VIEW);
         i.setData(Uri.parse(getString(R.string.website_url)));
         startActivity(i);
-    }
-
-    private void startLocationSettingsActivity () {
-        Log.d(TAG, "startLocationSettingsActivity");
-        final Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-        startActivity(intent);
-    }
-
-    private void startApplicationDetailSettingsActivity () {
-        final Intent intent = new Intent();
-        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-        final Uri uri = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null);
-        intent.setData(uri);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
     }
 
     public void showLog (final View view) {
@@ -608,47 +428,6 @@ public final class SymptomsActivity
         builder.create();
         builder.show();
     }
-
-    public void requestLocationPermission () {
-        Log.d(TAG, "requestLocationPermission");
-        mShouldProvideRationaleBeforeRequest = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
-        ActivityCompat.requestPermissions(SymptomsActivity.this,
-                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                PERM_REQ_ACCESS_FINE_LOCATION);
-    }
-
-    @Override
-    public void onLocationChanged (Location location) {
-        Log.d(TAG, "onLocationChanged location=" + location);
-        if (location != null) {
-            mViewModel.getCurrentLatitude().set(location.getLatitude());
-            mViewModel.getCurrentLongitude().set(location.getLongitude());
-        }
-    }
-
-    @Override
-    public void onStatusChanged (String provider, int status, Bundle extras) {
-        Log.d(TAG, "onStatusChanged");
-    }
-
-    @Override
-    public void onProviderEnabled (String provider) {
-        Log.d(TAG, "onProviderEnabled");
-    }
-
-    @Override
-    public void onProviderDisabled (String provider) {
-        Log.d(TAG, "onProviderDisabled provider=" + provider);
-    }
-
-    private boolean isHaveEnabledLocationProvider () {
-        boolean isHaveEnabledLocationProvider = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
-                mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER
-                );
-        Log.d(TAG, "checkHaveEnabledLocationProvider isHaveEnabledLocationProvider=" + isHaveEnabledLocationProvider);
-        return isHaveEnabledLocationProvider;
-    }
-
 
     private void checkLatestVersion () {
         Log.d(TAG, "checkLatestVersion");

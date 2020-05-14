@@ -16,69 +16,17 @@
 
         </com.google.android.material.appbar.AppBarLayout>
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start"
+            android:layout_margin="5dp"
+            android:onClick="showLog"
+            android:text="@string/action_log"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            android:textColor="@color/colorAccent"
+            android:visibility="@{BuildConfig.DEBUG ? View.VISIBLE : View.GONE}" />
 
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="start"
-                android:layout_margin="5dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvDateTime"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text='@{ViewModel.currentDatetime}'
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="showLog"
-                    android:text="@string/action_log"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                    android:textColor="@color/colorAccent"
-                    android:visibility="@{BuildConfig.DEBUG ? View.VISIBLE : View.GONE}" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_margin="5dp"
-                android:orientation="vertical">
-
-                <androidx.appcompat.widget.SwitchCompat
-                    android:id="@+id/scLocationEnable"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="@={ViewModel.isLocationEnabled()}"
-                    android:text="@string/location"
-                    android:theme="@style/LocationSwitchStyle" />
-
-                <TextView
-                    android:id="@+id/tvLatitude"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@{String.format(@string/latitude, ViewModel.currentLatitude)}"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                    android:visibility="@{ViewModel.currentLatitude != null ? View.VISIBLE : View.GONE}" />
-
-                <TextView
-                    android:id="@+id/tvLongitude"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@{String.format(@string/longitude, ViewModel.currentLongitude)}"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                    android:visibility="@{ViewModel.currentLongitude != null ? View.VISIBLE : View.GONE}" />
-
-            </LinearLayout>
-
-        </FrameLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

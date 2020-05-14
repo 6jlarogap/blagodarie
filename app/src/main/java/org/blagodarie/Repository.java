@@ -89,11 +89,11 @@ public final class Repository {
             if (lastUserSymptom != null) {
                 //обновить данные
                 lastUserSymptom.setTimestamp(userSymptom.getTimestamp());
+                lastUserSymptom.setSymptomsCount(lastUserSymptom.getSymptomsCount() + 1);
                 if (userSymptom.getLatitude() != null &&
                         userSymptom.getLongitude() != null) {
                     lastUserSymptom.setLatitude(userSymptom.getLatitude());
                     lastUserSymptom.setLongitude(userSymptom.getLongitude());
-                    lastUserSymptom.setSymptomsCount(lastUserSymptom.getSymptomsCount() + 1);
                 }
                 mLastUserSymptomDao.update(lastUserSymptom);
             } else {
