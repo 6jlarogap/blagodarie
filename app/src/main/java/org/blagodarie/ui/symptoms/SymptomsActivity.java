@@ -682,7 +682,11 @@ public final class SymptomsActivity
                 setTitle(R.string.info_msg_update_available).
                 setMessage(String.format(getString(R.string.qstn_want_load_new_version), versionName)).
                 setPositiveButton(R.string.btn_update, (dialog, which) -> toUpdate(versionName, latestVersionUri)).
-                setNegativeButton(R.string.btn_finish, (dialog, which) -> finish()).
+                setNegativeButton(R.string.btn_finish, (dialog, which) -> {
+                    if (!BuildConfig.DEBUG) {
+                        finish();
+                    }
+                }).
                 setCancelable(false).
                 create().
                 show();
