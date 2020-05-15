@@ -72,17 +72,24 @@ public final class Repository {
         return mUserSymptomDao.isHaveNotSynced(incognitoId, symptomId);
     }
 
+
+    public final LiveData<UserSymptom> getLatestUserSymptom (
+            @NonNull final UUID incognitoId,
+            @NonNull final Identifier symptomId
+    ) {
+        Log.d(TAG, "getLatestUserSymptom");
+        return mUserSymptomDao.getLatestUserSymptom(incognitoId, symptomId);
+    }
+
     public final List<UserSymptom> getNotSyncedUserSymptoms (@NonNull final UUID incognitoId) {
         Log.d(TAG, "getNotSyncedUserSymptoms");
         return mUserSymptomDao.getNotSynced(incognitoId);
     }
 
-    public final void insertUserSymptom (@NonNull final UserSymptom userSymptom) {
-        Log.d(TAG, "insertUserSymptom");
+    public final void updateLastUserSymptom (@NonNull final UserSymptom userSymptom) {
+        Log.d(TAG, "updateLastUserSymptom");
         //выполнить в транзакции
         mBlagodarieDatabase.runInTransaction(() -> {
-            //вставить userSymptom
-            mUserSymptomDao.insert(userSymptom);
             //получить lastUserSymptom, соответствующий userSymptom
             LastUserSymptom lastUserSymptom = mLastUserSymptomDao.get(userSymptom.getIncognitoId(), userSymptom.getSymptomId());
             //если существует
@@ -108,6 +115,16 @@ public final class Repository {
                 mLastUserSymptomDao.insert(lastUserSymptom);
             }
         });
+    }
+
+    public final void deleteUserSymptom (@NonNull final UserSymptom userSymptom) {
+        Log.d(TAG, "deleteUserSymptom");
+        mUserSymptomDao.delete(userSymptom);
+    }
+
+    public final void insertUserSymptomAndSetId (@NonNull final UserSymptom userSymptom) {
+        Log.d(TAG, "insertUserSymptomAndSetId");
+        mUserSymptomDao.insertAndSetId(userSymptom);
     }
 
     public final LastUserSymptom getLastUserSymptom (

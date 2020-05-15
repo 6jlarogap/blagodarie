@@ -231,11 +231,17 @@ public final class SymptomsActivity
     }
 
     @Override
+    protected void onStop () {
+        Log.d(TAG, "onStop");
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy () {
         Log.d(TAG, "onDestroy");
-        super.onDestroy();
         mDisposables.dispose();
         unregisterReceiver(mSyncErrorReceiver);
+        super.onDestroy();
     }
 
     private List<DisplaySymptomGroup> createDisplaySymptomGroups (
@@ -261,7 +267,25 @@ public final class SymptomsActivity
         Log.d(TAG, "createDisplaySymptoms");
         final List<DisplaySymptom> displaySymptoms = new ArrayList<>();
         for (Symptom symptom : symptoms) {
-            displaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(mIncognitoId, symptom.getId())));
+            displaySymptoms.add(
+                    new DisplaySymptom(
+                            symptom,
+                            mRepository.isHaveNotSyncedUserSymptoms(mIncognitoId, symptom.getId()),
+                            mRepository.getLatestUserSymptom(mIncognitoId, symptom.getId()),
+                            new DisplaySymptom.UnconfirmedUserSymptomListener() {
+                                @Override
+                                public void onConfirm (@NonNull final DisplaySymptom displaySymptom) {
+                                    updateLastUserSymptom(displaySymptom);
+                                    getAuthTokenAndRequestSync();
+                                }
+
+                                @Override
+                                public void onCancel (@NonNull final UserSymptom canceledUserSymptom) {
+                                    deleteNotConfirmedUserSymptom(canceledUserSymptom);
+                                }
+                            }
+                    )
+            );
         }
         return displaySymptoms;
     }
@@ -338,32 +362,49 @@ public final class SymptomsActivity
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
         final Date currentDate = new Date();
-        final Double latitude = mViewModel.getCurrentLatitude().get();
-        final Double longitude = mViewModel.getCurrentLongitude().get();
 
         final UserSymptom userSymptom = new UserSymptom(
                 mIncognitoId,
                 displaySymptom.getSymptomId(),
                 currentDate,
-                latitude,
-                longitude);
+                null,
+                null);
 
-        mDisposables.add(
-                Completable.
-                        fromAction(() ->
-                                mRepository.insertUserSymptom(userSymptom)
-                        ).
-                        subscribeOn(Schedulers.io()).
-                        observeOn(AndroidSchedulers.mainThread()).
-                        subscribe(() -> {
-                            displaySymptom.setLastDate(currentDate);
-                            displaySymptom.setLastLatitude(latitude);
-                            displaySymptom.setLastLongitude(longitude);
-                            displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
-                            displaySymptom.setHaveNotSynced(true);
-                            getAuthTokenAndRequestSync();
-                        })
-        );
+        Completable.
+                fromAction(() -> mRepository.insertUserSymptomAndSetId(userSymptom)).
+                subscribeOn(Schedulers.io()).
+                observeOn(AndroidSchedulers.mainThread()).
+                subscribe();
+    }
+
+    private void deleteNotConfirmedUserSymptom (
+            @NonNull final UserSymptom canceledUserSymptom
+    ) {
+        Log.d(TAG, "deleteNotConfirmedUserSymptom canceledUserSymptom=" + canceledUserSymptom);
+        Completable.
+                fromAction(() -> mRepository.deleteUserSymptom(canceledUserSymptom)).
+                subscribeOn(Schedulers.io()).
+                observeOn(AndroidSchedulers.mainThread()).
+                subscribe();
+    }
+
+    private void updateLastUserSymptom (
+            @NonNull final DisplaySymptom displaySymptom
+    ) {
+        Log.d(TAG, "updateLastUserSymptom displaySymptom=" + displaySymptom);
+        final UserSymptom userSymptom = displaySymptom.getNotConfirmedUserSymptom();
+        if (userSymptom != null) {
+            mDisposables.add(
+                    Completable.
+                            fromAction(() -> mRepository.updateLastUserSymptom(userSymptom)).
+                            subscribeOn(Schedulers.io()).
+                            observeOn(AndroidSchedulers.mainThread()).
+                            subscribe(() -> {
+                                displaySymptom.setLastDate(userSymptom.getTimestamp());
+                                displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
+                            })
+            );
+        }
     }
 
     private void getAuthTokenAndRequestSync () {

@@ -17,7 +17,6 @@ final class Converters {
     private static final String TAG = Converters.class.getSimpleName();
 
     private static final String DATE_STRING_FORMAT = "yyyy-MM-dd HH:mm:ss.SSSZ";
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(DATE_STRING_FORMAT, Locale.ENGLISH);
 
     @TypeConverter
     public Identifier longToIdentifier (final Long o) {
@@ -41,14 +40,14 @@ final class Converters {
 
     @TypeConverter
     public String dateToString (@NonNull final Date o) {
-        return DATE_FORMAT.format(o);
+        return new SimpleDateFormat(DATE_STRING_FORMAT, Locale.ENGLISH).format(o);
     }
 
     @Nullable
     @TypeConverter
     public Date stringToDate (@NonNull final String o) {
         try {
-            return DATE_FORMAT.parse(o);
+            return new SimpleDateFormat(DATE_STRING_FORMAT, Locale.ENGLISH).parse(o);
         } catch (ParseException e) {
             Log.e(TAG, "stringToDate error=" + e);
             return null;

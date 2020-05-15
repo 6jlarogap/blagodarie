@@ -13,6 +13,7 @@ import org.blagodatie.database.UserSymptom;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -25,9 +26,11 @@ import okhttp3.Response;
 
 import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
-final class UserSymptomSyncer {
+public final class UserSymptomSyncer {
 
     private static final String TAG = UserSymptomSyncer.class.getSimpleName();
+
+    public static final long USER_SYMPTOM_CONFIRMATION_TIME = 30000L;
 
     private static final String USER_SYMPTOM_JSON_PATTERN = "{\"symptom_id\":%s,\"timestamp\":%d,\"timezone\":\"%s\",\"latitude\":%f,\"longitude\":%f}";
 
@@ -56,8 +59,10 @@ final class UserSymptomSyncer {
         Log.d(TAG, "sync");
         final List<UserSymptom> notSyncedUserSymtpoms = repository.getNotSyncedUserSymptoms(incognitoId);
         Log.d(TAG, "notSyncedUserSymtpoms.size=" + notSyncedUserSymtpoms.size());
-        if (notSyncedUserSymtpoms.size() > 0) {
-            final String content = createJsonContent(incognitoId, notSyncedUserSymtpoms);
+        final List<UserSymptom> confirmedUserSymptoms = excludeUnconfirmed(notSyncedUserSymtpoms);
+        Log.d(TAG, "confirmedUserSymptoms.size=" + confirmedUserSymptoms.size());
+        if (confirmedUserSymptoms.size() > 0) {
+            final String content = createJsonContent(incognitoId, confirmedUserSymptoms);
             Log.d(TAG, "content=" + content);
 
             final Request request = createRequest(apiBaseUrl, authToken, content);
@@ -67,11 +72,22 @@ final class UserSymptomSyncer {
             Log.d(TAG, "response.code=" + response.code());
 
             if (response.code() == 200) {
-                repository.deleteUserSymptoms(notSyncedUserSymtpoms);
+                repository.deleteUserSymptoms(confirmedUserSymptoms);
             } else if (response.code() == 401) {
                 throw new UnauthorizedException();
             }
         }
+    }
+
+    private List<UserSymptom> excludeUnconfirmed (@NonNull final List<UserSymptom> userSymptoms){
+        final List<UserSymptom> confirmentUserSymptoms = new ArrayList<>();
+        for (UserSymptom userSymptom : userSymptoms){
+            final long howLongAgo = System.currentTimeMillis() - userSymptom.getTimestamp().getTime();
+            if (howLongAgo > UserSymptomSyncer.USER_SYMPTOM_CONFIRMATION_TIME) {
+                confirmentUserSymptoms.add(userSymptom);
+            }
+        }
+        return confirmentUserSymptoms;
     }
 
     private Request createRequest (

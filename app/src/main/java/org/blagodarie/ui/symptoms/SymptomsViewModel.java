@@ -1,11 +1,11 @@
 package org.blagodarie.ui.symptoms;
 
 import android.app.Application;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.util.Pair;
-import androidx.databinding.ObservableField;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
@@ -33,11 +33,7 @@ import io.reactivex.schedulers.Schedulers;
 public final class SymptomsViewModel
         extends AndroidViewModel {
 
-    @NonNull
-    private final ObservableField<Double> mCurrentLatitude = new ObservableField<>();
-
-    @NonNull
-    private final ObservableField<Double> mCurrentLongitude = new ObservableField<>();
+    private static final String TAG = SymptomsViewModel.class.getSimpleName();
 
     @NonNull
     private List<DisplaySymptomGroup> mDisplaySymptomGroups = new ArrayList<>();
@@ -64,6 +60,7 @@ public final class SymptomsViewModel
 
     @Override
     protected final void onCleared () {
+        Log.d(TAG, "onCleared");
         mDisposables.dispose();
         super.onCleared();
     }
@@ -130,16 +127,6 @@ public final class SymptomsViewModel
 
     final void setDisplaySymptomGroups (@NonNull final List<DisplaySymptomGroup> displaySymptomGroups) {
         mDisplaySymptomGroups = displaySymptomGroups;
-    }
-
-    @NonNull
-    public final ObservableField<Double> getCurrentLatitude () {
-        return mCurrentLatitude;
-    }
-
-    @NonNull
-    public final ObservableField<Double> getCurrentLongitude () {
-        return mCurrentLongitude;
     }
 
     @NonNull

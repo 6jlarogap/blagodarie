@@ -50,7 +50,7 @@ final class SymptomsAdapter
         final DisplaySymptom displaySymptom = mDisplaySymptoms.get(position);
         if (displaySymptom != null) {
             holder.bind(displaySymptom, v -> {
-                if (!displaySymptom.getHighlight()) {
+                if (displaySymptom.getNotConfirmedUserSymptom() == null) {
                     mDisplaySymptomClickListener.onClick(displaySymptom);
                 }
             });
@@ -144,9 +144,7 @@ final class SymptomsAdapter
             return newItem.getSymptomId().equals(oldItem.getSymptomId()) &&
                     newItem.getSymptomName().equals(oldItem.getSymptomName()) &&
                     newItem.getUserSymptomCount() == oldItem.getUserSymptomCount() &&
-                    (newItem.getLastDate() == null ? oldItem.getLastDate() == null : newItem.getLastDate().equals(oldItem.getLastDate())) &&
-                    (newItem.getLastLatitude() == null ? oldItem.getLastLatitude() == null : newItem.getLastLatitude().equals(oldItem.getLastLatitude())) &&
-                    (newItem.getLastLongitude() == null ? oldItem.getLastLongitude() == null : newItem.getLastLongitude().equals(oldItem.getLastLongitude()));
+                    (newItem.getLastDate() == null ? oldItem.getLastDate() == null : newItem.getLastDate().equals(oldItem.getLastDate()));
         }
     }
 }
