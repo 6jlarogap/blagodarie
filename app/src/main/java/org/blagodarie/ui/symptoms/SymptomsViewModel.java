@@ -11,12 +11,14 @@ import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
 import org.blagodarie.Repository;
+import org.blagodatie.database.Identifier;
 import org.blagodatie.database.LastUserSymptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -70,7 +72,7 @@ public final class SymptomsViewModel
             @NonNull final Action action
     ) {
         final Collection<DisplaySymptom> allDisplaySymptoms = new ArrayList<>();
-        for(DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups){
+        for (DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups) {
             allDisplaySymptoms.addAll(displaySymptomGroup.getDisplaySymptoms());
         }
 
@@ -106,10 +108,10 @@ public final class SymptomsViewModel
     }
 
     @Nullable
-    final DisplaySymptomGroup getSelectedDisplaySymptomGroup () {
+    final Identifier getSelectedSymptomGroupId () {
         for (DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups) {
             if (displaySymptomGroup.isSelected()) {
-                return displaySymptomGroup;
+                return displaySymptomGroup.getSymptomGroupId();
             }
         }
         return null;
@@ -134,8 +136,38 @@ public final class SymptomsViewModel
         return mSymptomCatalog;
     }
 
-    void setSymptomCatalog (@NonNull final List<SymptomGroupWithSymptoms> symptomCatalog) {
+    final void setSymptomCatalog (@NonNull final List<SymptomGroupWithSymptoms> symptomCatalog) {
         mSymptomCatalog = symptomCatalog;
+    }
+
+    final void orderDisplaySymptoms () {
+        Collections.sort(
+                mDisplaySymptoms,
+                (o1, o2) -> {
+                    long difference = o2.getUserSymptomCount() - o1.getUserSymptomCount();
+                    if (difference < 0) {
+                        return -1;
+                    } else if (difference > 0) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                });
+    }
+
+    final void orderDisplaySymptomGroups () {
+        Collections.sort(
+                mDisplaySymptomGroups,
+                (o1, o2) -> {
+                    long difference = o2.getUserSymptomCount() - o1.getUserSymptomCount();
+                    if (difference < 0) {
+                        return -1;
+                    } else if (difference > 0) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                });
     }
 
     static final class Factory

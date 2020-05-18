@@ -42,6 +42,7 @@ import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.sync.SyncService;
 import org.blagodarie.ui.update.UpdateActivity;
+import org.blagodatie.database.Identifier;
 import org.blagodatie.database.Symptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
 import org.blagodatie.database.UserSymptom;
@@ -147,26 +148,33 @@ public final class SymptomsActivity
                 //создать отображаемые группы
                 final List<DisplaySymptomGroup> newDisplaySymptomGroups = createDisplaySymptomGroups(newSymptomCatalog);
 
-                //запомнить выбранную группу
-                final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
+                //запомнить идентификатор выбранной группы
+                final Identifier selectedGroupId = mViewModel.getSelectedSymptomGroupId();
 
                 //задать новые данные
                 mViewModel.setDisplaySymptomGroups(newDisplaySymptomGroups);
 
                 //загрузить последние пользовательские данные о симптомах
                 mViewModel.loadLastValues(mIncognitoId, () -> {
+                    orderSymptomCatalog();
                     //восстановить выбранную группу
                     if (mViewModel.getDisplaySymptomGroups().size() > 0) {
-                        //если существует выбранная группа, и она присутствует в новом списке
-                        if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
-                            //выделить ее
-                            showSymptomsForGroup(selectedGroup);
-                        } else {
-                            //иначе выбрать первую
-                            showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                        //по-умолчанию выделить первую группу
+                        int selectedGroupIndex = 0;
+
+                        //если существует идентификатор выбранной группы
+                        if (selectedGroupId != null) {
+                            //найти группу с выбранным идентификатором в новом списке
+                            for (int i = 0; i < mViewModel.getDisplaySymptomGroups().size() && selectedGroupIndex == 0; i++) {
+                                if (mViewModel.getDisplaySymptomGroups().get(i).getSymptomGroupId().equals(selectedGroupId)) {
+                                    selectedGroupIndex = i;
+                                }
+                            }
                         }
+
+                        //показать симптомы для выбранной группы
+                        showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(selectedGroupIndex));
                     }
-                    orderSymptomCatalog();
                 });
             }
         }
@@ -207,8 +215,9 @@ public final class SymptomsActivity
     }
 
     private void orderSymptomGroups () {
+        mViewModel.orderDisplaySymptomGroups();
         if (mSymptomGroupsAdapter != null) {
-            mSymptomGroupsAdapter.order();
+            mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
         }
         if (mActivityBinding.rvSymptomGroups.getLayoutManager() != null) {
             mActivityBinding.rvSymptomGroups.getLayoutManager().scrollToPosition(0);
@@ -216,8 +225,9 @@ public final class SymptomsActivity
     }
 
     private void orderSymptoms () {
+        mViewModel.orderDisplaySymptoms();
         if (mSymptomsAdapter != null) {
-            mSymptomsAdapter.order();
+            mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
         }
         if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
             mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);

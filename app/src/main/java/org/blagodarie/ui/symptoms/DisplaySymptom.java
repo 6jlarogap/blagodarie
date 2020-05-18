@@ -14,6 +14,7 @@ import org.blagodatie.database.Symptom;
 import org.blagodatie.database.UserSymptom;
 
 import java.util.Date;
+import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -29,25 +30,47 @@ public final class DisplaySymptom
 
     interface UnconfirmedUserSymptomListener {
         void onConfirm (@NonNull final DisplaySymptom displaySymptom);
+
         void onCancel (@NonNull final UserSymptom canceledUserSymptom);
     }
 
+    /**
+     * Сообщение.
+     */
     @NonNull
     private final Symptom mSymptom;
 
+    /**
+     * Дата последней отметки.
+     */
     @Nullable
     private Date mLastDate;
 
+    /**
+     * Количество отметок.
+     */
     private long mUserSymptomCount = 0;
 
+    /**
+     * Неподтветжденное сообщение.
+     */
     @Nullable
     private UserSymptom mUnconfirmedUserSymptom;
 
+    /**
+     * Имеются ли несинхронизированные сообщения данного типа.
+     */
     private boolean mHaveNotSynced = false;
 
+    /**
+     * Слушатель подтверждения/отмены сообщения.
+     */
     @NonNull
     private final UnconfirmedUserSymptomListener mConfirmUserSymptomListener;
 
+    /**
+     * Таймер подтверждения.
+     */
     @Nullable
     private Timer mConfirmationTimer;
 
@@ -82,11 +105,11 @@ public final class DisplaySymptom
     @Nullable
     @Bindable
     public final Date getLastDate () {
-        Date lastDate = mLastDate;
         if (mUnconfirmedUserSymptom != null) {
-            lastDate = mUnconfirmedUserSymptom.getTimestamp();
+            return mUnconfirmedUserSymptom.getTimestamp();
+        } else {
+            return mLastDate;
         }
-        return lastDate;
     }
 
     final void setLastDate (@Nullable final Date lastDate) {
@@ -118,8 +141,13 @@ public final class DisplaySymptom
         notifyPropertyChanged(org.blagodarie.BR.haveNotSynced);
     }
 
-    private void startTimer (final long delay) {
-        Log.d(TAG, "startTimer");
+    /**
+     * Запускает таймер подтверждения сообщения.
+     *
+     * @param delay Время таймера.
+     */
+    private void startConfirmationTimer (final long delay) {
+        Log.d(TAG, "startConfirmationTimer");
         if (mConfirmationTimer == null) {
             mConfirmationTimer = new Timer();
             mConfirmationTimer.schedule(getConfirmationTask(), delay);
@@ -132,6 +160,9 @@ public final class DisplaySymptom
         return mUnconfirmedUserSymptom;
     }
 
+    /**
+     * Очищает неподтвержденный симптом.
+     */
     private void clearNotConfirmedUserSymptom () {
         mUnconfirmedUserSymptom = null;
         notifyPropertyChanged(org.blagodarie.BR.notConfirmedUserSymptom);
@@ -139,26 +170,37 @@ public final class DisplaySymptom
         notifyPropertyChanged(org.blagodarie.BR.userSymptomCount);
     }
 
+    /**
+     * Устанавливает неподтвержденное сообщение.
+     *
+     * @param notConfirmedUserSymptom Неподтвержденное сообщение.
+     */
     private void setNotConfirmedUserSymptom (@NonNull final UserSymptom notConfirmedUserSymptom) {
         Log.d(TAG, "setNotConfirmedUserSymptom notConfirmedUserSymptom=" + notConfirmedUserSymptom);
         final long howLongAgo = System.currentTimeMillis() - notConfirmedUserSymptom.getTimestamp().getTime();
         Log.d(TAG, "howLongAgo=" + howLongAgo);
         if (howLongAgo <= UserSymptomSyncer.USER_SYMPTOM_CONFIRMATION_TIME) {
             mUnconfirmedUserSymptom = notConfirmedUserSymptom;
-            startTimer(UserSymptomSyncer.USER_SYMPTOM_CONFIRMATION_TIME - howLongAgo);
+            startConfirmationTimer(UserSymptomSyncer.USER_SYMPTOM_CONFIRMATION_TIME - howLongAgo);
         }
         notifyPropertyChanged(org.blagodarie.BR.notConfirmedUserSymptom);
         notifyPropertyChanged(org.blagodarie.BR.lastDate);
         notifyPropertyChanged(org.blagodarie.BR.userSymptomCount);
     }
 
-    private void confirmUserSymptom () {
-        Log.d(TAG, "confirmUserSymptom");
+    /**
+     * Подтверждает неподтвержденное сообщение.
+     */
+    private void confirmUnconfirmedUserSymptom () {
+        Log.d(TAG, "confirmUnconfirmedUserSymptom");
         mConfirmUserSymptomListener.onConfirm(this);
         clearConfirmationTimer();
         clearNotConfirmedUserSymptom();
     }
 
+    /**
+     * Отменяет неподтвержденное сообщение.
+     */
     public final void cancelUnconfirmedUserSymptom () {
         Log.d(TAG, "cancelUnconfirmedUserSymptom");
         clearConfirmationTimer();
@@ -168,6 +210,9 @@ public final class DisplaySymptom
         clearNotConfirmedUserSymptom();
     }
 
+    /**
+     * Очищает таймер подтверждения.
+     */
     private void clearConfirmationTimer () {
         Log.d(TAG, "clearConfirmationTimer");
         if (mConfirmationTimer != null) {
@@ -176,16 +221,20 @@ public final class DisplaySymptom
         }
     }
 
+    /**
+     * Создает задачу подтверждения.
+     *
+     * @return Задача подтверждения.
+     */
     private TimerTask getConfirmationTask () {
         Log.d(TAG, "getConfirmationTask");
         return new TimerTask() {
             @Override
             public void run () {
-                confirmUserSymptom();
+                confirmUnconfirmedUserSymptom();
             }
         };
     }
-
 
     @Override
     public int compareTo (@NonNull final DisplaySymptom o) {
@@ -203,4 +252,39 @@ public final class DisplaySymptom
         return result;
     }
 
+    @Override
+    public boolean equals (Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DisplaySymptom that = (DisplaySymptom) o;
+        return mUserSymptomCount == that.mUserSymptomCount &&
+                mHaveNotSynced == that.mHaveNotSynced &&
+                mSymptom.equals(that.mSymptom) &&
+                Objects.equals(mLastDate, that.mLastDate) &&
+                Objects.equals(mUnconfirmedUserSymptom, that.mUnconfirmedUserSymptom);
+    }
+
+    @Override
+    public int hashCode () {
+        return Objects.hash(
+                mSymptom,
+                mLastDate,
+                mUserSymptomCount,
+                mUnconfirmedUserSymptom,
+                mHaveNotSynced
+        );
+    }
+
+    @Override
+    public String toString () {
+        return "DisplaySymptom{" +
+                "mSymptom=" + mSymptom +
+                ", mLastDate=" + mLastDate +
+                ", mUserSymptomCount=" + mUserSymptomCount +
+                ", mUnconfirmedUserSymptom=" + mUnconfirmedUserSymptom +
+                ", mHaveNotSynced=" + mHaveNotSynced +
+                ", mConfirmUserSymptomListener=" + mConfirmUserSymptomListener +
+                ", mConfirmationTimer=" + mConfirmationTimer +
+                '}';
+    }
 }
