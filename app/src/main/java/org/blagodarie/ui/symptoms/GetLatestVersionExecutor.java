@@ -17,22 +17,30 @@ class GetLatestVersionExecutor
     static final class ApiResult
             extends ServerApiExecutor.ApiResult {
 
+        private final boolean mGooglePlayUpdate;
+
         @NonNull
         private final String mVersionName;
 
-        @NonNull
-        private final Integer mVersionCode;
+        private final int mVersionCode;
 
         @NonNull
         private final Uri mLatestVersionUri;
 
+        @NonNull
+        private final Uri mGooglePlayUri;
+
         private ApiResult (
+                final boolean googlePlayUpdate,
                 @NonNull final String versionName,
-                @NonNull final Integer versionCode,
-                @NonNull final Uri latestVersionUri) {
-            this.mVersionName = versionName;
-            this.mVersionCode = versionCode;
-            this.mLatestVersionUri = latestVersionUri;
+                final int versionCode,
+                @NonNull final Uri latestVersionUri,
+                @NonNull final Uri googlePlayUri) {
+            mGooglePlayUpdate = googlePlayUpdate;
+            mVersionName = versionName;
+            mVersionCode = versionCode;
+            mLatestVersionUri = latestVersionUri;
+            mGooglePlayUri = googlePlayUri;
         }
 
         @NonNull
@@ -49,6 +57,15 @@ class GetLatestVersionExecutor
         Uri getUri () {
             return mLatestVersionUri;
         }
+
+        public boolean isGooglePlayUpdate () {
+            return mGooglePlayUpdate;
+        }
+
+        @NonNull
+        public Uri getGooglePlayUri () {
+            return mGooglePlayUri;
+        }
     }
 
     @Override
@@ -64,10 +81,12 @@ class GetLatestVersionExecutor
         if (response.body() != null) {
             final String responseBody = response.body().string();
             final JSONObject rootJSON = new JSONObject(responseBody);
-            int versionCode = rootJSON.getInt("version_code");
-            String versionName = rootJSON.getString("version_name");
-            String url = rootJSON.getString("url");
-            apiResult = new ApiResult(versionName, versionCode, Uri.parse(url));
+            final boolean googlePlayUpdate = rootJSON.getBoolean("google_play_update");
+            final int versionCode = 100500;//rootJSON.getInt("version_code");
+            final String versionName = rootJSON.getString("version_name");
+            final String url = rootJSON.getString("url");
+            final String googlePlayUrl = rootJSON.getString("google_play_url");
+            apiResult = new ApiResult(googlePlayUpdate, versionName, versionCode, Uri.parse(url), Uri.parse(googlePlayUrl));
         }
         return apiResult;
     }

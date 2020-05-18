@@ -492,7 +492,7 @@ public final class SymptomsActivity
                         subscribe(
                                 apiResult -> {
                                     if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
-                                        showUpdateVersionDialog(apiResult.getVersionName(), apiResult.getUri());
+                                        showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), apiResult.getVersionName(), apiResult.getUri(), apiResult.getGooglePlayUri());
                                     }
                                 },
                                 throwable -> {
@@ -503,15 +503,17 @@ public final class SymptomsActivity
     }
 
     private void showUpdateVersionDialog (
+            final boolean googlePlayUpdate,
             @NonNull final String versionName,
-            @NonNull final Uri latestVersionUri
+            @NonNull final Uri latestVersionUri,
+            @NonNull final Uri googlePlayUri
     ) {
         Log.d(TAG, "showUpdateVersionDialog");
         new AlertDialog.
                 Builder(this).
                 setTitle(R.string.info_msg_update_available).
                 setMessage(String.format(getString(R.string.qstn_want_load_new_version), versionName)).
-                setPositiveButton(R.string.btn_update, (dialog, which) -> toUpdate(versionName, latestVersionUri)).
+                setPositiveButton(R.string.btn_update, (dialog, which) -> toUpdate(googlePlayUpdate, versionName, latestVersionUri, googlePlayUri)).
                 setNegativeButton(R.string.btn_finish, (dialog, which) -> {
                     if (!BuildConfig.DEBUG) {
                         finish();
@@ -523,11 +525,19 @@ public final class SymptomsActivity
     }
 
     private void toUpdate (
+            final boolean googlePlayUpdate,
             @NonNull final String versionName,
-            @NonNull final Uri latestVersionUri
+            @NonNull final Uri latestVersionUri,
+            @NonNull final Uri googlePlayUri
     ) {
-        Log.d(TAG, "toUpdate versionName=" + versionName + "; latestVersionUri=" + latestVersionUri);
-        startActivity(UpdateActivity.createSelfIntent(this, versionName, latestVersionUri));
+        Log.d(TAG, "toUpdate googlePlayUpdate=" + googlePlayUpdate + "; versionName=" + versionName + "; latestVersionUri=" + latestVersionUri + "; googlePlayUri=" + googlePlayUri);
+        if (googlePlayUpdate) {
+            final Intent i = new Intent(Intent.ACTION_VIEW);
+            i.setData(googlePlayUri);
+            startActivity(i);
+        } else {
+            startActivity(UpdateActivity.createSelfIntent(this, versionName, latestVersionUri));
+        }
         finish();
     }
 
