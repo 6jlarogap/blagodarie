@@ -24,7 +24,7 @@ final class SymptomsAdapter
         extends RecyclerView.Adapter<SymptomsAdapter.SymptomViewHolder> {
 
     @NonNull
-    private List<DisplaySymptom> mDisplaySymptoms;
+    private final List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
 
     @NonNull
     private final DisplaySymptomClickListener mDisplaySymptomClickListener;
@@ -33,7 +33,7 @@ final class SymptomsAdapter
             @NonNull final List<DisplaySymptom> displaySymptoms,
             @NonNull final DisplaySymptomClickListener displaySymptomClickListener
     ) {
-        mDisplaySymptoms = displaySymptoms;
+        mDisplaySymptoms.addAll(displaySymptoms);
         mDisplaySymptomClickListener = displaySymptomClickListener;
     }
 
@@ -50,7 +50,7 @@ final class SymptomsAdapter
         final DisplaySymptom displaySymptom = mDisplaySymptoms.get(position);
         if (displaySymptom != null) {
             holder.bind(displaySymptom, v -> {
-                if (!displaySymptom.getHighlight()) {
+                if (displaySymptom.getNotConfirmedUserSymptom() == null) {
                     mDisplaySymptomClickListener.onClick(displaySymptom);
                 }
             });
@@ -65,27 +65,8 @@ final class SymptomsAdapter
     final void setData (@NonNull final List<DisplaySymptom> displaySymptoms) {
         final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomDiffUtilCallBack(displaySymptoms, mDisplaySymptoms));
         diffResult.dispatchUpdatesTo(this);
-        mDisplaySymptoms = displaySymptoms;
-    }
-
-    final void order () {
-        final List<DisplaySymptom> newDisplaySymptoms = new ArrayList<>(mDisplaySymptoms);
-        Collections.sort(
-                newDisplaySymptoms,
-                (o1, o2) -> {
-                    long difference = o2.getUserSymptomCount() - o1.getUserSymptomCount();
-                    if (difference < 0) {
-                        return -1;
-                    } else if (difference > 0) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
-                });
-        final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DisplaySymptomDiffUtilCallBack(newDisplaySymptoms, mDisplaySymptoms));
-        diffResult.dispatchUpdatesTo(this);
         mDisplaySymptoms.clear();
-        mDisplaySymptoms.addAll(newDisplaySymptoms);
+        mDisplaySymptoms.addAll(displaySymptoms);
     }
 
     static final class SymptomViewHolder
@@ -134,19 +115,14 @@ final class SymptomsAdapter
 
         @Override
         public boolean areItemsTheSame (int oldItemPosition, int newItemPosition) {
-            return mNewList.get(newItemPosition).getSymptomId().equals(mOldList.get(oldItemPosition).getSymptomId());
+            return mNewList.get(newItemPosition).equals(mOldList.get(oldItemPosition));
         }
 
         @Override
         public boolean areContentsTheSame (int oldItemPosition, int newItemPosition) {
             final DisplaySymptom newItem = mNewList.get(newItemPosition);
             final DisplaySymptom oldItem = mOldList.get(newItemPosition);
-            return newItem.getSymptomId().equals(oldItem.getSymptomId()) &&
-                    newItem.getSymptomName().equals(oldItem.getSymptomName()) &&
-                    newItem.getUserSymptomCount() == oldItem.getUserSymptomCount() &&
-                    (newItem.getLastDate() == null ? oldItem.getLastDate() == null : newItem.getLastDate().equals(oldItem.getLastDate())) &&
-                    (newItem.getLastLatitude() == null ? oldItem.getLastLatitude() == null : newItem.getLastLatitude().equals(oldItem.getLastLatitude())) &&
-                    (newItem.getLastLongitude() == null ? oldItem.getLastLongitude() == null : newItem.getLastLongitude().equals(oldItem.getLastLongitude()));
+            return newItem.equals(oldItem);
         }
     }
 }

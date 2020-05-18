@@ -60,33 +60,19 @@ public final class DisplaySymptomGroup
 
     long getUserSymptomCount () {
         long userSymptomCount = 0;
-        for(DisplaySymptom displaySymptom : mDisplaySymptoms){
+        for (DisplaySymptom displaySymptom : mDisplaySymptoms) {
             userSymptomCount += displaySymptom.getUserSymptomCount();
         }
         return userSymptomCount;
     }
 
     @Override
-    public boolean equals (Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        DisplaySymptomGroup that = (DisplaySymptomGroup) o;
-        return mSelected == that.mSelected &&
-                mSymptomGroupName.equals(that.mSymptomGroupName) &&
-                mDisplaySymptoms.equals(that.mDisplaySymptoms);
-    }
-
-    @Override
-    public int hashCode () {
-        return Objects.hash(mSymptomGroupName, mDisplaySymptoms, mSelected);
-    }
-
-    @Override
     public String toString () {
         return "DisplaySymptomGroup{" +
+                ", mSymptomGroupId=" + mSymptomGroupId +
                 ", mSymptomGroupName='" + mSymptomGroupName + '\'' +
-                ", mDisplaySymptoms=" + mDisplaySymptoms +
                 ", mSelected=" + mSelected +
+                ", mDisplaySymptoms=" + mDisplaySymptoms +
                 '}';
     }
 }

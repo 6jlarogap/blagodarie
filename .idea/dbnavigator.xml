@@ -43,7 +43,12 @@ SELECT SUM(lus.symptoms_count)
           LEFT JOIN tbl_symptom s ON s.id = lus.symptom_id
           WHERE s.group_id = 1;
 
-select * from tbl_last_user_symptom ;]]></console>
+select * from tbl_last_user_symptom ;
+
+select MAX(STRFTIME('%s',SUBSTR(timestamp, 0, INSTR(timestamp,'+'))))
+from tbl_last_user_symptom;
+
+SELECT strftime('%s','2004-01-01 02:34:56.983');;]]></console>
     </connection>
   </component>
   <component name="DBNavigator.Project.DatabaseFileManager">

@@ -38,6 +38,10 @@ public abstract class BaseEntity {
         return this.Id;
     }
 
+    final void setId (@NonNull final Identifier id) {
+        Id = id;
+    }
+
     @NonNull
     @Override
     public String toString () {

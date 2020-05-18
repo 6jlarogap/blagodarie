@@ -42,6 +42,7 @@ import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.sync.SyncService;
 import org.blagodarie.ui.update.UpdateActivity;
+import org.blagodatie.database.Identifier;
 import org.blagodatie.database.Symptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
 import org.blagodatie.database.UserSymptom;
@@ -147,26 +148,33 @@ public final class SymptomsActivity
                 //создать отображаемые группы
                 final List<DisplaySymptomGroup> newDisplaySymptomGroups = createDisplaySymptomGroups(newSymptomCatalog);
 
-                //запомнить выбранную группу
-                final DisplaySymptomGroup selectedGroup = mViewModel.getSelectedDisplaySymptomGroup();
+                //запомнить идентификатор выбранной группы
+                final Identifier selectedGroupId = mViewModel.getSelectedSymptomGroupId();
 
                 //задать новые данные
                 mViewModel.setDisplaySymptomGroups(newDisplaySymptomGroups);
 
                 //загрузить последние пользовательские данные о симптомах
                 mViewModel.loadLastValues(mIncognitoId, () -> {
+                    orderSymptomCatalog();
                     //восстановить выбранную группу
                     if (mViewModel.getDisplaySymptomGroups().size() > 0) {
-                        //если существует выбранная группа, и она присутствует в новом списке
-                        if (selectedGroup != null && mViewModel.getDisplaySymptomGroups().contains(selectedGroup)) {
-                            //выделить ее
-                            showSymptomsForGroup(selectedGroup);
-                        } else {
-                            //иначе выбрать первую
-                            showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(0));
+                        //по-умолчанию выделить первую группу
+                        int selectedGroupIndex = 0;
+
+                        //если существует идентификатор выбранной группы
+                        if (selectedGroupId != null) {
+                            //найти группу с выбранным идентификатором в новом списке
+                            for (int i = 0; i < mViewModel.getDisplaySymptomGroups().size() && selectedGroupIndex == 0; i++) {
+                                if (mViewModel.getDisplaySymptomGroups().get(i).getSymptomGroupId().equals(selectedGroupId)) {
+                                    selectedGroupIndex = i;
+                                }
+                            }
                         }
+
+                        //показать симптомы для выбранной группы
+                        showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(selectedGroupIndex));
                     }
-                    orderSymptomCatalog();
                 });
             }
         }
@@ -207,8 +215,9 @@ public final class SymptomsActivity
     }
 
     private void orderSymptomGroups () {
+        mViewModel.orderDisplaySymptomGroups();
         if (mSymptomGroupsAdapter != null) {
-            mSymptomGroupsAdapter.order();
+            mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
         }
         if (mActivityBinding.rvSymptomGroups.getLayoutManager() != null) {
             mActivityBinding.rvSymptomGroups.getLayoutManager().scrollToPosition(0);
@@ -216,8 +225,9 @@ public final class SymptomsActivity
     }
 
     private void orderSymptoms () {
+        mViewModel.orderDisplaySymptoms();
         if (mSymptomsAdapter != null) {
-            mSymptomsAdapter.order();
+            mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
         }
         if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
             mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
@@ -231,11 +241,17 @@ public final class SymptomsActivity
     }
 
     @Override
+    protected void onStop () {
+        Log.d(TAG, "onStop");
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy () {
         Log.d(TAG, "onDestroy");
-        super.onDestroy();
         mDisposables.dispose();
         unregisterReceiver(mSyncErrorReceiver);
+        super.onDestroy();
     }
 
     private List<DisplaySymptomGroup> createDisplaySymptomGroups (
@@ -261,7 +277,25 @@ public final class SymptomsActivity
         Log.d(TAG, "createDisplaySymptoms");
         final List<DisplaySymptom> displaySymptoms = new ArrayList<>();
         for (Symptom symptom : symptoms) {
-            displaySymptoms.add(new DisplaySymptom(symptom.getId(), symptom.getName(), mRepository.isHaveNotSyncedUserSymptoms(mIncognitoId, symptom.getId())));
+            displaySymptoms.add(
+                    new DisplaySymptom(
+                            symptom,
+                            mRepository.isHaveNotSyncedUserSymptoms(mIncognitoId, symptom.getId()),
+                            mRepository.getLatestUserSymptom(mIncognitoId, symptom.getId()),
+                            new DisplaySymptom.UnconfirmedUserSymptomListener() {
+                                @Override
+                                public void onConfirm (@NonNull final DisplaySymptom displaySymptom) {
+                                    updateLastUserSymptom(displaySymptom);
+                                    getAuthTokenAndRequestSync();
+                                }
+
+                                @Override
+                                public void onCancel (@NonNull final UserSymptom canceledUserSymptom) {
+                                    deleteNotConfirmedUserSymptom(canceledUserSymptom);
+                                }
+                            }
+                    )
+            );
         }
         return displaySymptoms;
     }
@@ -338,32 +372,49 @@ public final class SymptomsActivity
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
         final Date currentDate = new Date();
-        final Double latitude = mViewModel.getCurrentLatitude().get();
-        final Double longitude = mViewModel.getCurrentLongitude().get();
 
         final UserSymptom userSymptom = new UserSymptom(
                 mIncognitoId,
                 displaySymptom.getSymptomId(),
                 currentDate,
-                latitude,
-                longitude);
+                null,
+                null);
 
-        mDisposables.add(
-                Completable.
-                        fromAction(() ->
-                                mRepository.insertUserSymptom(userSymptom)
-                        ).
-                        subscribeOn(Schedulers.io()).
-                        observeOn(AndroidSchedulers.mainThread()).
-                        subscribe(() -> {
-                            displaySymptom.setLastDate(currentDate);
-                            displaySymptom.setLastLatitude(latitude);
-                            displaySymptom.setLastLongitude(longitude);
-                            displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
-                            displaySymptom.setHaveNotSynced(true);
-                            getAuthTokenAndRequestSync();
-                        })
-        );
+        Completable.
+                fromAction(() -> mRepository.insertUserSymptomAndSetId(userSymptom)).
+                subscribeOn(Schedulers.io()).
+                observeOn(AndroidSchedulers.mainThread()).
+                subscribe();
+    }
+
+    private void deleteNotConfirmedUserSymptom (
+            @NonNull final UserSymptom canceledUserSymptom
+    ) {
+        Log.d(TAG, "deleteNotConfirmedUserSymptom canceledUserSymptom=" + canceledUserSymptom);
+        Completable.
+                fromAction(() -> mRepository.deleteUserSymptom(canceledUserSymptom)).
+                subscribeOn(Schedulers.io()).
+                observeOn(AndroidSchedulers.mainThread()).
+                subscribe();
+    }
+
+    private void updateLastUserSymptom (
+            @NonNull final DisplaySymptom displaySymptom
+    ) {
+        Log.d(TAG, "updateLastUserSymptom displaySymptom=" + displaySymptom);
+        final UserSymptom userSymptom = displaySymptom.getNotConfirmedUserSymptom();
+        if (userSymptom != null) {
+            mDisposables.add(
+                    Completable.
+                            fromAction(() -> mRepository.updateLastUserSymptom(userSymptom)).
+                            subscribeOn(Schedulers.io()).
+                            observeOn(AndroidSchedulers.mainThread()).
+                            subscribe(() -> {
+                                displaySymptom.setLastDate(userSymptom.getTimestamp());
+                                displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
+                            })
+            );
+        }
     }
 
     private void getAuthTokenAndRequestSync () {
@@ -441,7 +492,7 @@ public final class SymptomsActivity
                         subscribe(
                                 apiResult -> {
                                     if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
-                                        showUpdateVersionDialog(apiResult.getVersionName(), apiResult.getUri());
+                                        showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), apiResult.getVersionName(), apiResult.getUri(), apiResult.getGooglePlayUri());
                                     }
                                 },
                                 throwable -> {
@@ -452,15 +503,17 @@ public final class SymptomsActivity
     }
 
     private void showUpdateVersionDialog (
+            final boolean googlePlayUpdate,
             @NonNull final String versionName,
-            @NonNull final Uri latestVersionUri
+            @NonNull final Uri latestVersionUri,
+            @NonNull final Uri googlePlayUri
     ) {
         Log.d(TAG, "showUpdateVersionDialog");
         new AlertDialog.
                 Builder(this).
                 setTitle(R.string.info_msg_update_available).
                 setMessage(String.format(getString(R.string.qstn_want_load_new_version), versionName)).
-                setPositiveButton(R.string.btn_update, (dialog, which) -> toUpdate(versionName, latestVersionUri)).
+                setPositiveButton(R.string.btn_update, (dialog, which) -> toUpdate(googlePlayUpdate, versionName, latestVersionUri, googlePlayUri)).
                 setNegativeButton(R.string.btn_finish, (dialog, which) -> {
                     if (!BuildConfig.DEBUG) {
                         finish();
@@ -472,11 +525,19 @@ public final class SymptomsActivity
     }
 
     private void toUpdate (
+            final boolean googlePlayUpdate,
             @NonNull final String versionName,
-            @NonNull final Uri latestVersionUri
+            @NonNull final Uri latestVersionUri,
+            @NonNull final Uri googlePlayUri
     ) {
-        Log.d(TAG, "toUpdate versionName=" + versionName + "; latestVersionUri=" + latestVersionUri);
-        startActivity(UpdateActivity.createSelfIntent(this, versionName, latestVersionUri));
+        Log.d(TAG, "toUpdate googlePlayUpdate=" + googlePlayUpdate + "; versionName=" + versionName + "; latestVersionUri=" + latestVersionUri + "; googlePlayUri=" + googlePlayUri);
+        if (googlePlayUpdate) {
+            final Intent i = new Intent(Intent.ACTION_VIEW);
+            i.setData(googlePlayUri);
+            startActivity(i);
+        } else {
+            startActivity(UpdateActivity.createSelfIntent(this, versionName, latestVersionUri));
+        }
         finish();
     }
 

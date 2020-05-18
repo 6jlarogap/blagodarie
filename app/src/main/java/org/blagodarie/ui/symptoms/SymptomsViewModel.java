@@ -1,22 +1,24 @@
 package org.blagodarie.ui.symptoms;
 
 import android.app.Application;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.util.Pair;
-import androidx.databinding.ObservableField;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
 import org.blagodarie.Repository;
+import org.blagodatie.database.Identifier;
 import org.blagodatie.database.LastUserSymptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,11 +35,7 @@ import io.reactivex.schedulers.Schedulers;
 public final class SymptomsViewModel
         extends AndroidViewModel {
 
-    @NonNull
-    private final ObservableField<Double> mCurrentLatitude = new ObservableField<>();
-
-    @NonNull
-    private final ObservableField<Double> mCurrentLongitude = new ObservableField<>();
+    private static final String TAG = SymptomsViewModel.class.getSimpleName();
 
     @NonNull
     private List<DisplaySymptomGroup> mDisplaySymptomGroups = new ArrayList<>();
@@ -64,6 +62,7 @@ public final class SymptomsViewModel
 
     @Override
     protected final void onCleared () {
+        Log.d(TAG, "onCleared");
         mDisposables.dispose();
         super.onCleared();
     }
@@ -73,7 +72,7 @@ public final class SymptomsViewModel
             @NonNull final Action action
     ) {
         final Collection<DisplaySymptom> allDisplaySymptoms = new ArrayList<>();
-        for(DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups){
+        for (DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups) {
             allDisplaySymptoms.addAll(displaySymptomGroup.getDisplaySymptoms());
         }
 
@@ -109,10 +108,10 @@ public final class SymptomsViewModel
     }
 
     @Nullable
-    final DisplaySymptomGroup getSelectedDisplaySymptomGroup () {
+    final Identifier getSelectedSymptomGroupId () {
         for (DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups) {
             if (displaySymptomGroup.isSelected()) {
-                return displaySymptomGroup;
+                return displaySymptomGroup.getSymptomGroupId();
             }
         }
         return null;
@@ -133,22 +132,42 @@ public final class SymptomsViewModel
     }
 
     @NonNull
-    public final ObservableField<Double> getCurrentLatitude () {
-        return mCurrentLatitude;
-    }
-
-    @NonNull
-    public final ObservableField<Double> getCurrentLongitude () {
-        return mCurrentLongitude;
-    }
-
-    @NonNull
     List<SymptomGroupWithSymptoms> getSymptomCatalog () {
         return mSymptomCatalog;
     }
 
-    void setSymptomCatalog (@NonNull final List<SymptomGroupWithSymptoms> symptomCatalog) {
+    final void setSymptomCatalog (@NonNull final List<SymptomGroupWithSymptoms> symptomCatalog) {
         mSymptomCatalog = symptomCatalog;
+    }
+
+    final void orderDisplaySymptoms () {
+        Collections.sort(
+                mDisplaySymptoms,
+                (o1, o2) -> {
+                    long difference = o2.getUserSymptomCount() - o1.getUserSymptomCount();
+                    if (difference < 0) {
+                        return -1;
+                    } else if (difference > 0) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                });
+    }
+
+    final void orderDisplaySymptomGroups () {
+        Collections.sort(
+                mDisplaySymptomGroups,
+                (o1, o2) -> {
+                    long difference = o2.getUserSymptomCount() - o1.getUserSymptomCount();
+                    if (difference < 0) {
+                        return -1;
+                    } else if (difference > 0) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                });
     }
 
     static final class Factory

@@ -1,5 +1,6 @@
 package org.blagodatie.database;
 
+import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
 import androidx.room.Delete;
@@ -17,8 +18,15 @@ public interface UserSymptomDao {
     @Insert
     long insert (final UserSymptom userSymptom);
 
+    default void insertAndSetId (@NonNull final UserSymptom userSymptom) {
+        userSymptom.setId(Identifier.newInstance(insert(userSymptom)));
+    }
+
     @Update
     void update (final Collection<UserSymptom> userSymptom);
+
+    @Delete
+    void delete (final UserSymptom userSymptom);
 
     @Delete
     void delete (final Collection<UserSymptom> userSymptoms);
@@ -34,8 +42,15 @@ public interface UserSymptomDao {
             "AND incognito_id = :incognitoId")
     LiveData<Boolean> isHaveNotSynced (final UUID incognitoId, final Identifier symptomId);
 
-    @Query ("UPDATE tbl_user_symptom " +
-            "SET incognito_id = :incognitoId " +
-            "WHERE incognito_id = 'null'")
-    void setupIncognitoId (final UUID incognitoId);
+    @Query ("SELECT * " +
+            "FROM tbl_user_symptom " +
+            "WHERE symptom_id = :symptomId " +
+            "AND incognito_id = :incognitoId " +
+            "AND STRFTIME('%s',SUBSTR(timestamp, 0, INSTR(timestamp,'+'))) = " +
+            "                (SELECT MAX(STRFTIME('%s',SUBSTR(timestamp, 0, INSTR(timestamp,'+')))) " +
+            "                 FROM tbl_user_symptom " +
+            "                 WHERE symptom_id = :symptomId " +
+            "                 AND incognito_id = :incognitoId)")
+    LiveData<UserSymptom> getLatestUserSymptom (final UUID incognitoId, final Identifier symptomId);
+
 }

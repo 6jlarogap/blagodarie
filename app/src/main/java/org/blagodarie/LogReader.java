@@ -36,6 +36,8 @@ public final class LogReader {
                     "SymptomsActivity:D",
                     "MigrationKeeper:D",
                     "GreetingActivity:D",
+                    "DisplaySymptom:D",
+                    "SymptomsViewModel:D",
             });
             BufferedReader br = new BufferedReader(new InputStreamReader(logcat.getInputStream()), 4 * 1024);
             String line;

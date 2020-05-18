@@ -12,6 +12,7 @@
     <string name="btn_finish">Завершить</string>
     <string name="btn_next">Далее</string>
     <string name="btn_cancel">Отмена</string>
+    <string name="btn_to_cancel">Отменить</string>
     <string name="btn_wait">Подождать</string>
     <string name="btn_send">Отправить</string>
     <string name="btn_copy">Скопировать</string>

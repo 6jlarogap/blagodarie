@@ -9,6 +9,7 @@ import androidx.room.Ignore;
 import androidx.room.Index;
 
 import java.util.Date;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -113,6 +114,23 @@ public final class UserSymptom
     @Nullable
     public final Double getLongitude () {
         return Longitude;
+    }
+
+    @Override
+    public boolean equals (Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UserSymptom that = (UserSymptom) o;
+        return IncognitoId.equals(that.IncognitoId) &&
+                SymptomId.equals(that.SymptomId) &&
+                Timestamp.equals(that.Timestamp) &&
+                Objects.equals(Latitude, that.Latitude) &&
+                Objects.equals(Longitude, that.Longitude);
+    }
+
+    @Override
+    public int hashCode () {
+        return Objects.hash(IncognitoId, SymptomId, Timestamp, Latitude, Longitude);
     }
 
     @NonNull

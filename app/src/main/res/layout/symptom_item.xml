@@ -5,7 +5,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="5dp"
-        android:background="@{DisplaySymptom.highlight ? @android:color/holo_green_light : @android:color/white}">
+        android:background="@{DisplaySymptom.notConfirmedUserSymptom == null ? @android:color/white : @android:color/holo_green_light}">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -63,19 +63,12 @@
                     android:layout_margin="5dp"
                     android:orientation="vertical">
 
-                    <TextView
+                    <androidx.appcompat.widget.AppCompatButton
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@{String.format(@string/latitude, DisplaySymptom.lastLatitude)}"
-                        android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                        android:visibility="@{DisplaySymptom.lastLatitude != 0 ? View.VISIBLE : View.GONE}" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@{String.format(@string/longitude, DisplaySymptom.lastLongitude)}"
-                        android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                        android:visibility="@{DisplaySymptom.lastLongitude != 0 ? View.VISIBLE : View.GONE}" />
+                        android:onClick="@{() -> DisplaySymptom.cancelUnconfirmedUserSymptom()}"
+                        android:text="@string/btn_to_cancel"
+                        android:visibility="@{DisplaySymptom.notConfirmedUserSymptom == null ? View.GONE : View.VISIBLE}" />
 
                 </LinearLayout>
 
