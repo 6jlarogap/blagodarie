@@ -82,7 +82,7 @@ class GetLatestVersionExecutor
             final String responseBody = response.body().string();
             final JSONObject rootJSON = new JSONObject(responseBody);
             final boolean googlePlayUpdate = rootJSON.getBoolean("google_play_update");
-            final int versionCode = 100500;//rootJSON.getInt("version_code");
+            final int versionCode = rootJSON.getInt("version_code");
             final String versionName = rootJSON.getString("version_name");
             final String url = rootJSON.getString("url");
             final String googlePlayUrl = rootJSON.getString("google_play_url");
