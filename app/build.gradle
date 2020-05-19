@@ -10,7 +10,7 @@ android {
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 33
+        versionCode 34
         versionName "0.3.11"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
