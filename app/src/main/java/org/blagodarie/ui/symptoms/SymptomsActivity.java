@@ -54,9 +54,11 @@ import java.util.List;
 import java.util.UUID;
 
 import io.reactivex.Completable;
+import io.reactivex.CompletableObserver;
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 
 /**
@@ -249,7 +251,6 @@ public final class SymptomsActivity
     @Override
     protected void onDestroy () {
         Log.d(TAG, "onDestroy");
-        mDisposables.dispose();
         unregisterReceiver(mSyncErrorReceiver);
         super.onDestroy();
     }
@@ -404,16 +405,27 @@ public final class SymptomsActivity
         Log.d(TAG, "updateLastUserSymptom displaySymptom=" + displaySymptom);
         final UserSymptom userSymptom = displaySymptom.getNotConfirmedUserSymptom();
         if (userSymptom != null) {
-            mDisposables.add(
-                    Completable.
-                            fromAction(() -> mRepository.updateLastUserSymptom(userSymptom)).
-                            subscribeOn(Schedulers.io()).
-                            observeOn(AndroidSchedulers.mainThread()).
-                            subscribe(() -> {
-                                displaySymptom.setLastDate(userSymptom.getTimestamp());
-                                displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
-                            })
-            );
+            Completable.
+                    fromAction(() -> mRepository.updateLastUserSymptom(userSymptom)).
+                    subscribeOn(Schedulers.io()).
+                    observeOn(AndroidSchedulers.mainThread()).
+                    subscribe(new CompletableObserver() {
+                        @Override
+                        public void onSubscribe (Disposable d) {
+
+                        }
+
+                        @Override
+                        public void onComplete () {
+                            displaySymptom.setLastDate(userSymptom.getTimestamp());
+                            displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
+                        }
+
+                        @Override
+                        public void onError (Throwable e) {
+
+                        }
+                    });
         }
     }
 
