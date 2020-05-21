@@ -6,19 +6,35 @@ android {
 
     def APPLICATION_ID = "org.blagodarie"
 
+    def CONTENT_PROVIDER_AUTHORITIES = ".content.provider"
+    def FILE_PROVIDER_AUTHORITIES = ".file.provider"
+
     defaultConfig {
+
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 34
-        versionName "0.3.11"
+        versionCode 35
+        versionName "0.3.12"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
+/*
+        //files authority
+        def filesAuthorityValue = applicationId + ".file.provider"
+        manifestPlaceholders = [filesAuthority: filesAuthorityValue]
+        buildConfigField("String",
+                "FILES_AUTHORITY",
+                "\"${filesAuthorityValue}\"")
+
+        //content authority
+        def contentAuthorityValue = applicationId + ".content.provider"
+        manifestPlaceholders = [contentAuthority: contentAuthorityValue]
+        buildConfigField("String",
+                "CONTENT_AUTHORITY",
+                "\"${contentAuthorityValue}\"")*/
     }
 
     buildTypes {
-        def CONTENT_PROVIDER_AUTHORITIES = ".content.provider"
-        def FILE_PROVIDER_AUTHORITIES = ".file.provider"
 
         release {
             minifyEnabled true
