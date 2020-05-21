@@ -441,7 +441,7 @@ public final class SymptomsActivity
                         Bundle bundle = future.getResult();
                         if (bundle != null) {
                             final String authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN);
-                            BlagodarieApp.requestSync(mAccount, authToken, getString(R.string.content_provider_authorities));
+                            BlagodarieApp.requestSync(mAccount, authToken, BuildConfig.CONTENT_AUTHORITY);
                         }
                     } catch (AuthenticatorException | IOException | OperationCanceledException e) {
                         e.printStackTrace();

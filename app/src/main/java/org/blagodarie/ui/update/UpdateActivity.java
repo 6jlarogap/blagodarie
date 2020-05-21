@@ -15,6 +15,7 @@ import androidx.core.content.FileProvider;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
 
+import org.blagodarie.BuildConfig;
 import org.blagodarie.R;
 import org.blagodarie.databinding.UpdateActivityBinding;
 
@@ -92,7 +93,7 @@ public final class UpdateActivity
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             Uri contentUri = FileProvider.getUriForFile(
                     this,
-                    getString(R.string.file_provider_authorities),
+                    BuildConfig.FILES_AUTHORITY,
                     new File(destination)
             );
             final Intent install = new Intent(Intent.ACTION_VIEW);

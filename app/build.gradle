@@ -6,9 +6,6 @@ android {
 
     def APPLICATION_ID = "org.blagodarie"
 
-    def CONTENT_PROVIDER_AUTHORITIES = ".content.provider"
-    def FILE_PROVIDER_AUTHORITIES = ".file.provider"
-
     defaultConfig {
 
         applicationId APPLICATION_ID
@@ -18,20 +15,7 @@ android {
         versionName "0.3.12"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
-/*
-        //files authority
-        def filesAuthorityValue = applicationId + ".file.provider"
-        manifestPlaceholders = [filesAuthority: filesAuthorityValue]
-        buildConfigField("String",
-                "FILES_AUTHORITY",
-                "\"${filesAuthorityValue}\"")
 
-        //content authority
-        def contentAuthorityValue = applicationId + ".content.provider"
-        manifestPlaceholders = [contentAuthority: contentAuthorityValue]
-        buildConfigField("String",
-                "CONTENT_AUTHORITY",
-                "\"${contentAuthorityValue}\"")*/
     }
 
     buildTypes {
@@ -39,16 +23,28 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            resValue "string", "content_provider_authorities", "${APPLICATION_ID}${CONTENT_PROVIDER_AUTHORITIES}"
-            resValue "string", "file_provider_authorities", "${APPLICATION_ID}${FILE_PROVIDER_AUTHORITIES}"
+
+            //files authority
+            def filesAuthorityValue = "${APPLICATION_ID}.files"
+            //content authority
+            def contentAuthorityValue = "${APPLICATION_ID}.content"
+            manifestPlaceholders = [filesAuthority: filesAuthorityValue, contentAuthority: contentAuthorityValue]
+            buildConfigField("String", "FILES_AUTHORITY", "\"${filesAuthorityValue}\"")
+            buildConfigField("String", "CONTENT_AUTHORITY", "\"${contentAuthorityValue}\"")
         }
         debug {
             debuggable true
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             applicationIdSuffix ".dbg"
-            resValue "string", "content_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${CONTENT_PROVIDER_AUTHORITIES}"
-            resValue "string", "file_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${FILE_PROVIDER_AUTHORITIES}"
+
+            //files authority
+            def filesAuthorityValue = "${APPLICATION_ID}${applicationIdSuffix}.files"
+            //content authority
+            def contentAuthorityValue = "${APPLICATION_ID}${applicationIdSuffix}.content"
+            manifestPlaceholders = [filesAuthority: filesAuthorityValue, contentAuthority: contentAuthorityValue]
+            buildConfigField("String", "FILES_AUTHORITY", "\"${filesAuthorityValue}\"")
+            buildConfigField("String", "CONTENT_AUTHORITY", "\"${contentAuthorityValue}\"")
         }
     }
 

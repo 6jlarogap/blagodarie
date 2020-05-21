@@ -66,7 +66,7 @@
 
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="@string/file_provider_authorities"
+            android:authorities="${filesAuthority}"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
@@ -76,7 +76,7 @@
 
         <provider
             android:name="org.blagodarie.sync.StubProvider"
-            android:authorities="@string/content_provider_authorities"
+            android:authorities="${contentAuthority}"
             android:exported="false"
             android:syncable="true" />
 
