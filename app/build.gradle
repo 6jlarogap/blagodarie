@@ -10,7 +10,6 @@ android {
     def FILE_PROVIDER_AUTHORITIES = ".file.provider"
 
     defaultConfig {
-
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
@@ -18,20 +17,6 @@ android {
         versionName "0.3.12"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
-/*
-        //files authority
-        def filesAuthorityValue = applicationId + ".file.provider"
-        manifestPlaceholders = [filesAuthority: filesAuthorityValue]
-        buildConfigField("String",
-                "FILES_AUTHORITY",
-                "\"${filesAuthorityValue}\"")
-
-        //content authority
-        def contentAuthorityValue = applicationId + ".content.provider"
-        manifestPlaceholders = [contentAuthority: contentAuthorityValue]
-        buildConfigField("String",
-                "CONTENT_AUTHORITY",
-                "\"${contentAuthorityValue}\"")*/
     }
 
     buildTypes {
