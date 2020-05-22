@@ -120,7 +120,7 @@ final class GetLatestVersionExecutor
             final boolean googlePlayUpdate = rootJSON.getBoolean("google_play_update");
             final int versionCode = rootJSON.getInt("version_code");
             final String versionNameString = rootJSON.getString("version_name");
-            final ApiResult.VersionName versionName = new ApiResult.VersionName(versionNameString);
+            final ApiResult.VersionName versionName = new ApiResult.VersionName(versionNameString.replaceAll("-dbg", ""));
             final String url = rootJSON.getString("url");
             final String googlePlayUrl = rootJSON.getString("google_play_url");
             apiResult = new ApiResult(googlePlayUpdate, versionName, versionCode, Uri.parse(url), Uri.parse(googlePlayUrl));
