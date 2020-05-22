@@ -95,8 +95,8 @@ public final class SplashActivity
         final AlertDialog alertDialog = new AlertDialog.
                 Builder(this).
                 setView(binding.getRoot()).
-                setPositiveButton(R.string.btn_copy, null).
-                setNegativeButton(R.string.btn_delete, (dialog, which) -> {
+                setNegativeButton(R.string.btn_copy, null).
+                setPositiveButton(R.string.btn_delete, (dialog, which) -> {
                     Intent intent = new Intent(Intent.ACTION_DELETE);
                     intent.setData(Uri.parse("package:" + getApplicationContext().getPackageName()));
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -108,7 +108,7 @@ public final class SplashActivity
 
         alertDialog.show();
 
-        alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+        alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
             final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
             final ClipData clip = ClipData.newPlainText(getString(R.string.txt_incognito_id), incognitoId);
             clipboard.setPrimaryClip(clip);
