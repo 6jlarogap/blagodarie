@@ -5,7 +5,6 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import org.blagodarie.BuildConfig;
 import org.blagodarie.server.ServerApiExecutor;
 import org.json.JSONObject;
 
@@ -16,7 +15,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-class GetLatestVersionExecutor
+final class GetLatestVersionExecutor
         implements ServerApiExecutor<GetLatestVersionExecutor.ApiResult> {
 
     private static final String TAG = GetLatestVersionExecutor.class.getSimpleName();
@@ -36,9 +35,9 @@ class GetLatestVersionExecutor
                 final Matcher matcher = pattern.matcher(versionName);
                 if (matcher.matches()) {
                     final String[] versionNameSegments = versionName.split("\\.");
-                    MajorSegment = Integer.valueOf(versionNameSegments[0]);
-                    MiddleSegment = Integer.valueOf(versionNameSegments[1]);
-                    MinorSegment = Integer.valueOf(versionNameSegments[2]);
+                    MajorSegment = Integer.parseInt(versionNameSegments[0]);
+                    MiddleSegment = Integer.parseInt(versionNameSegments[1]);
+                    MinorSegment = Integer.parseInt(versionNameSegments[2]);
                 } else {
                     throw new IllegalArgumentException("Incorrect version name string: " + versionName);
                 }
@@ -121,7 +120,7 @@ class GetLatestVersionExecutor
             final boolean googlePlayUpdate = rootJSON.getBoolean("google_play_update");
             final int versionCode = rootJSON.getInt("version_code");
             final String versionNameString = rootJSON.getString("version_name");
-            final ApiResult.VersionName versionName = new ApiResult.VersionName(versionNameString.replaceAll("-dbg", ""));
+            final ApiResult.VersionName versionName = new ApiResult.VersionName(versionNameString);
             final String url = rootJSON.getString("url");
             final String googlePlayUrl = rootJSON.getString("google_play_url");
             apiResult = new ApiResult(googlePlayUpdate, versionName, versionCode, Uri.parse(url), Uri.parse(googlePlayUrl));
