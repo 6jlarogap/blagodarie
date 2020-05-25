@@ -5,6 +5,7 @@ import android.accounts.AccountManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
@@ -72,20 +73,29 @@ public final class GreetingActivity
             }
         }
 
-        new AlertDialog.
+        final AlertDialog alertDialog = new AlertDialog.
                 Builder(this).
                 setView(view).
+                setNeutralButton(R.string.btn_back, null).
+                setNegativeButton(R.string.btn_paste, null).
                 setPositiveButton(R.string.btn_continue, (dialog, which) -> {
                     final String incognitoIdString = ((EditText) view.findViewById(R.id.etIncognitoId)).getText().toString();
                     try {
                         final UUID incognitoId = UUID.fromString(incognitoIdString);
                         addNewAccount(getString(R.string.account_type), true, incognitoId.toString());
                     } catch (IllegalArgumentException e) {
-                        Toast.makeText(this, getString(R.string.err_msg_incorrect_incognito_id) + e.getLocalizedMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, getString(R.string.err_msg_incorrect_incognito_id), Toast.LENGTH_SHORT).show();
                     }
                 }).
-                create().
-                show();
+                create();
+
+        alertDialog.show();
+
+        alertDialog.getButton(DialogInterface.BUTTON_NEGATIVE).setOnClickListener(v -> {
+            final ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+            final String bufferString = item.getText().toString();
+            ((EditText) view.findViewById(R.id.etIncognitoId)).setText(bufferString);
+        });
     }
 
     public static Intent createSelfIntent (

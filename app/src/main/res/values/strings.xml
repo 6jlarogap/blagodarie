@@ -12,14 +12,16 @@
     <string name="btn_finish">Завершить</string>
     <string name="btn_next">Далее</string>
     <string name="btn_cancel">Отмена</string>
+    <string name="btn_back">Назад</string>
     <string name="btn_to_cancel">Отменить</string>
     <string name="btn_wait">Подождать</string>
     <string name="btn_send">Отправить</string>
     <string name="btn_copy">Скопировать</string>
+    <string name="btn_paste">Вставить</string>
     <string name="btn_share">Поделится</string>
     <string name="btn_delete">Удалить</string>
     <string name="btn_i_have_incognito_id">У меня есть ключ</string>
-    <string name="btn_new_incognito_id">Новый ключ</string>
+    <string name="btn_new_incognito_id">Новый пользователь</string>
     <string name="btn_continue">Продолжить</string>
     <!---->
 
@@ -58,5 +60,5 @@
     <string name="txt_incognito_symptoms">Анонимные ощущения</string>
     <string name="txt_authorization_required">Необходима авторизация</string>
     <string name="location_explanation">Местоположение покажет какой стороной в момент ощущения Земля повёрнута к Солнцу, Луне и другим планетам. Для анонимности кооринаты смещаются в случайном направлении в радиусе до 600 метров.</string>
-    <string name="incogito_id">Уникальный идентификатор пользователя</string>
+    <string name="incognito_id">Уникальный идентификатор пользователя</string>
 </resources>

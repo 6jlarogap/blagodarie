@@ -10,6 +10,6 @@
         android:layout_height="wrap_content"
         android:importantForAutofill="no"
         android:inputType="text"
-        android:hint="@string/incogito_id"/>
+        android:hint="@string/incognito_id"/>
 
 </com.google.android.material.textfield.TextInputLayout>
