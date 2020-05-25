@@ -150,7 +150,7 @@ public final class SymptomsViewModel
                     } else if (difference > 0) {
                         return 1;
                     } else {
-                        return 0;
+                        return o1.getSymptomName().compareTo(o2.getSymptomName());
                     }
                 });
     }
@@ -165,7 +165,7 @@ public final class SymptomsViewModel
                     } else if (difference > 0) {
                         return 1;
                     } else {
-                        return 0;
+                        return o1.getSymptomGroupName().compareTo(o2.getSymptomGroupName());
                     }
                 });
     }
