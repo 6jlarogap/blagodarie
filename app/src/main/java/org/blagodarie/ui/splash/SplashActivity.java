@@ -7,6 +7,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Spannable;
@@ -108,6 +109,7 @@ public final class SplashActivity
 
         alertDialog.show();
 
+        alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.rgb(255, 50, 50));
         alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
             final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
             final ClipData clip = ClipData.newPlainText(getString(R.string.txt_incognito_id), incognitoId);
