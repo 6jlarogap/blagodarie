@@ -23,6 +23,7 @@ public final class Authenticator
     private static final String TAG = Authenticator.class.getSimpleName();
 
     public static final String OPTION_IS_INCOGNITO_USER = "org.blagodarie.authentication.Authenticator.isIncognitoUser";
+    public static final String OPTION_INCOGNITO_ID = "org.blagodarie.authentication.Authenticator.incognitoId";
 
     @NonNull
     private final Context mContext;
@@ -57,7 +58,9 @@ public final class Authenticator
             final AccountManager accountManager = AccountManager.get(mContext);
             final Account account = new Account(accountName, mContext.getString(R.string.account_type));
             final Bundle userData = new Bundle();
-            userData.putString(AccountGeneral.USER_DATA_INCOGNITO_ID, UUID.randomUUID().toString());
+            final String incognitoIdString = options.getString(OPTION_INCOGNITO_ID);
+            final UUID incognitoId = incognitoIdString == null ? UUID.randomUUID() : UUID.fromString(incognitoIdString);
+            userData.putString(AccountGeneral.USER_DATA_INCOGNITO_ID, incognitoId.toString());
             accountManager.addAccountExplicitly(account, "", userData);
             return null;
         } else {

@@ -6,8 +6,8 @@ package org.blagodarie.ui.greeting;
  */
 public interface GreetingUserActionListener {
 
-    void toSymptomsActivity ();
+    void createNewIncognitoId ();
 
-    void showIncognitoIdDialog ();
+    void enterExistingIncognitoId ();
 
 }
