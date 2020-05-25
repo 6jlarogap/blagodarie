@@ -55,7 +55,7 @@
     <string name="empty_location_alert">Местоположение еще не определено</string>
     <string name="add_symptom_without_location">Желаете отправить сообщение без местоположения?</string>
     <string name="error_server_connection">Ошибка связи с сервером</string>
-    <string name="txt_hello">Братья и сёстры, здравия и мира вашим домам! Приложение \"Благодарие\" позволяет отмечать и прогнозировать периодические ухудшения и улучшения самочувствия.</string>
+    <string name="txt_hello">Здравия и мира вашим домам! Приложение \"Благодарие\" позволяет отмечать и прогнозировать периодические ухудшения и улучшения самочувствия.\nПользуйтесь на здоровье!</string>
     <string name="txt_incognito_id"><u>Анонимный ключ</u></string>
     <string name="txt_incognito_symptoms">Анонимные ощущения</string>
     <string name="txt_authorization_required">Необходима авторизация</string>
