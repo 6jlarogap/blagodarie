@@ -54,9 +54,11 @@ import java.util.List;
 import java.util.UUID;
 
 import io.reactivex.Completable;
+import io.reactivex.CompletableObserver;
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 
 /**
@@ -249,7 +251,6 @@ public final class SymptomsActivity
     @Override
     protected void onDestroy () {
         Log.d(TAG, "onDestroy");
-        mDisposables.dispose();
         unregisterReceiver(mSyncErrorReceiver);
         super.onDestroy();
     }
@@ -404,16 +405,27 @@ public final class SymptomsActivity
         Log.d(TAG, "updateLastUserSymptom displaySymptom=" + displaySymptom);
         final UserSymptom userSymptom = displaySymptom.getNotConfirmedUserSymptom();
         if (userSymptom != null) {
-            mDisposables.add(
-                    Completable.
-                            fromAction(() -> mRepository.updateLastUserSymptom(userSymptom)).
-                            subscribeOn(Schedulers.io()).
-                            observeOn(AndroidSchedulers.mainThread()).
-                            subscribe(() -> {
-                                displaySymptom.setLastDate(userSymptom.getTimestamp());
-                                displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
-                            })
-            );
+            Completable.
+                    fromAction(() -> mRepository.updateLastUserSymptom(userSymptom)).
+                    subscribeOn(Schedulers.io()).
+                    observeOn(AndroidSchedulers.mainThread()).
+                    subscribe(new CompletableObserver() {
+                        @Override
+                        public void onSubscribe (Disposable d) {
+
+                        }
+
+                        @Override
+                        public void onComplete () {
+                            displaySymptom.setLastDate(userSymptom.getTimestamp());
+                            displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
+                        }
+
+                        @Override
+                        public void onError (Throwable e) {
+
+                        }
+                    });
         }
     }
 
@@ -491,20 +503,34 @@ public final class SymptomsActivity
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(
                                 apiResult -> {
-                                    if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
+                                    if (isNeedMandatoryUpdate(apiResult)) {
                                         showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), apiResult.getVersionName(), apiResult.getUri(), apiResult.getGooglePlayUri());
                                     }
                                 },
                                 throwable -> {
-                                    Log.e(TAG, "chechLatestVersion error=" + throwable);
+                                    Log.e(TAG, "checkLatestVersion error=" + throwable);
                                     Toast.makeText(this, R.string.error_server_connection, Toast.LENGTH_LONG).show();
-                                })
+                                }
+                        )
         );
+    }
+
+    private boolean isNeedMandatoryUpdate (@NonNull final GetLatestVersionExecutor.ApiResult apiResult) {
+        boolean needUpdate = false;
+        if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
+            final GetLatestVersionExecutor.ApiResult.VersionName currentVersionName = new GetLatestVersionExecutor.ApiResult.VersionName(BuildConfig.VERSION_NAME.replace("-dbg", ""));
+            if (currentVersionName.MajorSegment < apiResult.getVersionName().MajorSegment ||
+                    (currentVersionName.MajorSegment == apiResult.getVersionName().MajorSegment &&
+                            currentVersionName.MiddleSegment < apiResult.getVersionName().MiddleSegment)) {
+                needUpdate = true;
+            }
+        }
+        return needUpdate;
     }
 
     private void showUpdateVersionDialog (
             final boolean googlePlayUpdate,
-            @NonNull final String versionName,
+            @NonNull final GetLatestVersionExecutor.ApiResult.VersionName versionName,
             @NonNull final Uri latestVersionUri,
             @NonNull final Uri googlePlayUri
     ) {
@@ -526,7 +552,7 @@ public final class SymptomsActivity
 
     private void toUpdate (
             final boolean googlePlayUpdate,
-            @NonNull final String versionName,
+            @NonNull final GetLatestVersionExecutor.ApiResult.VersionName versionName,
             @NonNull final Uri latestVersionUri,
             @NonNull final Uri googlePlayUri
     ) {
@@ -536,7 +562,7 @@ public final class SymptomsActivity
             i.setData(googlePlayUri);
             startActivity(i);
         } else {
-            startActivity(UpdateActivity.createSelfIntent(this, versionName, latestVersionUri));
+            startActivity(UpdateActivity.createSelfIntent(this, versionName.toString(), latestVersionUri));
         }
         finish();
     }
