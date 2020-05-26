@@ -30,7 +30,7 @@ public final class UserSymptomSyncer {
 
     private static final String TAG = UserSymptomSyncer.class.getSimpleName();
 
-    public static final long USER_SYMPTOM_CONFIRMATION_TIME = 4000L;
+    public static final long USER_SYMPTOM_CONFIRMATION_TIME = 30000L;
 
     private static final String USER_SYMPTOM_JSON_PATTERN = "{\"symptom_id\":%s,\"timestamp\":%d,\"timezone\":\"%s\",\"latitude\":%f,\"longitude\":%f}";
 

@@ -6,32 +6,30 @@ android {
 
     def APPLICATION_ID = "org.blagodarie"
 
-    def CONTENT_PROVIDER_AUTHORITIES = ".content.provider"
-    def FILE_PROVIDER_AUTHORITIES = ".file.provider"
-
     defaultConfig {
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 37
-        versionName "0.4.0"
+        versionCode 33
+        versionName "0.3.10"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
     }
 
     buildTypes {
+        def CONTENT_PROVIDER_AUTHORITIES = ".content.provider"
+        def FILE_PROVIDER_AUTHORITIES = ".file.provider"
 
         release {
-            minifyEnabled true
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             resValue "string", "content_provider_authorities", "${APPLICATION_ID}${CONTENT_PROVIDER_AUTHORITIES}"
             resValue "string", "file_provider_authorities", "${APPLICATION_ID}${FILE_PROVIDER_AUTHORITIES}"
         }
         debug {
             debuggable true
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             applicationIdSuffix ".dbg"
+            versionNameSuffix "-dbg"
             resValue "string", "content_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${CONTENT_PROVIDER_AUTHORITIES}"
             resValue "string", "file_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${FILE_PROVIDER_AUTHORITIES}"
         }
@@ -50,13 +48,13 @@ android {
                     def distDir = "/latest"
 
                     def dbgSuffix = ""
-                    if (buildType.name == "debug") {
+                    if(buildType.name == "debug") {
                         dbgSuffix = "-dbg"
                     }
 
                     //скопировать apk в latest
                     copy {
-                        from("${projectDir}\\${buildType.name}\\${outputFileName}") {
+                        from ("${projectDir}\\${buildType.name}\\${outputFileName}"){
                             rename '.*', "blagodarie${dbgSuffix}-latest.apk"
                         }
                         into "${distDir}${dbgSuffix}"
@@ -64,7 +62,7 @@ android {
 
                     //скопировать output.json в latest
                     copy {
-                        from("${projectDir}\\${buildType.name}\\output.json") {
+                        from ("${projectDir}\\${buildType.name}\\output.json"){
                             rename '.*', "output.json"
                         }
                         into "${distDir}${dbgSuffix}"
@@ -93,10 +91,10 @@ dependencies {
 
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation "androidx.cardview:cardview:1.0.0"
-    implementation "androidx.constraintlayout:constraintlayout:2.0.0-beta6"
+    implementation "androidx.constraintlayout:constraintlayout:2.0.0-beta4"
     implementation 'androidx.recyclerview:recyclerview:1.1.0'
-    implementation "androidx.navigation:navigation-dynamic-features-fragment:2.3.0-alpha06"
-    implementation "androidx.navigation:navigation-fragment:2.3.0-alpha06"
+    implementation "androidx.navigation:navigation-dynamic-features-fragment:2.3.0-alpha05"
+    implementation "androidx.navigation:navigation-fragment:2.3.0-alpha05"
     implementation "androidx.room:room-runtime:2.2.5"
 
     implementation 'com.android.support:multidex:1.0.3'

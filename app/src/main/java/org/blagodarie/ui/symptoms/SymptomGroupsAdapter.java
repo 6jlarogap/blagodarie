@@ -15,7 +15,7 @@ import org.blagodarie.databinding.SymptomGroupItemBinding;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class SymptomGroupsAdapter
+public class SymptomGroupsAdapter
         extends RecyclerView.Adapter<SymptomGroupsAdapter.SymptomGroupViewHolder> {
 
     @NonNull
