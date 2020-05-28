@@ -21,13 +21,30 @@ import androidx.databinding.DataBindingUtil;
 import androidx.fragment.app.Fragment;
 
 import org.blagodarie.authentication.databinding.IncognitoSignUpFragmentBinding;
+import org.blagodarie.server.ServerApiExecutor;
+import org.blagodarie.server.ServerConnector;
+import org.json.JSONException;
+import org.json.JSONObject;
 
+import java.io.IOException;
 import java.util.UUID;
 
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.schedulers.Schedulers;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
 import static android.app.Activity.RESULT_OK;
+import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
 public final class IncognitoSignUpFragment
         extends Fragment {
+
+    private static final String TAG = IncognitoSignUpFragment.class.getSimpleName();
 
     public interface IncognitoSignUpUserAction {
 
@@ -37,7 +54,75 @@ public final class IncognitoSignUpFragment
 
     }
 
-    private static final String TAG = IncognitoSignUpFragment.class.getSimpleName();
+    public static final class IncognitoSignUpExecutor
+            implements ServerApiExecutor<IncognitoSignUpExecutor.ApiResult> {
+
+        private static final String TAG = IncognitoSignUpExecutor.class.getSimpleName();
+
+        public static final class ApiResult
+                extends ServerApiExecutor.ApiResult {
+
+            @NonNull
+            private final Long mUserId;
+
+            ApiResult (
+                    @NonNull final Long userId
+            ) {
+                mUserId = userId;
+            }
+
+            @NonNull
+            public Long getUserId () {
+                return mUserId;
+            }
+        }
+
+        private static final String JSON_PATTERN = "{\"incognito\":{\"private_key\":\"%s\",\"public_key\":\"%s\"}}";
+
+        @NonNull
+        private final String mIncognitoPrivateKey;
+
+        @NonNull
+        private final String mIncognitoPublicKey;
+
+        public IncognitoSignUpExecutor (
+                @NonNull final String incognitoPrivateKey,
+                @NonNull final String incognitoPublicKey
+        ) {
+            mIncognitoPrivateKey = incognitoPrivateKey;
+            mIncognitoPublicKey = incognitoPublicKey;
+        }
+
+        @Override
+        public IncognitoSignUpExecutor.ApiResult execute (
+                @NonNull final String apiBaseUrl,
+                @NonNull final OkHttpClient okHttpClient
+        ) throws JSONException, IOException {
+            Log.d(TAG, "execute");
+            Long userId = null;
+            final String content = String.format(JSON_PATTERN, mIncognitoPrivateKey, mIncognitoPublicKey);
+            Log.d(TAG, "content=" + content);
+            final RequestBody body = RequestBody.create(JSON_TYPE, content);
+            final Request request = new Request.Builder()
+                    .url(apiBaseUrl + "auth/signup/incognito")
+                    .post(body)
+                    .build();
+            final Response response = okHttpClient.newCall(request).execute();
+            Log.d(TAG, "response.code=" + response.code());
+            if (response.body() != null) {
+                final String responseBody = response.body().string();
+                Log.d(TAG, "responseBody=" + responseBody);
+                if (response.code() == 200) {
+                    final JSONObject userJSON = new JSONObject(responseBody);
+                    userId = userJSON.getLong("incognito_user_id");
+                }
+            }
+            return new IncognitoSignUpExecutor.ApiResult(userId);
+
+        }
+    }
+
+    private CompositeDisposable mDisposables = new CompositeDisposable();
 
     @Override
     public View onCreateView (
@@ -50,7 +135,7 @@ public final class IncognitoSignUpFragment
         binding.setIncognitoSignUpUserActionListener(new IncognitoSignUpUserAction() {
             @Override
             public void createNewIncognitoId () {
-                createIncognitoAccount(UUID.randomUUID());
+                startSignUp(UUID.randomUUID(), UUID.randomUUID());
             }
 
             @Override
@@ -87,7 +172,7 @@ public final class IncognitoSignUpFragment
                     final String incognitoIdString = ((EditText) view.findViewById(R.id.etIncognitoId)).getText().toString();
                     try {
                         final UUID incognitoId = UUID.fromString(incognitoIdString);
-                        createIncognitoAccount(incognitoId);
+                        startSignUp(incognitoId, UUID.randomUUID());
                     } catch (IllegalArgumentException e) {
                         Toast.makeText(requireContext(), getString(R.string.err_msg_incorrect_incognito_id), Toast.LENGTH_SHORT).show();
                     }
@@ -103,21 +188,43 @@ public final class IncognitoSignUpFragment
         });
     }
 
+    private void startSignUp (
+            @NonNull final UUID incognitoPrivateKey,
+            @NonNull final UUID incognitoPublicKey
+    ) {
+        Log.d(TAG, "startSignUp");
+        final ServerConnector serverConnector = new ServerConnector(requireContext());
+        final IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpExecutor(incognitoPrivateKey.toString(), incognitoPublicKey.toString());
+        mDisposables.add(
+                Observable.
+                        fromCallable(() -> serverConnector.execute(signUpExecutor)).
+                        subscribeOn(Schedulers.io()).
+                        observeOn(AndroidSchedulers.mainThread()).
+                        subscribe(
+                                apiResult -> createIncognitoAccount(incognitoPrivateKey, incognitoPublicKey, apiResult.getUserId()),
+                                throwable -> Toast.makeText(requireActivity(), throwable.getMessage(), Toast.LENGTH_LONG).show()
+                        )
+        );
+    }
+
     private void createIncognitoAccount (
-            @NonNull final UUID incognitoPrivateKey
+            @NonNull final UUID incognitoPrivateKey,
+            @NonNull final UUID incognitoPublicKey,
+            @NonNull final Long userId
     ) {
         Log.d(TAG, "createAccount");
         final String accountName = getString(R.string.incognito_account_name);
         final AccountManager accountManager = AccountManager.get(getContext());
         final Account account = new Account(accountName, getString(R.string.account_type));
         final Bundle userData = new Bundle();
+        userData.putString(AccountGeneral.USER_DATA_USER_ID, userId.toString());
         userData.putString(AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY, incognitoPrivateKey.toString());
+        userData.putString(AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, incognitoPublicKey.toString());
         accountManager.addAccountExplicitly(account, "", userData);
 
         final Bundle bundle = new Bundle();
         bundle.putString(AccountManager.KEY_ACCOUNT_NAME, accountName);
         bundle.putString(AccountManager.KEY_ACCOUNT_TYPE, getString(R.string.account_type));
-        //bundle.putString(AccountManager.KEY_AUTHTOKEN, authToken);
         final Intent res = new Intent();
         res.putExtras(bundle);
 

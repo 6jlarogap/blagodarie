@@ -37,6 +37,7 @@ import org.blagodarie.R;
 import org.blagodarie.Repository;
 import org.blagodarie.UnauthorizedException;
 import org.blagodarie.authentication.AccountGeneral;
+import org.blagodarie.authentication.IncognitoSignUpFragment;
 import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
@@ -453,8 +454,40 @@ public final class SymptomsActivity
 
     public void onLinkClick (final View view) {
         Log.d(TAG, "onLinkClick");
+        final String incognitoPublicKey = mAccountManager.getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY);
+        if (incognitoPublicKey != null) {
+            openWebsite(incognitoPublicKey);
+        } else {
+            //TODO: временный костыль
+            createIncognitoPublicKey();
+        }
+    }
+
+    private void createIncognitoPublicKey () {
+        Log.d(TAG, "createIncognitoPublicKey");
+        final String newIncognitoPublicKey = UUID.randomUUID().toString();
+        final ServerConnector serverConnector = new ServerConnector(this);
+        final IncognitoSignUpFragment.IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpFragment.IncognitoSignUpExecutor(mIncognitoId.toString(), newIncognitoPublicKey);
+        mDisposables.add(
+                Observable.
+                        fromCallable(() -> serverConnector.execute(signUpExecutor)).
+                        subscribeOn(Schedulers.io()).
+                        observeOn(AndroidSchedulers.mainThread()).
+                        subscribe(
+                                apiResult -> {
+                                    openWebsite(newIncognitoPublicKey);
+                                    mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_USER_ID, apiResult.getUserId().toString());
+                                    mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, newIncognitoPublicKey);
+                                },
+                                throwable -> Toast.makeText(this, throwable.getMessage(), Toast.LENGTH_LONG).show()
+                        )
+        );
+    }
+
+    private void openWebsite (@NonNull final String incognitoPublicKey) {
+        Log.d(TAG, "openWebsite");
         final Intent i = new Intent(Intent.ACTION_VIEW);
-        i.setData(Uri.parse(getString(R.string.website_url)));
+        i.setData(Uri.parse(String.format(getString(R.string.website_url), incognitoPublicKey)));
         startActivity(i);
     }
 
