@@ -11,8 +11,6 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import java.util.UUID;
-
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/raw/master/LICENSE License
@@ -23,7 +21,6 @@ public final class Authenticator
     private static final String TAG = Authenticator.class.getSimpleName();
 
     public static final String OPTION_IS_INCOGNITO_USER = "org.blagodarie.authentication.Authenticator.isIncognitoUser";
-    public static final String OPTION_INCOGNITO_ID = "org.blagodarie.authentication.Authenticator.incognitoId";
 
     @NonNull
     private final Context mContext;
