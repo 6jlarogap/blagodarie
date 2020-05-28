@@ -326,7 +326,7 @@ public final class SymptomsActivity
             Log.d(TAG, "account=" + mAccount);
 
             //получить анонимный ключ
-            final String incognitoId = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_ID);
+            final String incognitoId = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY);
             //если анонимного ключа не существует
             if (incognitoId != null) {
                 //попытаться преобразовать строку в UUID

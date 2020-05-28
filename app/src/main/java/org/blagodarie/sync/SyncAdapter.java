@@ -43,7 +43,7 @@ public final class SyncAdapter
     ) {
         Log.d(TAG, "onPerformSync");
         final String authToken = extras.getString(AccountManager.KEY_AUTHTOKEN);
-        final UUID incognitoId = UUID.fromString(AccountManager.get(getContext()).getUserData(account, AccountGeneral.USER_DATA_INCOGNITO_ID));
+        final UUID incognitoId = UUID.fromString(AccountManager.get(getContext()).getUserData(account, AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY));
         try {
             syncAll(incognitoId, authToken);
         } catch (JSONException | IOException  e) {

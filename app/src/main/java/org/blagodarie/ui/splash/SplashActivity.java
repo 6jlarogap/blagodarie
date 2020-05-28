@@ -14,7 +14,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import org.blagodarie.R;
 import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.authentication.Authenticator;
-import org.blagodarie.ui.greeting.GreetingActivity;
 import org.blagodarie.ui.symptoms.SymptomsActivity;
 
 import java.util.Arrays;
@@ -62,8 +61,26 @@ public final class SplashActivity
         } else if (accounts.length > 1) {
             showAccountPicker(accounts);
         } else {
-            toGreetingActivity();
+            addNewAccount(accountType, true);
         }
+    }
+
+    private void addNewAccount (
+            @NonNull final String accountType,
+            final boolean isIncognitoAccount
+    ) {
+        Log.d(TAG, "addNewAccount accountType=" + accountType);
+        Bundle bundle = new Bundle();
+        bundle.putBoolean(Authenticator.OPTION_IS_INCOGNITO_USER, isIncognitoAccount);
+        mAccountManager.addAccount(
+                accountType,
+                getString(R.string.token_type),
+                null,
+                bundle,
+                this,
+                future -> chooseAccount(),
+                null
+        );
     }
 
     private void showAccountPicker (
@@ -94,12 +111,6 @@ public final class SplashActivity
     ) {
         Log.d(TAG, "toSymptomsActivity account=" + account);
         startActivity(SymptomsActivity.createSelfIntent(this, account));
-        finish();
-    }
-
-    private void toGreetingActivity () {
-        Log.d(TAG, "toGreetingActivity");
-        startActivity(GreetingActivity.createSelfIntent(this));
         finish();
     }
 

@@ -53,23 +53,11 @@ public final class Authenticator
             final Bundle options
     ) {
         Log.d(TAG, "addAccount");
-        if (options.getBoolean(OPTION_IS_INCOGNITO_USER, false)) {
-            final String accountName = mContext.getString(R.string.incognito_account_name);
-            final AccountManager accountManager = AccountManager.get(mContext);
-            final Account account = new Account(accountName, mContext.getString(R.string.account_type));
-            final Bundle userData = new Bundle();
-            final String incognitoIdString = options.getString(OPTION_INCOGNITO_ID);
-            final UUID incognitoId = incognitoIdString == null ? UUID.randomUUID() : UUID.fromString(incognitoIdString);
-            userData.putString(AccountGeneral.USER_DATA_INCOGNITO_ID, incognitoId.toString());
-            accountManager.addAccountExplicitly(account, "", userData);
-            return null;
-        } else {
-            final Intent intent = AuthenticationActivity.createSelfIntent(mContext, accountType, response);
-            final Bundle bundle = new Bundle();
-            bundle.putAll(options);
-            bundle.putParcelable(AccountManager.KEY_INTENT, intent);
-            return bundle;
-        }
+        final Intent intent = AuthenticationActivity.createSelfIntent(mContext, accountType, response);
+        final Bundle bundle = new Bundle();
+        bundle.putAll(options);
+        bundle.putParcelable(AccountManager.KEY_INTENT, intent);
+        return bundle;
     }
 
     @Override

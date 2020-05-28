@@ -35,7 +35,8 @@ public final class AuthenticationActivity
     private static final String TAG = AuthenticationActivity.class.getSimpleName();
 
     private static final String EXTRA_ACCOUNT_TYPE = "org.blagodarie.authentication.ACCOUNT_TYPE";
-    static final String EXTRA_USER_ID = "org.blagodarie.authentication.USER_ID";
+    private static final String EXTRA_USER_ID = "org.blagodarie.authentication.USER_ID";
+    private static final String EXTRA_IS_INCOGNITO_USER = "org.blagodarie.authentication.IS_INCOGNITO_USER";
 
     static final int ACTIVITY_REQUEST_CODE_GOGGLE_SIGN_IN = 1;
 
@@ -68,7 +69,11 @@ public final class AuthenticationActivity
                 Toast.makeText(this, R.string.one_account_only, Toast.LENGTH_LONG).show();
                 finish();
             } else {
-                toGreeting();
+                if (getIntent().getBooleanExtra(EXTRA_IS_INCOGNITO_USER, false)) {
+                    toIncognitoSignUp();
+                } else {
+                    toGreeting();
+                }
             }
         }
 
@@ -110,7 +115,8 @@ public final class AuthenticationActivity
     ) {
         Log.d(TAG, "createSelfIntent");
         final Intent intent = new Intent(context, AuthenticationActivity.class);
-        intent.putExtra(AuthenticationActivity.EXTRA_ACCOUNT_TYPE, accountType);
+        intent.putExtra(EXTRA_ACCOUNT_TYPE, accountType);
+        intent.putExtra(EXTRA_IS_INCOGNITO_USER, true);
         intent.putExtra(AccountManager.KEY_ACCOUNT_AUTHENTICATOR_RESPONSE, response);
         return intent;
     }
@@ -158,6 +164,11 @@ public final class AuthenticationActivity
         mNavController.navigate(R.id.action_startFragment_to_greetingFragment);
     }
 
+    void toIncognitoSignUp () {
+        Log.d(TAG, "toIncognitoSignUp");
+        mNavController.navigate(R.id.action_startFragment_to_incognitoSignUpFragment);
+    }
+
     void toSignIn () {
         Log.d(TAG, "toSignIn");
         final long badUserId = Long.MIN_VALUE;
@@ -165,8 +176,8 @@ public final class AuthenticationActivity
         if (userId != badUserId) {
             final NavDirections action = StartFragmentDirections.actionStartFragmentToSignInFragment(userId);
             mNavController.navigate(action);
-        } else{
-            Toast.makeText(this, R.string.error_bad_user_id,Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, R.string.error_bad_user_id, Toast.LENGTH_SHORT).show();
             finish();
         }
     }

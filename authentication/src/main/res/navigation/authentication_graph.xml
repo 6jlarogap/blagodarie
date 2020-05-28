@@ -23,6 +23,9 @@
         <action
             android:id="@+id/action_startFragment_to_signInFragment"
             app:destination="@id/signInFragment" />
+        <action
+            android:id="@+id/action_startFragment_to_incognitoSignUpFragment"
+            app:destination="@id/incognitoSignUpFragment" />
     </fragment>
     <fragment
         android:id="@+id/signInFragment"
@@ -36,4 +39,8 @@
         android:id="@+id/signUpFragment"
         android:name="org.blagodarie.authentication.SignUpFragment"
         android:label="SignUpFragment" />
+    <fragment
+        android:id="@+id/incognitoSignUpFragment"
+        android:name="org.blagodarie.authentication.IncognitoSignUpFragment"
+        android:label="IncognitoSignUpFragment" />
 </navigation>

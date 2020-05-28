@@ -24,13 +24,13 @@
             <androidx.appcompat.widget.AppCompatButton
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:onClick="@{() -> GreetingUserActionListener.enterExistingIncognitoId()}"
+                android:onClick="@{() -> IncognitoSignUpUserActionListener.enterExistingIncognitoId()}"
                 android:text="@string/btn_i_have_incognito_id" />
 
             <Button
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:onClick="@{() -> GreetingUserActionListener.createNewIncognitoId()}"
+                android:onClick="@{() -> IncognitoSignUpUserActionListener.createNewIncognitoId()}"
                 android:text="@string/btn_new_incognito_id" />
 
         </LinearLayout>
@@ -40,8 +40,8 @@
     <data>
 
         <variable
-            name="GreetingUserActionListener"
-            type="org.blagodarie.ui.greeting.GreetingUserActionListener" />
+            name="IncognitoSignUpUserActionListener"
+            type="org.blagodarie.authentication.IncognitoSignUpFragment.IncognitoSignUpUserAction" />
     </data>
 
 </layout>
