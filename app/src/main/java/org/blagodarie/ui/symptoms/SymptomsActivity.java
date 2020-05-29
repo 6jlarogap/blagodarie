@@ -116,6 +116,8 @@ public final class SymptomsActivity
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
+        registerReceiver(mSyncErrorReceiver, new IntentFilter(SyncService.ACTION_SYNC_EXCEPTION));
+
         //попытаться инициализировать данные пользователя
         final String initUserDataErrorMessage = tryInitUserData();
         //если ошибок нет
@@ -133,8 +135,6 @@ public final class SymptomsActivity
                     this,
                     this::updateSymptomCatalogIfNeed
             );
-
-            registerReceiver(mSyncErrorReceiver, new IntentFilter(SyncService.ACTION_SYNC_EXCEPTION));
         } else {
             //иначе показать сообщение об ошибке и завершить Activity
             Toast.makeText(this, initUserDataErrorMessage, Toast.LENGTH_SHORT).show();
