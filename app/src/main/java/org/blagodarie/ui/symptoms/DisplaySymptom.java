@@ -28,6 +28,11 @@ public final class DisplaySymptom
 
     private static final String TAG = DisplaySymptom.class.getSimpleName();
 
+    /**
+     * Время подсветки сообщения в миллисекундах. В течении этого времени сообщение нельня еще раз отметить.
+     */
+    private static final long HIGHLIGHT_TIME = 30000L;
+
     interface UnconfirmedUserSymptomListener {
         void onConfirm (@NonNull final DisplaySymptom displaySymptom);
 
@@ -63,6 +68,11 @@ public final class DisplaySymptom
     private boolean mHaveNotSynced = false;
 
     /**
+     * Подсвечивать ли сообщение.
+     */
+    private boolean mHighlight = false;
+
+    /**
      * Слушатель подтверждения/отмены сообщения.
      */
     @NonNull
@@ -73,6 +83,12 @@ public final class DisplaySymptom
      */
     @Nullable
     private Timer mConfirmationTimer;
+
+    /**
+     * Таймер подсветки.
+     */
+    @Nullable
+    private Timer mHighlightTimer;
 
     public DisplaySymptom (
             @NonNull final Symptom symptom,
@@ -114,6 +130,7 @@ public final class DisplaySymptom
 
     final void setLastDate (@Nullable final Date lastDate) {
         mLastDate = lastDate;
+        highlightIfNeed();
         notifyPropertyChanged(org.blagodarie.BR.lastDate);
     }
 
@@ -141,6 +158,16 @@ public final class DisplaySymptom
         notifyPropertyChanged(org.blagodarie.BR.haveNotSynced);
     }
 
+    @Bindable
+    public final boolean isHighlight () {
+        return mHighlight;
+    }
+
+    private void setHighlight (boolean mHighlight) {
+        this.mHighlight = mHighlight;
+        notifyPropertyChanged(org.blagodarie.BR.highlight);
+    }
+
     /**
      * Запускает таймер подтверждения сообщения.
      *
@@ -151,6 +178,19 @@ public final class DisplaySymptom
         if (mConfirmationTimer == null) {
             mConfirmationTimer = new Timer();
             mConfirmationTimer.schedule(getConfirmationTask(), delay);
+        }
+    }
+
+    /**
+     * Запускает таймер подсветки сообщения.
+     *
+     * @param delay Время таймера.
+     */
+    private void startHighlightTimer (final long delay) {
+        Log.d(TAG, "startHighlightTimer");
+        if (mHighlightTimer == null) {
+            mHighlightTimer = new Timer();
+            mHighlightTimer.schedule(getHighlightTask(), delay);
         }
     }
 
@@ -183,9 +223,21 @@ public final class DisplaySymptom
             mUnconfirmedUserSymptom = notConfirmedUserSymptom;
             startConfirmationTimer(UserSymptomSyncer.USER_SYMPTOM_CONFIRMATION_TIME - howLongAgo);
         }
+        highlightIfNeed();
         notifyPropertyChanged(org.blagodarie.BR.notConfirmedUserSymptom);
         notifyPropertyChanged(org.blagodarie.BR.lastDate);
         notifyPropertyChanged(org.blagodarie.BR.userSymptomCount);
+    }
+
+    private void highlightIfNeed () {
+        final Date lastDate = getLastDate();
+        if (lastDate != null) {
+            final long howLongAgo = System.currentTimeMillis() - lastDate.getTime();
+            if (howLongAgo <= HIGHLIGHT_TIME) {
+                setHighlight(true);
+                startHighlightTimer(HIGHLIGHT_TIME - howLongAgo);
+            }
+        }
     }
 
     /**
@@ -204,9 +256,14 @@ public final class DisplaySymptom
     public final void cancelUnconfirmedUserSymptom () {
         Log.d(TAG, "cancelUnconfirmedUserSymptom");
         clearConfirmationTimer();
+
+        setHighlight(false);
+        clearHighlightTimer();
+
         if (mUnconfirmedUserSymptom != null) {
             mConfirmUserSymptomListener.onCancel(mUnconfirmedUserSymptom);
         }
+
         clearNotConfirmedUserSymptom();
     }
 
@@ -222,6 +279,17 @@ public final class DisplaySymptom
     }
 
     /**
+     * Очищает таймер подсветки.
+     */
+    private void clearHighlightTimer () {
+        Log.d(TAG, "clearHighlightTimer");
+        if (mHighlightTimer != null) {
+            mHighlightTimer.cancel();
+            mHighlightTimer = null;
+        }
+    }
+
+    /**
      * Создает задачу подтверждения.
      *
      * @return Задача подтверждения.
@@ -232,6 +300,21 @@ public final class DisplaySymptom
             @Override
             public void run () {
                 confirmUnconfirmedUserSymptom();
+            }
+        };
+    }
+
+    /**
+     * Создает задачу подтверждения.
+     *
+     * @return Задача подтверждения.
+     */
+    private TimerTask getHighlightTask () {
+        Log.d(TAG, "getHighlightTask");
+        return new TimerTask() {
+            @Override
+            public void run () {
+                setHighlight(false);
             }
         };
     }
@@ -259,6 +342,7 @@ public final class DisplaySymptom
         DisplaySymptom that = (DisplaySymptom) o;
         return mUserSymptomCount == that.mUserSymptomCount &&
                 mHaveNotSynced == that.mHaveNotSynced &&
+                mHighlight == that.mHighlight &&
                 mSymptom.equals(that.mSymptom) &&
                 Objects.equals(mLastDate, that.mLastDate) &&
                 Objects.equals(mUnconfirmedUserSymptom, that.mUnconfirmedUserSymptom);
@@ -271,7 +355,8 @@ public final class DisplaySymptom
                 mLastDate,
                 mUserSymptomCount,
                 mUnconfirmedUserSymptom,
-                mHaveNotSynced
+                mHaveNotSynced,
+                mHighlight
         );
     }
 
@@ -283,8 +368,10 @@ public final class DisplaySymptom
                 ", mUserSymptomCount=" + mUserSymptomCount +
                 ", mUnconfirmedUserSymptom=" + mUnconfirmedUserSymptom +
                 ", mHaveNotSynced=" + mHaveNotSynced +
+                ", mHighlight=" + mHighlight +
                 ", mConfirmUserSymptomListener=" + mConfirmUserSymptomListener +
                 ", mConfirmationTimer=" + mConfirmationTimer +
+                ", mHighlightTimer=" + mHighlightTimer +
                 '}';
     }
 }

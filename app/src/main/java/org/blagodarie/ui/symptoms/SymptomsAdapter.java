@@ -50,7 +50,7 @@ final class SymptomsAdapter
         final DisplaySymptom displaySymptom = mDisplaySymptoms.get(position);
         if (displaySymptom != null) {
             holder.bind(displaySymptom, v -> {
-                if (displaySymptom.getNotConfirmedUserSymptom() == null) {
+                if (!displaySymptom.isHighlight()) {
                     mDisplaySymptomClickListener.onClick(displaySymptom);
                 }
             });

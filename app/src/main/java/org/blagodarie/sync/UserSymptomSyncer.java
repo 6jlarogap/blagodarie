@@ -30,7 +30,10 @@ public final class UserSymptomSyncer {
 
     private static final String TAG = UserSymptomSyncer.class.getSimpleName();
 
-    public static final long USER_SYMPTOM_CONFIRMATION_TIME = 4000L;
+    /**
+     * Время подтверждения сообщения в миллисекундах. В течении этого времени сообщение можно отменить.
+     */
+    public static final long USER_SYMPTOM_CONFIRMATION_TIME = 3000L;
 
     private static final String USER_SYMPTOM_JSON_PATTERN = "{\"symptom_id\":%s,\"timestamp\":%d,\"timezone\":\"%s\",\"latitude\":%f,\"longitude\":%f}";
 
