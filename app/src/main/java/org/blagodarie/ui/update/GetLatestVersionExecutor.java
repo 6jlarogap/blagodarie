@@ -1,4 +1,4 @@
-package org.blagodarie.ui.symptoms;
+package org.blagodarie.ui.update;
 
 import android.net.Uri;
 import android.util.Log;
@@ -7,9 +7,6 @@ import androidx.annotation.NonNull;
 
 import org.blagodarie.server.ServerApiExecutor;
 import org.json.JSONObject;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -23,32 +20,6 @@ final class GetLatestVersionExecutor
     static final class ApiResult
             extends ServerApiExecutor.ApiResult {
 
-        static final class VersionName {
-
-            private static final String VERSION_NAME_PATTERN = "^\\d+\\.\\d+\\.\\d+$";
-            final int MajorSegment;
-            final int MiddleSegment;
-            final int MinorSegment;
-
-            VersionName (final String versionName) {
-                final Pattern pattern = Pattern.compile(VERSION_NAME_PATTERN);
-                final Matcher matcher = pattern.matcher(versionName);
-                if (matcher.matches()) {
-                    final String[] versionNameSegments = versionName.split("\\.");
-                    MajorSegment = Integer.parseInt(versionNameSegments[0]);
-                    MiddleSegment = Integer.parseInt(versionNameSegments[1]);
-                    MinorSegment = Integer.parseInt(versionNameSegments[2]);
-                } else {
-                    throw new IllegalArgumentException("Incorrect version name string: " + versionName);
-                }
-            }
-
-            @Override
-            public String toString () {
-                return MajorSegment + "." + MiddleSegment + "." + MinorSegment;
-            }
-        }
-
         private final boolean mGooglePlayUpdate;
 
         @NonNull
@@ -60,43 +31,54 @@ final class GetLatestVersionExecutor
         private final Uri mLatestVersionUri;
 
         @NonNull
-        private final Uri mGooglePlayUri;
+        private final Uri mPlayMarketUri;
 
         private ApiResult (
                 final boolean googlePlayUpdate,
                 @NonNull final VersionName versionName,
                 final int versionCode,
                 @NonNull final Uri latestVersionUri,
-                @NonNull final Uri googlePlayUri) {
+                @NonNull final Uri playMarketUri
+        ) {
             mGooglePlayUpdate = googlePlayUpdate;
             mVersionName = versionName;
             mVersionCode = versionCode;
             mLatestVersionUri = latestVersionUri;
-            mGooglePlayUri = googlePlayUri;
+            mPlayMarketUri = playMarketUri;
         }
 
         @NonNull
-        VersionName getVersionName () {
+        final VersionName getVersionName () {
             return mVersionName;
         }
 
-        @NonNull
-        Integer getVersionCode () {
+        final int getVersionCode () {
             return mVersionCode;
         }
 
         @NonNull
-        Uri getUri () {
+        final Uri getUri () {
             return mLatestVersionUri;
         }
 
-        boolean isGooglePlayUpdate () {
+        final boolean isGooglePlayUpdate () {
             return mGooglePlayUpdate;
         }
 
         @NonNull
-        Uri getGooglePlayUri () {
-            return mGooglePlayUri;
+        final Uri getPlayMarketUri () {
+            return mPlayMarketUri;
+        }
+
+        @Override
+        public String toString () {
+            return "ApiResult{" +
+                    "mGooglePlayUpdate=" + mGooglePlayUpdate +
+                    ", mVersionName=" + mVersionName +
+                    ", mVersionCode=" + mVersionCode +
+                    ", mLatestVersionUri=" + mLatestVersionUri +
+                    ", mPlayMarketUri=" + mPlayMarketUri +
+                    '}';
         }
     }
 
@@ -120,10 +102,10 @@ final class GetLatestVersionExecutor
             final boolean googlePlayUpdate = rootJSON.getBoolean("google_play_update");
             final int versionCode = rootJSON.getInt("version_code");
             final String versionNameString = rootJSON.getString("version_name");
-            final ApiResult.VersionName versionName = new ApiResult.VersionName(versionNameString.replaceAll("-dbg", ""));
+            final VersionName versionName = new VersionName(versionNameString.replaceAll("-dbg", ""));
             final String url = rootJSON.getString("url");
-            final String googlePlayUrl = rootJSON.getString("google_play_url");
-            apiResult = new ApiResult(googlePlayUpdate, versionName, versionCode, Uri.parse(url), Uri.parse(googlePlayUrl));
+            final String playMarketUri = rootJSON.getString("google_play_url");
+            apiResult = new ApiResult(googlePlayUpdate, versionName, versionCode, Uri.parse(url), Uri.parse(playMarketUri));
         }
         return apiResult;
     }

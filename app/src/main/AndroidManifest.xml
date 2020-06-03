@@ -44,7 +44,6 @@
             android:name=".ui.symptoms.SymptomsActivity"
             android:screenOrientation="portrait" />
         <activity android:name=".ui.update.UpdateActivity" />
-        <activity android:name=".ui.greeting.GreetingActivity" />
 
         <service android:name="org.blagodarie.authentication.AuthenticatorService">
             <intent-filter>

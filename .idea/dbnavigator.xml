@@ -23,15 +23,11 @@
     <autoscroll-to-editor value="false" />
     <autoscroll-from-editor value="true" />
     <show-object-properties value="true" />
-    <loaded-nodes>
-      <connection connection-id="f91f0ff1-0ff7-405d-8941-d801d45b43ed">
-        <schema name="main" object-types="column, index, dataset trigger, view, table, constraint" />
-      </connection>
-    </loaded-nodes>
+    <loaded-nodes />
   </component>
   <component name="DBNavigator.Project.DatabaseConsoleManager">
     <connection id="f91f0ff1-0ff7-405d-8941-d801d45b43ed">
-      <console name="Connection 1" type="STANDARD" schema="main" session="Main">SELECT * 
+      <console name="Connection 1" type="STANDARD" schema="main" session="Main"><![CDATA[SELECT * 
 FROM tbl_symptom_group sg
 WHERE EXISTS (SELECT * 
               FROM tbl_symptom s 
@@ -54,7 +50,7 @@ from tbl_last_user_symptom;
 
 SELECT strftime('%s','2004-01-01 02:34:56.983');;
 
-select instr('2020-04-30 07:56:02.000+0300','+');</console>
+select instr('2020-04-30 07:56:02.000+0300','+');]]></console>
     </connection>
   </component>
   <component name="DBNavigator.Project.DatabaseFileManager">

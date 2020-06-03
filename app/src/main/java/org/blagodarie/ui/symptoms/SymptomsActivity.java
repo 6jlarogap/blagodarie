@@ -24,7 +24,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -42,7 +41,7 @@ import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.sync.SyncService;
-import org.blagodarie.ui.update.UpdateActivity;
+import org.blagodarie.ui.update.UpdatingActivity;
 import org.blagodatie.database.Identifier;
 import org.blagodatie.database.Symptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
@@ -67,7 +66,7 @@ import io.reactivex.schedulers.Schedulers;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class SymptomsActivity
-        extends AppCompatActivity {
+        extends UpdatingActivity {
 
     private static final String TAG = SymptomsActivity.class.getSimpleName();
 
@@ -206,7 +205,6 @@ public final class SymptomsActivity
     public void onResume () {
         Log.d(TAG, "onResume");
         super.onResume();
-        checkLatestVersion();
         getAuthTokenAndRequestSync();
 
         orderSymptomCatalog();
@@ -523,81 +521,6 @@ public final class SymptomsActivity
                 });
         builder.create();
         builder.show();
-    }
-
-    private void checkLatestVersion () {
-        Log.d(TAG, "checkLatestVersion");
-        final ServerConnector serverConnector = new ServerConnector(this);
-        final GetLatestVersionExecutor getLatestVersionExecutor = new GetLatestVersionExecutor();
-        mDisposables.add(
-                Observable.
-                        fromCallable(() -> serverConnector.execute(getLatestVersionExecutor)).
-                        subscribeOn(Schedulers.io()).
-                        observeOn(AndroidSchedulers.mainThread()).
-                        subscribe(
-                                apiResult -> {
-                                    if (isNeedMandatoryUpdate(apiResult)) {
-                                        showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), apiResult.getVersionName(), apiResult.getUri(), apiResult.getGooglePlayUri());
-                                    }
-                                },
-                                throwable -> {
-                                    Log.e(TAG, "checkLatestVersion error=" + throwable);
-                                    Toast.makeText(this, R.string.error_server_connection, Toast.LENGTH_LONG).show();
-                                }
-                        )
-        );
-    }
-
-    private boolean isNeedMandatoryUpdate (@NonNull final GetLatestVersionExecutor.ApiResult apiResult) {
-        boolean needUpdate = false;
-        if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
-            final GetLatestVersionExecutor.ApiResult.VersionName currentVersionName = new GetLatestVersionExecutor.ApiResult.VersionName(BuildConfig.VERSION_NAME.replace("-dbg", ""));
-            if (currentVersionName.MajorSegment < apiResult.getVersionName().MajorSegment ||
-                    (currentVersionName.MajorSegment == apiResult.getVersionName().MajorSegment &&
-                            currentVersionName.MiddleSegment < apiResult.getVersionName().MiddleSegment)) {
-                needUpdate = true;
-            }
-        }
-        return needUpdate;
-    }
-
-    private void showUpdateVersionDialog (
-            final boolean googlePlayUpdate,
-            @NonNull final GetLatestVersionExecutor.ApiResult.VersionName versionName,
-            @NonNull final Uri latestVersionUri,
-            @NonNull final Uri googlePlayUri
-    ) {
-        Log.d(TAG, "showUpdateVersionDialog");
-        new AlertDialog.
-                Builder(this).
-                setTitle(R.string.info_msg_update_available).
-                setMessage(String.format(getString(R.string.qstn_want_load_new_version), versionName)).
-                setPositiveButton(R.string.btn_update, (dialog, which) -> toUpdate(googlePlayUpdate, versionName, latestVersionUri, googlePlayUri)).
-                setNegativeButton(R.string.btn_finish, (dialog, which) -> {
-                    if (!BuildConfig.DEBUG) {
-                        finish();
-                    }
-                }).
-                setCancelable(false).
-                create().
-                show();
-    }
-
-    private void toUpdate (
-            final boolean googlePlayUpdate,
-            @NonNull final GetLatestVersionExecutor.ApiResult.VersionName versionName,
-            @NonNull final Uri latestVersionUri,
-            @NonNull final Uri googlePlayUri
-    ) {
-        Log.d(TAG, "toUpdate googlePlayUpdate=" + googlePlayUpdate + "; versionName=" + versionName + "; latestVersionUri=" + latestVersionUri + "; googlePlayUri=" + googlePlayUri);
-        if (googlePlayUpdate) {
-            final Intent i = new Intent(Intent.ACTION_VIEW);
-            i.setData(googlePlayUri);
-            startActivity(i);
-        } else {
-            startActivity(UpdateActivity.createSelfIntent(this, versionName.toString(), latestVersionUri));
-        }
-        finish();
     }
 
     public static Intent createSelfIntent (

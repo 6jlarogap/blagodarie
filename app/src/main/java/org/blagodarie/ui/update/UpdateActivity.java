@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,6 +31,8 @@ public final class UpdateActivity
         extends AppCompatActivity
         implements UpdateManager.ProgressListener {
 
+    private static final String TAG = UpdateActivity.class.getSimpleName();
+
     private static final String FILE_BASE_PATH = "file://";
 
     private static final String EXTRA_LATEST_VERSION_NAME = "org.blagodarie.ui.update.LATEST_VERSION_NAME";
@@ -47,6 +50,7 @@ public final class UpdateActivity
 
     @Override
     protected void onCreate (@Nullable final Bundle savedInstanceState) {
+        Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
         mLatestVersionName = getIntent().getStringExtra(EXTRA_LATEST_VERSION_NAME);
@@ -75,6 +79,7 @@ public final class UpdateActivity
     }
 
     private void initViewModel () {
+        Log.d(TAG, "initViewModel");
         //создаем фабрику
         final UpdateViewModel.Factory factory = new UpdateViewModel.Factory(mLatestVersionName);
 
@@ -83,6 +88,7 @@ public final class UpdateActivity
     }
 
     private void startInstall () {
+        Log.d(TAG, "startInstall");
         final File externalFilesDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
         String destination = null;
         if (externalFilesDir != null) {
@@ -115,6 +121,7 @@ public final class UpdateActivity
     }
 
     private void showRepeatDialog () {
+        Log.d(TAG, "showRepeatDialog");
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.info_msg_download_failed);
         builder.setMessage(getString(R.string.qstn_want_repeat));
@@ -128,11 +135,12 @@ public final class UpdateActivity
         builder.show();
     }
 
-    public static Intent createSelfIntent (
+    static Intent createSelfIntent (
             @NonNull final Context context,
             @NonNull final String versionName,
             @NonNull final Uri latestVersionUri
     ) {
+        Log.d(TAG, "createSelfIntent");
         final Intent intent = new Intent(context, UpdateActivity.class);
         intent.putExtra(EXTRA_LATEST_VERSION_NAME, versionName);
         intent.putExtra(EXTRA_LATEST_VERSION_URI, latestVersionUri);
@@ -141,6 +149,7 @@ public final class UpdateActivity
 
     @Override
     public void onNext (long total, long downloaded) {
+        Log.d(TAG, "onNext");
         mViewModel.getTotalBytes().set((float) total / 1000000F);
         mViewModel.getDownloadedBytes().set((float) downloaded / 1000000F);
         mViewModel.getProgress().set((int) ((downloaded * 100L) / total));
@@ -148,6 +157,7 @@ public final class UpdateActivity
 
     @Override
     public void onSuccess () {
+        Log.d(TAG, "onSuccess");
         mViewModel.getProgress().set(100);
         mViewModel.getDownloadedBytes().set(mViewModel.getTotalBytes().get());
         startInstall();
@@ -155,6 +165,7 @@ public final class UpdateActivity
 
     @Override
     public void onFail () {
+        Log.d(TAG, "onFail");
         showRepeatDialog();
     }
 }
