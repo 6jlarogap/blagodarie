@@ -5,6 +5,7 @@
     android:id="@+id/toolbar"
     android:layout_width="match_parent"
     android:layout_height="?attr/actionBarSize"
+    android:onClick="onLinkClick"
     app:layout_scrollFlags="scroll|snap|enterAlways"
     app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
-    android:onClick="onLinkClick"/>
+    app:titleTextColor="@android:color/white"/>

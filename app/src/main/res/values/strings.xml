@@ -2,32 +2,29 @@
     <string name="app_name">Благодарие</string>
     <string name="toolbar_title">Благодарие.рф</string>
     <string name="website_url" tools:ignore="TypographyDashes">https://xn--80aabjfhut3aw.xn--p1ai?incognitopublickey=%s</string>
-    <string name="latitude">Широта: %f</string>
-    <string name="longitude">Долгота: %f</string>
 
     <!-- Buttons: prefix="btn_" -->
     <string name="btn_repeat">Повторить</string>
-    <string name="btn_close">Закрыть</string>
     <string name="btn_update">Обновить</string>
     <string name="btn_finish">Завершить</string>
     <string name="btn_next">Далее</string>
     <string name="btn_cancel">Отмена</string>
     <string name="btn_back">Назад</string>
     <string name="btn_to_cancel">Отменить</string>
-    <string name="btn_wait">Подождать</string>
-    <string name="btn_send">Отправить</string>
     <string name="btn_copy">Скопировать</string>
     <string name="btn_paste">Вставить</string>
     <string name="btn_share">Поделится</string>
-    <string name="btn_delete">Удалить</string>
     <string name="btn_continue">Продолжить</string>
     <!---->
 
     <!-- Error Messages: prefix="err_msg_" -->
     <string name="err_msg_account_not_set">Не задан аккаунт</string>
-    <string name="err_msg_incognito_id_is_missing">Анонимный ключ отсутствует</string>
-    <string name="err_msg_incorrect_incognito_id">Некорректный анонимный ключ</string>
+    <string name="err_msg_incognito_private_key_is_missing">Анонимный приватный ключ отсутствует</string>
+    <string name="err_msg_incorrect_incognito_private_key">Некорректный приватный анонимный ключ</string>
+    <string name="err_msg_incorrect_incognito_public_key">Некорректный публичный анонимный ключ</string>
     <string name="err_msg_no_internet_connection">Отсутствует соединение с интернетом</string>
+    <string name="err_msg_server_connection">Ошибка связи с сервером</string>
+    <string name="err_msg_server_connection1">Ошибка связи с сервером</string>
     <!---->
 
     <!-- Info Messages: prefix="info_msg_" -->
@@ -49,13 +46,11 @@
     <string name="action_log"><u>Журнал</u></string>
     <string name="txt_log">Журнал</string>
     <string name="copied_to_clipboard">Скопировано в буффер обмена</string>
-    <string name="location">Местоположение</string>
-    <string name="empty_location_alert">Местоположение еще не определено</string>
-    <string name="add_symptom_without_location">Желаете отправить сообщение без местоположения?</string>
-    <string name="error_server_connection">Ошибка связи с сервером</string>
-    <string name="txt_incognito_id"><u>Анонимный ключ</u></string>
-    <string name="txt_incognito_symptoms">Анонимные ощущения</string>
     <string name="txt_authorization_required">Необходима авторизация</string>
-    <string name="location_explanation">Местоположение покажет какой стороной в момент ощущения Земля повёрнута к Солнцу, Луне и другим планетам. Для анонимности кооринаты смещаются в случайном направлении в радиусе до 600 метров.</string>
     <string name="incognito_id">Уникальный идентификатор пользователя</string>
+    <string name="show_incognito_private_key">Показать приватный ключ</string>
+    <string name="update_incognito_public_key">Обновить публичный ключ</string>
+    <string name="your_incognito_public_key">Ваш публичный ключ:</string>
+    <string name="incognito_private_key">Приватный анонимный ключ</string>
+    <string name="incognito_public_key_updated">Публичный ключ обновлен</string>
 </resources>

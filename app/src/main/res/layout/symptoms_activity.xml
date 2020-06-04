@@ -1,58 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <LinearLayout
+    <androidx.drawerlayout.widget.DrawerLayout
+        android:id="@+id/drawer_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
-
-        <com.google.android.material.appbar.AppBarLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
-
-            <include layout="@layout/toolbar" />
-
-        </com.google.android.material.appbar.AppBarLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="start"
-            android:layout_margin="5dp"
-            android:onClick="showLog"
-            android:text="@string/action_log"
-            android:textAppearance="@style/TextAppearance.AppCompat.Small"
-            android:textColor="@color/colorAccent"
-            android:visibility="@{BuildConfig.DEBUG ? View.VISIBLE : View.GONE}" />
-
+        tools:context=".ui.symptoms.SymptomsActivity">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvSymptoms"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:fadeScrollbars="false"
-                android:scrollbars="vertical"
-                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvSymptomGroups"
+            <com.google.android.material.appbar.AppBarLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom"
-                android:fadeScrollbars="false"
-                android:scrollbars="horizontal" />
+                android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
+
+                <include layout="@layout/toolbar" />
+
+            </com.google.android.material.appbar.AppBarLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_margin="5dp"
+                android:onClick="showLog"
+                android:text="@string/action_log"
+                android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                android:textColor="@color/colorAccent"
+                android:visibility="@{BuildConfig.DEBUG ? View.VISIBLE : View.GONE}" />
+
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvSymptoms"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:fadeScrollbars="false"
+                    android:scrollbars="vertical"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvSymptomGroups"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:fadeScrollbars="false"
+                    android:scrollbars="horizontal" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
-    </LinearLayout>
+        <com.google.android.material.navigation.NavigationView
+            android:id="@+id/nvNavigation"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="start"
+            app:menu="@menu/symptoms_menu" />
+
+    </androidx.drawerlayout.widget.DrawerLayout>
 
     <data>
 

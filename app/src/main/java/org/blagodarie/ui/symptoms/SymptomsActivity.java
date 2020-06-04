@@ -16,6 +16,7 @@ import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.UnderlineSpan;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.ScrollView;
 import android.widget.Toast;
@@ -24,7 +25,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.view.GravityCompat;
 import androidx.databinding.DataBindingUtil;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -38,6 +41,7 @@ import org.blagodarie.UnauthorizedException;
 import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.authentication.IncognitoSignUpFragment;
 import org.blagodarie.databinding.LogDialogBinding;
+import org.blagodarie.databinding.NavHeaderBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.sync.SyncService;
@@ -74,7 +78,9 @@ public final class SymptomsActivity
 
     private Account mAccount;
 
-    private UUID mIncognitoId;
+    private UUID mIncognitoPrivateKey;
+
+    private UUID mIncognitoPublicKey;
 
     private SymptomsViewModel mViewModel;
 
@@ -89,6 +95,11 @@ public final class SymptomsActivity
     private Repository mRepository;
 
     private AccountManager mAccountManager;
+
+    /**
+     * Боковое меню.
+     */
+    private DrawerLayout mDrawerLayout;
 
     private final BroadcastReceiver mSyncErrorReceiver = new BroadcastReceiver() {
         @Override
@@ -128,6 +139,8 @@ public final class SymptomsActivity
 
             initBinding();
 
+            setupNavigationDrawer();
+
             setupToolbar();
 
             mRepository.getSymptomGroupsWithSymptoms().observe(
@@ -141,9 +154,33 @@ public final class SymptomsActivity
         }
     }
 
+    private void setupNavigationDrawer () {
+        Log.d(TAG, "setupNavigationDrawer");
+        mDrawerLayout = findViewById(R.id.drawer_layout);
+        mDrawerLayout.setStatusBarBackground(R.color.colorPrimaryDark);
+
+        NavHeaderBinding binding = DataBindingUtil.inflate(getLayoutInflater(), R.layout.nav_header, null, false);
+        binding.setViewModel(mViewModel);
+        mActivityBinding.nvNavigation.addHeaderView(binding.getRoot());
+
+        mActivityBinding.nvNavigation.setNavigationItemSelectedListener(menuItem -> {
+            switch (menuItem.getItemId()) {
+                case R.id.miShowIncognitoPrivateKey:
+                    showIncognitoPrivateKeyDialog();
+                    break;
+                case R.id.miUpdateIncognitoPublicKey:
+                    updateIncognitoPublicKey();
+                    break;
+            }
+            mDrawerLayout.closeDrawers();
+            return true;
+        });
+    }
+
     private void updateSymptomCatalogIfNeed (
             @Nullable final List<SymptomGroupWithSymptoms> newSymptomCatalog
     ) {
+        Log.d(TAG, "updateSymptomCatalogIfNeed");
         if (newSymptomCatalog != null) {
             if (!mViewModel.getSymptomCatalog().equals(newSymptomCatalog)) {
                 mViewModel.setSymptomCatalog(newSymptomCatalog);
@@ -157,7 +194,7 @@ public final class SymptomsActivity
                 mViewModel.setDisplaySymptomGroups(newDisplaySymptomGroups);
 
                 //загрузить последние пользовательские данные о симптомах
-                mViewModel.loadLastValues(mIncognitoId, () -> {
+                mViewModel.loadLastValues(mIncognitoPrivateKey, () -> {
                     orderSymptomCatalog();
                     //восстановить выбранную группу
                     if (mViewModel.getDisplaySymptomGroups().size() > 0) {
@@ -187,7 +224,8 @@ public final class SymptomsActivity
 
         //создаем фабрику
         final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
-                getApplication()
+                getApplication(),
+                mIncognitoPublicKey.toString()
         );
 
         //создаем UpdateViewModel
@@ -280,8 +318,8 @@ public final class SymptomsActivity
             displaySymptoms.add(
                     new DisplaySymptom(
                             symptom,
-                            mRepository.isHaveNotSyncedUserSymptoms(mIncognitoId, symptom.getId()),
-                            mRepository.getLatestUserSymptom(mIncognitoId, symptom.getId()),
+                            mRepository.isHaveNotSyncedUserSymptoms(mIncognitoPrivateKey, symptom.getId()),
+                            mRepository.getLatestUserSymptom(mIncognitoPrivateKey, symptom.getId()),
                             new DisplaySymptom.UnconfirmedUserSymptomListener() {
                                 @Override
                                 public void onConfirm (@NonNull final DisplaySymptom displaySymptom) {
@@ -309,7 +347,23 @@ public final class SymptomsActivity
             final SpannableString spannableTitle = new SpannableString(title + " " + BuildConfig.VERSION_NAME);
             spannableTitle.setSpan(new UnderlineSpan(), 0, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             actionBar.setTitle(spannableTitle);
+            actionBar.setHomeAsUpIndicator(R.drawable.ic_menu);
+            actionBar.setDisplayHomeAsUpEnabled(true);
         }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected (final MenuItem item) {
+        Log.d(TAG, "onOptionsItemSelected item=" + item);
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                mDrawerLayout.openDrawer(GravityCompat.START);
+                return true;
+            case R.id.miShowIncognitoPrivateKey:
+                mDrawerLayout.openDrawer(GravityCompat.START);
+                return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     /**
@@ -324,19 +378,34 @@ public final class SymptomsActivity
             mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
             Log.d(TAG, "account=" + mAccount);
 
-            //получить анонимный ключ
-            final String incognitoId = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY);
-            //если анонимного ключа не существует
-            if (incognitoId != null) {
+            //получить публичный анонимный ключ
+            final String incognitoPublicKey = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY);
+            //если публичный анонимный ключ существует
+            if (incognitoPublicKey != null) {
                 //попытаться преобразовать строку в UUID
                 try {
-                    mIncognitoId = UUID.fromString(incognitoId);
+                    mIncognitoPublicKey = UUID.fromString(incognitoPublicKey);
                 } catch (IllegalArgumentException e) {
-                    errorMessage = getString(R.string.err_msg_incorrect_incognito_id) + e.getLocalizedMessage();
+                    errorMessage = getString(R.string.err_msg_incorrect_incognito_public_key) + e.getLocalizedMessage();
                 }
             } else {
-                //установить сообщение об ошибке
-                errorMessage = getString(R.string.err_msg_incognito_id_is_missing);
+                //иначе установить сообщение об ошибке
+                createIncognitoPublicKey();
+            }
+
+            //получить приватный анонимный ключ
+            final String incognitoPrivateKey = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY);
+            //если приватный анонимный ключ существует
+            if (incognitoPrivateKey != null) {
+                //попытаться преобразовать строку в UUID
+                try {
+                    mIncognitoPrivateKey = UUID.fromString(incognitoPrivateKey);
+                } catch (IllegalArgumentException e) {
+                    errorMessage = getString(R.string.err_msg_incorrect_incognito_private_key) + e.getLocalizedMessage();
+                }
+            } else {
+                //иначе установить сообщение об ошибке
+                errorMessage = getString(R.string.err_msg_incognito_private_key_is_missing);
             }
         } else {
             //иначе установить сообщение об ошибке
@@ -374,7 +443,7 @@ public final class SymptomsActivity
         final Date currentDate = new Date();
 
         final UserSymptom userSymptom = new UserSymptom(
-                mIncognitoId,
+                mIncognitoPrivateKey,
                 displaySymptom.getSymptomId(),
                 currentDate,
                 null,
@@ -465,7 +534,7 @@ public final class SymptomsActivity
         Log.d(TAG, "createIncognitoPublicKey");
         final String newIncognitoPublicKey = UUID.randomUUID().toString();
         final ServerConnector serverConnector = new ServerConnector(this);
-        final IncognitoSignUpFragment.IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpFragment.IncognitoSignUpExecutor(mIncognitoId.toString(), newIncognitoPublicKey);
+        final IncognitoSignUpFragment.IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpFragment.IncognitoSignUpExecutor(mIncognitoPrivateKey.toString(), newIncognitoPublicKey);
         mDisposables.add(
                 Observable.
                         fromCallable(() -> serverConnector.execute(signUpExecutor)).
@@ -476,6 +545,28 @@ public final class SymptomsActivity
                                     openWebsite(newIncognitoPublicKey);
                                     mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_USER_ID, apiResult.getUserId().toString());
                                     mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, newIncognitoPublicKey);
+                                },
+                                throwable -> Toast.makeText(this, throwable.getMessage(), Toast.LENGTH_LONG).show()
+                        )
+        );
+    }
+
+    private void updateIncognitoPublicKey () {
+        Log.d(TAG, "updateIncognitoPublicKey");
+        mIncognitoPublicKey = UUID.randomUUID();
+        final ServerConnector serverConnector = new ServerConnector(this);
+        final IncognitoSignUpFragment.IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpFragment.IncognitoSignUpExecutor(mIncognitoPrivateKey.toString(), mIncognitoPublicKey.toString());
+        mDisposables.add(
+                Observable.
+                        fromCallable(() -> serverConnector.execute(signUpExecutor)).
+                        subscribeOn(Schedulers.io()).
+                        observeOn(AndroidSchedulers.mainThread()).
+                        subscribe(
+                                apiResult -> {
+                                    mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_USER_ID, apiResult.getUserId().toString());
+                                    mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, mIncognitoPublicKey.toString());
+                                    mViewModel.getIncognitoPublicKey().set(mIncognitoPublicKey.toString());
+                                    Toast.makeText(this, R.string.incognito_public_key_updated, Toast.LENGTH_LONG).show();
                                 },
                                 throwable -> Toast.makeText(this, throwable.getMessage(), Toast.LENGTH_LONG).show()
                         )
@@ -498,29 +589,29 @@ public final class SymptomsActivity
         //перемотать в конец
         logDialogBinding.svLog.post(() -> logDialogBinding.svLog.fullScroll(ScrollView.FOCUS_DOWN));
 
-        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.txt_log);
-        builder.setView(logDialogBinding.getRoot());
-        builder.setPositiveButton(
-                R.string.btn_copy,
-                (dialog, which) -> {
-                    final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                    final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), log);
-                    clipboard.setPrimaryClip(clip);
-                    Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
-                });
-        builder.setNeutralButton(
-                R.string.btn_share,
-                (dialog, which) -> {
-                    final Intent sendIntent = new Intent();
-                    sendIntent.setAction(Intent.ACTION_SEND);
-                    sendIntent.putExtra(Intent.EXTRA_TEXT, (CharSequence) log);
-                    sendIntent.putExtra(Intent.EXTRA_SUBJECT, "Благодарие журнал");
-                    sendIntent.setType("text/plain");
-                    startActivity(Intent.createChooser(sendIntent, getString(R.string.btn_share)));
-                });
-        builder.create();
-        builder.show();
+        new AlertDialog.Builder(this).
+                setTitle(R.string.txt_log).
+                setView(logDialogBinding.getRoot()).
+                setPositiveButton(
+                        R.string.btn_copy,
+                        (dialog, which) -> {
+                            final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                            final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), log);
+                            clipboard.setPrimaryClip(clip);
+                            Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+                        }).
+                setNeutralButton(
+                        R.string.btn_share,
+                        (dialog, which) -> {
+                            final Intent sendIntent = new Intent();
+                            sendIntent.setAction(Intent.ACTION_SEND);
+                            sendIntent.putExtra(Intent.EXTRA_TEXT, (CharSequence) log);
+                            sendIntent.putExtra(Intent.EXTRA_SUBJECT, "Благодарие журнал");
+                            sendIntent.setType("text/plain");
+                            startActivity(Intent.createChooser(sendIntent, getString(R.string.btn_share)));
+                        }).
+                create().
+                show();
     }
 
     public static Intent createSelfIntent (
@@ -532,4 +623,25 @@ public final class SymptomsActivity
         intent.putExtra(EXTRA_ACCOUNT, account);
         return intent;
     }
+
+    public void showIncognitoPrivateKeyDialog () {
+        Log.d(TAG, "showIncognitoPrivateKeyDialog");
+        new AlertDialog.Builder(this).
+                setTitle(R.string.incognito_private_key).
+                setMessage("Текст предупреждения:\n\n" + mIncognitoPrivateKey.toString()).
+                setPositiveButton(
+                        R.string.btn_copy,
+                        (dialog, which) -> {
+                            final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                            final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), mIncognitoPrivateKey.toString());
+                            clipboard.setPrimaryClip(clip);
+                            Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+                        }).
+                setNegativeButton(
+                        R.string.btn_cancel,
+                        null).
+                create().
+                show();
+    }
+
 }

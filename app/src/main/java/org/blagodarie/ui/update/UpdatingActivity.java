@@ -81,7 +81,7 @@ public abstract class UpdatingActivity
                                 },
                                 throwable -> {
                                     Log.e(TAG, "checkLatestVersion error=" + throwable);
-                                    Toast.makeText(this, R.string.error_server_connection, Toast.LENGTH_LONG).show();
+                                    Toast.makeText(this, R.string.err_msg_server_connection, Toast.LENGTH_LONG).show();
                                 }
                         )
         );
