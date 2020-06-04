@@ -628,8 +628,8 @@ public final class SymptomsActivity
         Log.d(TAG, "showIncognitoPrivateKeyDialog");
         new AlertDialog.Builder(this).
                 setTitle(R.string.incognito_private_key).
-                setMessage("Текст предупреждения:\n\n" + mIncognitoPrivateKey.toString()).
-                setPositiveButton(
+                setMessage(String.format(getString(R.string.txt_incognito_private_key), mIncognitoPrivateKey.toString())).
+                setNegativeButton(
                         R.string.btn_copy,
                         (dialog, which) -> {
                             final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
@@ -637,7 +637,7 @@ public final class SymptomsActivity
                             clipboard.setPrimaryClip(clip);
                             Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
                         }).
-                setNegativeButton(
+                setPositiveButton(
                         R.string.btn_cancel,
                         null).
                 create().

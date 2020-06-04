@@ -48,9 +48,11 @@
     <string name="copied_to_clipboard">Скопировано в буффер обмена</string>
     <string name="txt_authorization_required">Необходима авторизация</string>
     <string name="incognito_id">Уникальный идентификатор пользователя</string>
-    <string name="show_incognito_private_key">Показать приватный ключ</string>
+    <string name="show_incognito_private_key">Показать закрытый ключ</string>
     <string name="update_incognito_public_key">Обновить публичный ключ</string>
     <string name="your_incognito_public_key">Ваш публичный ключ:</string>
-    <string name="incognito_private_key">Приватный анонимный ключ</string>
+    <string name="incognito_private_key">Закрытый анонимный ключ</string>
     <string name="incognito_public_key_updated">Публичный ключ обновлен</string>
+    <string name="txt_incognito_private_key">Внимание! Никому не сообщайте этот ключ - по нему посторонний сможет отправлять статистику от Вашего имени!\n\n%s</string>
+
 </resources>
