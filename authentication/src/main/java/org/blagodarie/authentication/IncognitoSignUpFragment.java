@@ -153,7 +153,7 @@ public final class IncognitoSignUpFragment
         final ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
         final ClipData clipData = clipboard.getPrimaryClip();
         if (clipData != null) {
-            final ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+            final ClipData.Item item = clipData.getItemAt(0);
             final String incognitoIdString = item.getText().toString();
             try {
                 final UUID incognitoId = UUID.fromString(incognitoIdString);
@@ -182,9 +182,11 @@ public final class IncognitoSignUpFragment
         alertDialog.show();
 
         alertDialog.getButton(DialogInterface.BUTTON_NEGATIVE).setOnClickListener(v -> {
-            final ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
-            final String bufferString = item.getText().toString();
-            ((EditText) view.findViewById(R.id.etIncognitoId)).setText(bufferString);
+            if (clipboard.getPrimaryClip() != null) {
+                final ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+                final String bufferString = item.getText().toString();
+                ((EditText) view.findViewById(R.id.etIncognitoId)).setText(bufferString);
+            }
         });
     }
 
