@@ -113,15 +113,21 @@ public final class SymptomsActivity
                 final Intent intent
         ) {
             final Throwable throwable = (Throwable) intent.getSerializableExtra(SyncService.EXTRA_EXCEPTION);
-            if (throwable instanceof UnauthorizedException) {
-                Toast.makeText(getApplicationContext(), R.string.txt_authorization_required, Toast.LENGTH_LONG).show();
-                getAuthTokenAndRequestSync();
+            if (throwable == null) {
+                mViewModel.isShowNoServerConnectionErrMsg().set(false);
             } else {
-                String message = getString(R.string.err_msg_no_internet_connection);
-                if (BuildConfig.DEBUG) {
-                    message = throwable.getLocalizedMessage();
+                mViewModel.isShowNoServerConnectionErrMsg().set(false);
+                if (throwable instanceof UnauthorizedException) {
+                    Toast.makeText(getApplicationContext(), R.string.txt_authorization_required, Toast.LENGTH_LONG).show();
+                    getAuthTokenAndRequestSync();
+                } else {
+                    mViewModel.isShowNoServerConnectionErrMsg().set(true);
+                    String message = getString(R.string.err_msg_no_internet_connection);
+                    if (BuildConfig.DEBUG) {
+                        message = throwable.getLocalizedMessage();
+                    }
+                    Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
                 }
-                Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
             }
         }
     };
@@ -546,13 +552,18 @@ public final class SymptomsActivity
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(
                                 apiResult -> {
+                                    mViewModel.isShowNoServerConnectionErrMsg().set(false);
                                     mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_USER_ID, apiResult.getUserId().toString());
                                     mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, mIncognitoPublicKey.toString());
                                     mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY_TIMESTAMP, mIncognitoPublicKeyTimestamp.toString());
                                     mViewModel.getIncognitoPublicKey().set(mIncognitoPublicKey.toString());
                                     Toast.makeText(this, R.string.incognito_public_key_updated, Toast.LENGTH_LONG).show();
                                 },
-                                throwable -> Toast.makeText(this, throwable.getMessage(), Toast.LENGTH_LONG).show()
+                                throwable -> {
+                                    mViewModel.isShowNoServerConnectionErrMsg().set(true);
+                                    Log.e(TAG, "updateIncognitoPublicKey error=" + throwable);
+                                    Toast.makeText(this, throwable.getMessage(), Toast.LENGTH_LONG).show();
+                                }
                         )
         );
     }
@@ -639,6 +650,7 @@ public final class SymptomsActivity
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(
                                 apiResult -> {
+                                    mViewModel.isShowNoServerConnectionErrMsg().set(false);
                                     if (apiResult.getIncognitoPublicKeyTimestamp() >= mIncognitoPublicKeyTimestamp) {
                                         mIncognitoPublicKey = apiResult.getIncognitoPublicKey();
                                         mIncognitoPublicKeyTimestamp = apiResult.getIncognitoPublicKeyTimestamp();
@@ -673,6 +685,7 @@ public final class SymptomsActivity
                                     }
                                 },
                                 throwable -> {
+                                    mViewModel.isShowNoServerConnectionErrMsg().set(true);
                                     Log.e(TAG, "checkLatestVersion error=" + throwable);
                                     Toast.makeText(this, R.string.err_msg_server_connection, Toast.LENGTH_LONG).show();
                                 }

@@ -6,6 +6,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.util.Pair;
+import androidx.databinding.ObservableBoolean;
 import androidx.databinding.ObservableField;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.ViewModel;
@@ -55,6 +56,9 @@ public final class SymptomsViewModel
 
     @NonNull
     private final ObservableField<String> mIncognitoPublicKey;
+
+    @NonNull
+    private final ObservableBoolean mShowNoServerConnectionErrMsg = new ObservableBoolean(false);
 
     public SymptomsViewModel (
             @NonNull final Application application,
@@ -180,6 +184,11 @@ public final class SymptomsViewModel
     @NonNull
     public ObservableField<String> getIncognitoPublicKey () {
         return mIncognitoPublicKey;
+    }
+
+    @NonNull
+    public ObservableBoolean isShowNoServerConnectionErrMsg () {
+        return mShowNoServerConnectionErrMsg;
     }
 
     static final class Factory

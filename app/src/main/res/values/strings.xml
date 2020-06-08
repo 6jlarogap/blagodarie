@@ -23,6 +23,7 @@
     <string name="err_msg_incorrect_incognito_private_key">Некорректный приватный анонимный ключ</string>
     <string name="err_msg_incorrect_incognito_public_key">Некорректный публичный анонимный ключ</string>
     <string name="err_msg_no_internet_connection">Отсутствует соединение с интернетом</string>
+    <string name="err_msg_no_server_connection">Отсутствует соединение с сервером</string>
     <string name="err_msg_server_connection">Ошибка связи с сервером</string>
     <string name="err_msg_server_connection1">Ошибка связи с сервером</string>
     <!---->

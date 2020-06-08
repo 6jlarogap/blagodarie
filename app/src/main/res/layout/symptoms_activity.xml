@@ -57,6 +57,15 @@
                     android:fadeScrollbars="false"
                     android:scrollbars="horizontal" />
 
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@android:color/holo_red_dark"
+                    android:gravity="center"
+                    android:text="@string/err_msg_no_server_connection"
+                    android:textColor="@android:color/white"
+                    android:visibility="@{ViewModel.isShowNoServerConnectionErrMsg() ? View.VISIBLE : View.GONE}" />
+
             </LinearLayout>
 
         </LinearLayout>
