@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/miShowIncognitoPrivateKey"
+        android:title="@string/show_incognito_private_key" />
+
+    <item
+        android:id="@+id/miUpdateIncognitoPublicKey"
+        android:title="@string/update_incognito_public_key" />
+
+</menu>

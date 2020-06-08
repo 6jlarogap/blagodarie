@@ -135,7 +135,7 @@ public final class IncognitoSignUpFragment
         binding.setIncognitoSignUpUserActionListener(new IncognitoSignUpUserAction() {
             @Override
             public void createNewIncognitoId () {
-                startSignUp(UUID.randomUUID(), UUID.randomUUID());
+                startSignUp(UUID.randomUUID(), UUID.randomUUID(), (System.currentTimeMillis() / 1000L));
             }
 
             @Override
@@ -153,7 +153,7 @@ public final class IncognitoSignUpFragment
         final ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
         final ClipData clipData = clipboard.getPrimaryClip();
         if (clipData != null) {
-            final ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+            final ClipData.Item item = clipData.getItemAt(0);
             final String incognitoIdString = item.getText().toString();
             try {
                 final UUID incognitoId = UUID.fromString(incognitoIdString);
@@ -172,7 +172,7 @@ public final class IncognitoSignUpFragment
                     final String incognitoIdString = ((EditText) view.findViewById(R.id.etIncognitoId)).getText().toString();
                     try {
                         final UUID incognitoId = UUID.fromString(incognitoIdString);
-                        startSignUp(incognitoId, UUID.randomUUID());
+                        startSignUp(incognitoId, UUID.randomUUID(), (System.currentTimeMillis() / 1000L));
                     } catch (IllegalArgumentException e) {
                         Toast.makeText(requireContext(), getString(R.string.err_msg_incorrect_incognito_id), Toast.LENGTH_SHORT).show();
                     }
@@ -182,15 +182,18 @@ public final class IncognitoSignUpFragment
         alertDialog.show();
 
         alertDialog.getButton(DialogInterface.BUTTON_NEGATIVE).setOnClickListener(v -> {
-            final ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
-            final String bufferString = item.getText().toString();
-            ((EditText) view.findViewById(R.id.etIncognitoId)).setText(bufferString);
+            if (clipboard.getPrimaryClip() != null) {
+                final ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+                final String bufferString = item.getText().toString();
+                ((EditText) view.findViewById(R.id.etIncognitoId)).setText(bufferString);
+            }
         });
     }
 
     private void startSignUp (
             @NonNull final UUID incognitoPrivateKey,
-            @NonNull final UUID incognitoPublicKey
+            @NonNull final UUID incognitoPublicKey,
+            @NonNull final Long incognitoPublicKeyTimestamp
     ) {
         Log.d(TAG, "startSignUp");
         final ServerConnector serverConnector = new ServerConnector(requireContext());
@@ -201,7 +204,7 @@ public final class IncognitoSignUpFragment
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(
-                                apiResult -> createIncognitoAccount(incognitoPrivateKey, incognitoPublicKey, apiResult.getUserId()),
+                                apiResult -> createIncognitoAccount(incognitoPrivateKey, incognitoPublicKey, incognitoPublicKeyTimestamp, apiResult.getUserId()),
                                 throwable -> Toast.makeText(requireActivity(), throwable.getMessage(), Toast.LENGTH_LONG).show()
                         )
         );
@@ -210,6 +213,7 @@ public final class IncognitoSignUpFragment
     private void createIncognitoAccount (
             @NonNull final UUID incognitoPrivateKey,
             @NonNull final UUID incognitoPublicKey,
+            @NonNull final Long incognitoPublicKeyTimestamp,
             @NonNull final Long userId
     ) {
         Log.d(TAG, "createAccount");
@@ -220,6 +224,7 @@ public final class IncognitoSignUpFragment
         userData.putString(AccountGeneral.USER_DATA_USER_ID, userId.toString());
         userData.putString(AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY, incognitoPrivateKey.toString());
         userData.putString(AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, incognitoPublicKey.toString());
+        userData.putString(AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY_TIMESTAMP, incognitoPublicKeyTimestamp.toString());
         accountManager.addAccountExplicitly(account, "", userData);
 
         final Bundle bundle = new Bundle();

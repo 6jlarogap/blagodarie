@@ -13,8 +13,8 @@ android {
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 41
-        versionName "0.4.4"
+        versionCode 42
+        versionName "0.4.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
     }
@@ -95,10 +95,10 @@ dependencies {
     implementation "androidx.cardview:cardview:1.0.0"
     implementation "androidx.constraintlayout:constraintlayout:2.0.0-beta6"
     implementation 'androidx.recyclerview:recyclerview:1.1.0'
-    implementation "androidx.navigation:navigation-dynamic-features-fragment:2.3.0-alpha06"
-    implementation "androidx.navigation:navigation-fragment:2.3.0-alpha06"
+    implementation "androidx.navigation:navigation-dynamic-features-fragment:2.3.0-beta01"
+    implementation "androidx.navigation:navigation-fragment:2.3.0-beta01"
     implementation "androidx.room:room-runtime:2.2.5"
-    implementation 'com.google.android.material:material:1.2.0-alpha06'
+    implementation 'com.google.android.material:material:1.2.0-beta01'
 
     implementation 'com.android.support:multidex:1.0.3'
 

@@ -6,6 +6,8 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.util.Pair;
+import androidx.databinding.ObservableBoolean;
+import androidx.databinding.ObservableField;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
@@ -52,10 +54,19 @@ public final class SymptomsViewModel
     @NonNull
     private List<SymptomGroupWithSymptoms> mSymptomCatalog = new ArrayList<>();
 
+    @NonNull
+    private final ObservableField<String> mIncognitoPublicKey;
+
+    @NonNull
+    private final ObservableBoolean mShowNoServerConnectionErrMsg = new ObservableBoolean(false);
+
     public SymptomsViewModel (
-            @NonNull final Application application
+            @NonNull final Application application,
+            @NonNull final String incognitoPublicKey
     ) {
         super(application);
+
+        mIncognitoPublicKey = new ObservableField<>(incognitoPublicKey);
 
         mRepository = Repository.getInstance(application.getApplicationContext());
     }
@@ -170,17 +181,32 @@ public final class SymptomsViewModel
                 });
     }
 
+    @NonNull
+    public ObservableField<String> getIncognitoPublicKey () {
+        return mIncognitoPublicKey;
+    }
+
+    @NonNull
+    public ObservableBoolean isShowNoServerConnectionErrMsg () {
+        return mShowNoServerConnectionErrMsg;
+    }
+
     static final class Factory
             extends ViewModelProvider.AndroidViewModelFactory {
 
         @NonNull
         private final Application mApplication;
 
+        @NonNull
+        private final String mIncognitoPublicKey;
+
         Factory (
-                @NonNull final Application application
+                @NonNull final Application application,
+                @NonNull final String incognitoPublicKey
         ) {
             super(application);
             mApplication = application;
+            mIncognitoPublicKey = incognitoPublicKey;
         }
 
 
@@ -189,7 +215,7 @@ public final class SymptomsViewModel
         public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
             if (AndroidViewModel.class.isAssignableFrom(modelClass)) {
                 try {
-                    return modelClass.getConstructor(Application.class).newInstance(mApplication);
+                    return modelClass.getConstructor(Application.class, String.class).newInstance(mApplication, mIncognitoPublicKey);
                 } catch (NoSuchMethodException |
                         IllegalAccessException |
                         InstantiationException |

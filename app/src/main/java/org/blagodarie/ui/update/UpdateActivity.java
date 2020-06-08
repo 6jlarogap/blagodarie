@@ -135,7 +135,7 @@ public final class UpdateActivity
         builder.show();
     }
 
-    static Intent createSelfIntent (
+    public static Intent createSelfIntent (
             @NonNull final Context context,
             @NonNull final String versionName,
             @NonNull final Uri latestVersionUri
