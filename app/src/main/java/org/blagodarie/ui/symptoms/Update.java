@@ -1,4 +1,4 @@
-package org.blagodarie.ui.update;
+package org.blagodarie.ui.symptoms;
 
 import androidx.annotation.NonNull;
 

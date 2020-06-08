@@ -25,6 +25,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.GravityCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -45,7 +46,7 @@ import org.blagodarie.databinding.NavHeaderBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
 import org.blagodarie.sync.SyncService;
-import org.blagodarie.ui.update.UpdatingActivity;
+import org.blagodarie.ui.update.UpdateActivity;
 import org.blagodatie.database.Identifier;
 import org.blagodatie.database.Symptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
@@ -70,9 +71,11 @@ import io.reactivex.schedulers.Schedulers;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class SymptomsActivity
-        extends UpdatingActivity {
+        extends AppCompatActivity {
 
     private static final String TAG = SymptomsActivity.class.getSimpleName();
+
+    private static final String NEW_VERSION_NOTIFICATION_PREFERENCE = "org.blagodarie.ui.update.preference.newVersionNotification";
 
     private static final String EXTRA_ACCOUNT = "org.blagodarie.ui.symptoms.ACCOUNT";
 
@@ -81,6 +84,8 @@ public final class SymptomsActivity
     private UUID mIncognitoPrivateKey;
 
     private UUID mIncognitoPublicKey;
+
+    private Long mIncognitoPublicKeyTimestamp;
 
     private SymptomsViewModel mViewModel;
 
@@ -243,6 +248,7 @@ public final class SymptomsActivity
     public void onResume () {
         Log.d(TAG, "onResume");
         super.onResume();
+        checkLatestVersion();
         getAuthTokenAndRequestSync();
 
         orderSymptomCatalog();
@@ -390,8 +396,11 @@ public final class SymptomsActivity
                 }
             } else {
                 //иначе установить сообщение об ошибке
-                createIncognitoPublicKey();
+                updateIncognitoPublicKey();
             }
+
+            final String incognitoPublicKeyTimestamp = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY_TIMESTAMP);
+            mIncognitoPublicKeyTimestamp = incognitoPublicKeyTimestamp != null ? Long.parseLong(incognitoPublicKeyTimestamp) : 0L;
 
             //получить приватный анонимный ключ
             final String incognitoPrivateKey = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY);
@@ -521,39 +530,13 @@ public final class SymptomsActivity
 
     public void onLinkClick (final View view) {
         Log.d(TAG, "onLinkClick");
-        final String incognitoPublicKey = mAccountManager.getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY);
-        if (incognitoPublicKey != null) {
-            openWebsite(incognitoPublicKey);
-        } else {
-            //TODO: временный костыль
-            createIncognitoPublicKey();
-        }
-    }
-
-    private void createIncognitoPublicKey () {
-        Log.d(TAG, "createIncognitoPublicKey");
-        final String newIncognitoPublicKey = UUID.randomUUID().toString();
-        final ServerConnector serverConnector = new ServerConnector(this);
-        final IncognitoSignUpFragment.IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpFragment.IncognitoSignUpExecutor(mIncognitoPrivateKey.toString(), newIncognitoPublicKey);
-        mDisposables.add(
-                Observable.
-                        fromCallable(() -> serverConnector.execute(signUpExecutor)).
-                        subscribeOn(Schedulers.io()).
-                        observeOn(AndroidSchedulers.mainThread()).
-                        subscribe(
-                                apiResult -> {
-                                    openWebsite(newIncognitoPublicKey);
-                                    mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_USER_ID, apiResult.getUserId().toString());
-                                    mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, newIncognitoPublicKey);
-                                },
-                                throwable -> Toast.makeText(this, throwable.getMessage(), Toast.LENGTH_LONG).show()
-                        )
-        );
+        openWebsite();
     }
 
     private void updateIncognitoPublicKey () {
         Log.d(TAG, "updateIncognitoPublicKey");
         mIncognitoPublicKey = UUID.randomUUID();
+        mIncognitoPublicKeyTimestamp = System.currentTimeMillis() / 1000L;
         final ServerConnector serverConnector = new ServerConnector(this);
         final IncognitoSignUpFragment.IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpFragment.IncognitoSignUpExecutor(mIncognitoPrivateKey.toString(), mIncognitoPublicKey.toString());
         mDisposables.add(
@@ -565,6 +548,7 @@ public final class SymptomsActivity
                                 apiResult -> {
                                     mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_USER_ID, apiResult.getUserId().toString());
                                     mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, mIncognitoPublicKey.toString());
+                                    mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY_TIMESTAMP, mIncognitoPublicKeyTimestamp.toString());
                                     mViewModel.getIncognitoPublicKey().set(mIncognitoPublicKey.toString());
                                     Toast.makeText(this, R.string.incognito_public_key_updated, Toast.LENGTH_LONG).show();
                                 },
@@ -573,10 +557,10 @@ public final class SymptomsActivity
         );
     }
 
-    private void openWebsite (@NonNull final String incognitoPublicKey) {
+    private void openWebsite () {
         Log.d(TAG, "openWebsite");
         final Intent i = new Intent(Intent.ACTION_VIEW);
-        i.setData(Uri.parse(String.format(getString(R.string.website_url), incognitoPublicKey)));
+        i.setData(Uri.parse(String.format(getString(R.string.website_url), mIncognitoPublicKey.toString())));
         startActivity(i);
     }
 
@@ -644,4 +628,103 @@ public final class SymptomsActivity
                 show();
     }
 
+    private void checkLatestVersion () {
+        Log.d(TAG, "checkLatestVersion");
+        final ServerConnector serverConnector = new ServerConnector(this);
+        final GetLatestVersionExecutor getLatestVersionExecutor = new GetLatestVersionExecutor(mIncognitoPrivateKey);
+        mDisposables.add(
+                Observable.
+                        fromCallable(() -> serverConnector.execute(getLatestVersionExecutor)).
+                        subscribeOn(Schedulers.io()).
+                        observeOn(AndroidSchedulers.mainThread()).
+                        subscribe(
+                                apiResult -> {
+                                    if (apiResult.getIncognitoPublicKeyTimestamp() >= mIncognitoPublicKeyTimestamp) {
+                                        mIncognitoPublicKey = apiResult.getIncognitoPublicKey();
+                                        mIncognitoPublicKeyTimestamp = apiResult.getIncognitoPublicKeyTimestamp();
+                                        mViewModel.getIncognitoPublicKey().set(mIncognitoPublicKey.toString());
+                                        mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, mIncognitoPublicKey.toString());
+                                        mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY_TIMESTAMP, mIncognitoPublicKeyTimestamp.toString());
+                                    }
+                                    if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
+                                        final Update update = Update.determine(apiResult.getVersionName());
+                                        switch (update) {
+                                            case OPTIONAL:
+                                                if (!getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).contains(apiResult.getVersionName().toString())) {
+                                                    showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), update, apiResult.getVersionName(), apiResult.getUri(), apiResult.getPlayMarketUri());
+                                                    getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
+                                                            edit().
+                                                            putString(apiResult.getVersionName().toString(), "").
+                                                            apply();
+                                                }
+                                                break;
+                                            case MANDATORY:
+                                                showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), update, apiResult.getVersionName(), apiResult.getUri(), apiResult.getPlayMarketUri());
+                                                getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
+                                                        edit().
+                                                        putString(apiResult.getVersionName().toString(), "").
+                                                        apply();
+                                                break;
+                                            case NO:
+                                                break;
+                                            default:
+                                                Log.e(TAG, "Indefinite update type");
+                                        }
+                                    }
+                                },
+                                throwable -> {
+                                    Log.e(TAG, "checkLatestVersion error=" + throwable);
+                                    Toast.makeText(this, R.string.err_msg_server_connection, Toast.LENGTH_LONG).show();
+                                }
+                        )
+        );
+    }
+
+    private void showUpdateVersionDialog (
+            final boolean googlePlayUpdate,
+            @NonNull final Update update,
+            @NonNull final VersionName versionName,
+            @NonNull final Uri latestVersionUri,
+            @NonNull final Uri playMarketUri
+    ) {
+        Log.d(TAG, "showUpdateVersionDialog");
+        new AlertDialog.
+                Builder(this).
+                setTitle(R.string.info_msg_update_available).
+                setMessage(String.format(getString(R.string.qstn_want_load_new_version), versionName)).
+                setPositiveButton(
+                        R.string.btn_update,
+                        (dialog, which) -> {
+                            if (googlePlayUpdate) {
+                                toPlayMarket(playMarketUri);
+                            } else {
+                                toIndependentUpdate(versionName, latestVersionUri);
+                            }
+                        }).
+                setNegativeButton(
+                        update == Update.MANDATORY ? R.string.btn_finish : R.string.btn_cancel,
+                        (dialog, which) -> {
+                            if (update == Update.MANDATORY) {
+                                finish();
+                            }
+                        }).
+                create().
+                show();
+    }
+
+    public void toPlayMarket (@NonNull final Uri playMarketUri) {
+        final Intent i = new Intent(Intent.ACTION_VIEW);
+        i.setData(playMarketUri);
+        startActivity(i);
+        finish();
+    }
+
+    private void toIndependentUpdate (
+            @NonNull final VersionName versionName,
+            @NonNull final Uri latestVersionUri
+    ) {
+        Log.d(TAG, "toIndependentUpdate versionName=" + versionName + "; latestVersionUri=" + latestVersionUri);
+        startActivity(UpdateActivity.createSelfIntent(this, versionName.toString(), latestVersionUri));
+        finish();
+    }
 }
