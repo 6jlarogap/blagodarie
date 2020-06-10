@@ -19,7 +19,6 @@ import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ScrollView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -52,7 +51,6 @@ import org.blagodatie.database.Identifier;
 import org.blagodatie.database.Symptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
 import org.blagodatie.database.UserSymptom;
-import org.w3c.dom.Text;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -354,9 +352,7 @@ public final class SymptomsActivity
             final String title = getString(R.string.toolbar_title);
             final SpannableString spannableTitle = new SpannableString(title + " " + BuildConfig.VERSION_NAME);
             spannableTitle.setSpan(new UnderlineSpan(), 0, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            actionBar.setTitle(null);
-            final TextView tvTitle = findViewById(R.id.tvTitle);
-            tvTitle.setText(spannableTitle);
+            actionBar.setTitle(spannableTitle);
             actionBar.setHomeAsUpIndicator(R.drawable.ic_menu);
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
