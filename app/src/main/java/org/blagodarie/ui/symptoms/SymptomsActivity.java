@@ -233,15 +233,9 @@ public final class SymptomsActivity
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
 
-        //создаем фабрику
-        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
-                getApplication(),
-                mIncognitoPublicKey.toString()
-        );
-
         //создаем UpdateViewModel
-        mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
-
+        mViewModel = new ViewModelProvider(this).get(SymptomsViewModel.class);
+        mViewModel.getIncognitoPublicKey().set(mIncognitoPublicKey.toString());
     }
 
     private void initBinding () {
@@ -401,7 +395,7 @@ public final class SymptomsActivity
                     errorMessage = getString(R.string.err_msg_incorrect_incognito_public_key) + e.getLocalizedMessage();
                 }
             } else {
-                //иначе установить сообщение об ошибке
+                //иначе обновить публичный ключ
                 updateIncognitoPublicKey();
             }
 
