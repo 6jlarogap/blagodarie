@@ -55,18 +55,15 @@ public final class SymptomsViewModel
     private List<SymptomGroupWithSymptoms> mSymptomCatalog = new ArrayList<>();
 
     @NonNull
-    private final ObservableField<String> mIncognitoPublicKey;
+    private final ObservableField<String> mIncognitoPublicKey = new ObservableField<>("");
 
     @NonNull
     private final ObservableBoolean mShowNoServerConnectionErrMsg = new ObservableBoolean(false);
 
     public SymptomsViewModel (
-            @NonNull final Application application,
-            @NonNull final String incognitoPublicKey
+            @NonNull final Application application
     ) {
         super(application);
-
-        mIncognitoPublicKey = new ObservableField<>(incognitoPublicKey);
 
         mRepository = Repository.getInstance(application.getApplicationContext());
     }
@@ -191,40 +188,4 @@ public final class SymptomsViewModel
         return mShowNoServerConnectionErrMsg;
     }
 
-    static final class Factory
-            extends ViewModelProvider.AndroidViewModelFactory {
-
-        @NonNull
-        private final Application mApplication;
-
-        @NonNull
-        private final String mIncognitoPublicKey;
-
-        Factory (
-                @NonNull final Application application,
-                @NonNull final String incognitoPublicKey
-        ) {
-            super(application);
-            mApplication = application;
-            mIncognitoPublicKey = incognitoPublicKey;
-        }
-
-
-        @NonNull
-        @Override
-        public <T extends ViewModel> T create (@NonNull final Class<T> modelClass) {
-            if (AndroidViewModel.class.isAssignableFrom(modelClass)) {
-                try {
-                    return modelClass.getConstructor(Application.class, String.class).newInstance(mApplication, mIncognitoPublicKey);
-                } catch (NoSuchMethodException |
-                        IllegalAccessException |
-                        InstantiationException |
-                        InvocationTargetException e
-                ) {
-                    throw new RuntimeException("Cannot create an instance of " + modelClass, e);
-                }
-            }
-            return super.create(modelClass);
-        }
-    }
 }
