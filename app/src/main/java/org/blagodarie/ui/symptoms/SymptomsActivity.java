@@ -235,9 +235,15 @@ public final class SymptomsActivity
     private void initViewModel () {
         Log.d(TAG, "initViewModel");
 
+        //создаем фабрику
+        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
+                getApplication(),
+                mIncognitoPublicKey.toString()
+        );
+
         //создаем UpdateViewModel
-        mViewModel = new ViewModelProvider(this).get(SymptomsViewModel.class);
-        mViewModel.getIncognitoPublicKey().set(mIncognitoPublicKey.toString());
+        mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
+
     }
 
     private void initBinding () {
