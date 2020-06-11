@@ -218,7 +218,7 @@ public final class IncognitoSignUpFragment
     ) {
         Log.d(TAG, "createAccount");
         final String accountName = getString(R.string.incognito_account_name);
-        final AccountManager accountManager = AccountManager.get(getContext());
+        final AccountManager accountManager = AccountManager.get(requireContext());
         final Account account = new Account(accountName, getString(R.string.account_type));
         final Bundle userData = new Bundle();
         userData.putString(AccountGeneral.USER_DATA_USER_ID, userId.toString());

@@ -13,8 +13,8 @@ android {
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 44
-        versionName "0.4.7"
+        versionCode 45
+        versionName "0.4.8"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
     }
@@ -23,14 +23,21 @@ android {
 
         release {
             minifyEnabled true
+            shrinkResources true
+
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
             resValue "string", "content_provider_authorities", "${APPLICATION_ID}${CONTENT_PROVIDER_AUTHORITIES}"
             resValue "string", "file_provider_authorities", "${APPLICATION_ID}${FILE_PROVIDER_AUTHORITIES}"
         }
         debug {
             debuggable true
-            minifyEnabled false
+
+            minifyEnabled true
+            shrinkResources true
+
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
             applicationIdSuffix ".dbg"
             resValue "string", "content_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${CONTENT_PROVIDER_AUTHORITIES}"
             resValue "string", "file_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${FILE_PROVIDER_AUTHORITIES}"
