@@ -84,7 +84,8 @@ public final class AuthenticationActivity
         Log.d(TAG, "onBackPressed");
         if (mNavController.getCurrentDestination() != null) {
             if (mNavController.getCurrentDestination().getId() == R.id.greetingFragment ||
-                    mNavController.getCurrentDestination().getId() == R.id.signInFragment) {
+                    mNavController.getCurrentDestination().getId() == R.id.signInFragment ||
+                    mNavController.getCurrentDestination().getId() == R.id.incognitoSignUpFragment) {
                 finish();
             } else {
                 super.onBackPressed();
