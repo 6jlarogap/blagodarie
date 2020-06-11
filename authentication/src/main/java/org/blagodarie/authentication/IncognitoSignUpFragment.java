@@ -122,6 +122,8 @@ public final class IncognitoSignUpFragment
         }
     }
 
+    private IncognitoSignUpFragmentBinding mBinding;
+
     private CompositeDisposable mDisposables = new CompositeDisposable();
 
     @Override
@@ -131,8 +133,8 @@ public final class IncognitoSignUpFragment
             final Bundle savedInstanceState
     ) {
         Log.d(TAG, "onCreateView");
-        final IncognitoSignUpFragmentBinding binding = DataBindingUtil.inflate(inflater, R.layout.incognito_sign_up_fragment, null, false);
-        binding.setIncognitoSignUpUserActionListener(new IncognitoSignUpUserAction() {
+        mBinding = DataBindingUtil.inflate(inflater, R.layout.incognito_sign_up_fragment, null, false);
+        mBinding.setIncognitoSignUpUserActionListener(new IncognitoSignUpUserAction() {
             @Override
             public void createNewIncognitoId () {
                 startSignUp(UUID.randomUUID(), UUID.randomUUID(), (System.currentTimeMillis() / 1000L));
@@ -143,7 +145,7 @@ public final class IncognitoSignUpFragment
                 showIncognitoIdDialog();
             }
         });
-        return binding.getRoot();
+        return mBinding.getRoot();
     }
 
     private void showIncognitoIdDialog () {
@@ -196,6 +198,7 @@ public final class IncognitoSignUpFragment
             @NonNull final Long incognitoPublicKeyTimestamp
     ) {
         Log.d(TAG, "startSignUp");
+        disableButtons();
         final ServerConnector serverConnector = new ServerConnector(requireContext());
         final IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpExecutor(incognitoPrivateKey.toString(), incognitoPublicKey.toString());
         mDisposables.add(
@@ -205,9 +208,24 @@ public final class IncognitoSignUpFragment
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(
                                 apiResult -> createIncognitoAccount(incognitoPrivateKey, incognitoPublicKey, incognitoPublicKeyTimestamp, apiResult.getUserId()),
-                                throwable -> Toast.makeText(requireActivity(), throwable.getMessage(), Toast.LENGTH_LONG).show()
+                                throwable -> {
+                                    enableButtons();
+                                    Toast.makeText(requireActivity(), throwable.getMessage(), Toast.LENGTH_LONG).show();
+                                }
                         )
         );
+    }
+
+    private void disableButtons () {
+        mBinding.btnNewAccount.setVisibility(View.GONE);
+        mBinding.btnHaveIncognitoPrivateKey.setVisibility(View.GONE);
+        mBinding.pbSignUp.setVisibility(View.VISIBLE);
+    }
+
+    private void enableButtons () {
+        mBinding.btnNewAccount.setVisibility(View.VISIBLE);
+        mBinding.btnHaveIncognitoPrivateKey.setVisibility(View.VISIBLE);
+        mBinding.pbSignUp.setVisibility(View.GONE);
     }
 
     private void createIncognitoAccount (
