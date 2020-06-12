@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout>
+
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:gravity="center"
+            android:text="@string/txt_hello"
+            android:textAppearance="@style/TextAppearance.AppCompat.Large" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center">
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnHaveIncognitoPrivateKey"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="@{() -> IncognitoSignUpUserActionListener.enterExistingIncognitoId()}"
+                android:text="@string/btn_i_have_incognito_id" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnNewAccount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="@{() -> IncognitoSignUpUserActionListener.createNewIncognitoId()}"
+                android:text="@string/btn_new_incognito_id" />
+
+            <ProgressBar
+                android:id="@+id/pbSignUp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <data>
+
+        <variable
+            name="IncognitoSignUpUserActionListener"
+            type="org.blagodarie.authentication.IncognitoSignUpFragment.IncognitoSignUpUserAction" />
+    </data>
+
+</layout>

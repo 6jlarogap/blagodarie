@@ -43,14 +43,15 @@ public final class SyncAdapter
     ) {
         Log.d(TAG, "onPerformSync");
         final String authToken = extras.getString(AccountManager.KEY_AUTHTOKEN);
-        final UUID incognitoId = UUID.fromString(AccountManager.get(getContext()).getUserData(account, AccountGeneral.USER_DATA_INCOGNITO_ID));
+        final UUID incognitoId = UUID.fromString(AccountManager.get(getContext()).getUserData(account, AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY));
         try {
             syncAll(incognitoId, authToken);
-        } catch (JSONException | IOException  e) {
+            sendBroadcastException(null);
+        } catch (JSONException | IOException e) {
             Log.e(TAG, "onPerformSync error=" + e);
             e.printStackTrace();
             sendBroadcastException(e);
-        } catch (UnauthorizedException e){
+        } catch (UnauthorizedException e) {
             Log.e(TAG, "onPerformSync error=" + e);
             e.printStackTrace();
             //очистить токен
@@ -88,10 +89,12 @@ public final class SyncAdapter
 
     }
 
-    private void sendBroadcastException(@NonNull final Throwable throwable){
+    private void sendBroadcastException (@Nullable final Throwable throwable) {
         Log.d(TAG, "sendBroadcastException");
         final Intent intent = new Intent(SyncService.ACTION_SYNC_EXCEPTION);
-        intent.putExtra(SyncService.EXTRA_EXCEPTION, throwable);
+        if (throwable != null) {
+            intent.putExtra(SyncService.EXTRA_EXCEPTION, throwable);
+        }
         getContext().sendBroadcast(intent);
     }
 

@@ -13,8 +13,8 @@ android {
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 37
-        versionName "0.4.0"
+        versionCode 46
+        versionName "0.4.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
     }
@@ -23,14 +23,21 @@ android {
 
         release {
             minifyEnabled true
+            shrinkResources true
+
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
             resValue "string", "content_provider_authorities", "${APPLICATION_ID}${CONTENT_PROVIDER_AUTHORITIES}"
             resValue "string", "file_provider_authorities", "${APPLICATION_ID}${FILE_PROVIDER_AUTHORITIES}"
         }
         debug {
             debuggable true
-            minifyEnabled false
+
+            minifyEnabled true
+            shrinkResources true
+
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
             applicationIdSuffix ".dbg"
             resValue "string", "content_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${CONTENT_PROVIDER_AUTHORITIES}"
             resValue "string", "file_provider_authorities", "${APPLICATION_ID}${applicationIdSuffix}${FILE_PROVIDER_AUTHORITIES}"
@@ -95,9 +102,10 @@ dependencies {
     implementation "androidx.cardview:cardview:1.0.0"
     implementation "androidx.constraintlayout:constraintlayout:2.0.0-beta6"
     implementation 'androidx.recyclerview:recyclerview:1.1.0'
-    implementation "androidx.navigation:navigation-dynamic-features-fragment:2.3.0-alpha06"
-    implementation "androidx.navigation:navigation-fragment:2.3.0-alpha06"
+    implementation "androidx.navigation:navigation-dynamic-features-fragment:2.3.0-beta01"
+    implementation "androidx.navigation:navigation-fragment:2.3.0-beta01"
     implementation "androidx.room:room-runtime:2.2.5"
+    implementation 'com.google.android.material:material:1.2.0-beta01'
 
     implementation 'com.android.support:multidex:1.0.3'
 

@@ -7,8 +7,11 @@ package org.blagodarie.authentication;
 public final class AccountGeneral {
 
     public static final String USER_DATA_USER_ID = "org.blagodarie.authentication.USER_ID";
-    public static final String USER_DATA_INCOGNITO_ID = "org.blagodarie.authentication.INCOGNITO_ID";
+    public static final String USER_DATA_INCOGNITO_PRIVATE_KEY = "org.blagodarie.authentication.INCOGNITO_ID";
+    public static final String USER_DATA_INCOGNITO_PUBLIC_KEY = "org.blagodarie.authentication.INCOGNITO_PUBLIC_KEY";
+    public static final String USER_DATA_INCOGNITO_PUBLIC_KEY_TIMESTAMP = "org.blagodarie.authentication.INCOGNITO_PUBLIC_KEY_TIMESTAMP";
 
-    private AccountGeneral(){}
+    private AccountGeneral () {
+    }
 
 }

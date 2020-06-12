@@ -1,3 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Благодарие-dbg</string>
+    <string name="website_url" tools:ignore="TypographyDashes">https://dev.xn--80aabjfhut3aw.xn--p1ai?incognitopublickey=%s</string>
 </resources>

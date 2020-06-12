@@ -1,11 +1,21 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="btn_i_have_incognito_id">У меня есть ключ</string>
+    <string name="btn_new_incognito_id">Новый пользователь</string>
+    <string name="btn_next">Далее</string>
+    <string name="btn_back">Назад</string>
+    <string name="btn_paste">Вставить</string>
+    <string name="btn_continue">Продолжить</string>
+
+    <string name="err_msg_incorrect_incognito_id">Некорректный анонимный ключ</string>
+
     <string name="account_type">org.blagodarie</string>
     <string name="token_type">token_type</string>
     <string name="txt_greeting">Здравствуйте!</string>
-    <string name="btn_next">Далее</string>
     <string name="oauth2_client_id" tools:ignore="TypographyDashes">404507462751-5a4j37k4o6nnvlnuof95tl68j30c151p.apps.googleusercontent.com</string>
     <string name="one_account_only">Нельзя добавить больше аккаунтов</string>
     <string name="error_bad_user_id">Неверный идентификатор пользователя</string>
     <string name="account_name_pattern">Пользователь %d</string>
     <string name="incognito_account_name">Анонимный пользователь</string>
+    <string name="incognito_id">Уникальный идентификатор пользователя</string>
+    <string name="txt_hello">Здравия и мира вашим домам! Приложение \"Благодарие\" позволяет отмечать и прогнозировать периодические ухудшения и улучшения самочувствия.\nПользуйтесь на здоровье!</string>
 </resources>

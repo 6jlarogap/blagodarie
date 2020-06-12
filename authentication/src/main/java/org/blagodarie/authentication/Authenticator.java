@@ -11,8 +11,6 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import java.util.UUID;
-
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/raw/master/LICENSE License
@@ -52,21 +50,11 @@ public final class Authenticator
             final Bundle options
     ) {
         Log.d(TAG, "addAccount");
-        if (options.getBoolean(OPTION_IS_INCOGNITO_USER, false)) {
-            final String accountName = mContext.getString(R.string.incognito_account_name);
-            final AccountManager accountManager = AccountManager.get(mContext);
-            final Account account = new Account(accountName, mContext.getString(R.string.account_type));
-            final Bundle userData = new Bundle();
-            userData.putString(AccountGeneral.USER_DATA_INCOGNITO_ID, UUID.randomUUID().toString());
-            accountManager.addAccountExplicitly(account, "", userData);
-            return null;
-        } else {
-            final Intent intent = AuthenticationActivity.createSelfIntent(mContext, accountType, response);
-            final Bundle bundle = new Bundle();
-            bundle.putAll(options);
-            bundle.putParcelable(AccountManager.KEY_INTENT, intent);
-            return bundle;
-        }
+        final Intent intent = AuthenticationActivity.createSelfIntent(mContext, accountType, response);
+        final Bundle bundle = new Bundle();
+        bundle.putAll(options);
+        bundle.putParcelable(AccountManager.KEY_INTENT, intent);
+        return bundle;
     }
 
     @Override

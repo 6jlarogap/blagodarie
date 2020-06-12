@@ -131,7 +131,8 @@ public final class SignUpFragment
     public View onCreateView (
             @NonNull final LayoutInflater inflater,
             final ViewGroup container,
-            final Bundle savedInstanceState) {
+            final Bundle savedInstanceState
+    ) {
         Log.d(TAG, "onCreateView");
         final View view = inflater.inflate(R.layout.sign_up_fragment, container, false);
         initViews(view);
@@ -140,13 +141,13 @@ public final class SignUpFragment
 
 
     @Override
-    public void onActivityCreated (@Nullable Bundle savedInstanceState) {
+    public void onActivityCreated (@Nullable final Bundle savedInstanceState) {
         Log.d(TAG, "onActivityCreated");
         super.onActivityCreated(savedInstanceState);
         AuthenticationActivity.googleSignIn(requireActivity(), this, getString(R.string.oauth2_client_id));
     }
 
-    private void initViews (View view) {
+    private void initViews (final View view) {
         Log.d(TAG, "initViews");
         view.findViewById(R.id.btnSignIn).setOnClickListener(v -> AuthenticationActivity.googleSignIn(requireActivity(), this, getString(R.string.oauth2_client_id)));
     }
@@ -208,7 +209,7 @@ public final class SignUpFragment
         final Account account = new Account(accountName, getString(R.string.account_type));
         final Bundle userData = new Bundle();
         userData.putString(AccountGeneral.USER_DATA_USER_ID, userId.toString());
-        userData.putString(AccountGeneral.USER_DATA_INCOGNITO_ID, UUID.randomUUID().toString());
+        userData.putString(AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY, UUID.randomUUID().toString());
         accountManager.addAccountExplicitly(account, "", userData);
         accountManager.setAuthToken(account, getString(R.string.token_type), authToken);
 

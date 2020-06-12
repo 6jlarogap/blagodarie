@@ -46,8 +46,8 @@ public interface UserSymptomDao {
             "FROM tbl_user_symptom " +
             "WHERE symptom_id = :symptomId " +
             "AND incognito_id = :incognitoId " +
-            "AND STRFTIME('%s',SUBSTR(timestamp, 0, INSTR(timestamp,'+'))) = " +
-            "                (SELECT MAX(STRFTIME('%s',SUBSTR(timestamp, 0, INSTR(timestamp,'+')))) " +
+            "AND STRFTIME('%s', SUBSTR(timestamp, 0, 24)) = " +
+            "                (SELECT MAX(STRFTIME('%s', SUBSTR(timestamp, 0, 24))) " +
             "                 FROM tbl_user_symptom " +
             "                 WHERE symptom_id = :symptomId " +
             "                 AND incognito_id = :incognitoId)")

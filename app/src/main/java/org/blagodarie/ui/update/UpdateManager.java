@@ -4,6 +4,7 @@ import android.app.DownloadManager;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -20,6 +21,8 @@ import static android.content.Context.DOWNLOAD_SERVICE;
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 final class UpdateManager {
+
+    private static final String TAG = UpdateManager.class.getSimpleName();
 
     /**
      * Интерфейс для получения прогресса загрузки.
@@ -114,6 +117,7 @@ final class UpdateManager {
      */
     static UpdateManager getInstance (
     ) {
+        Log.d(TAG, "getInstance");
         synchronized (UpdateManager.class) {
             if (INSTANCE == null) {
                 INSTANCE = new UpdateManager();
@@ -128,6 +132,7 @@ final class UpdateManager {
      * @param progressListener Слушатель прогресса загрузки.
      */
     void setProgressListener (@NonNull final ProgressListener progressListener) {
+        Log.d(TAG, "setProgressListener");
         mProgressListener = progressListener;
     }
 
@@ -137,6 +142,7 @@ final class UpdateManager {
      * @return Статус загрузки.
      */
     DownloadStatus getDownloadStatus () {
+        Log.d(TAG, "getDownloadStatus");
         return mDownloadStatus;
     }
 
@@ -152,6 +158,7 @@ final class UpdateManager {
             @NonNull final File apkFile,
             @NonNull final Uri latestVersionUri
     ) {
+        Log.d(TAG, "startDownload");
         if (mDownloadStatus == DownloadStatus.WAIT) {
             mDownloadStatus = DownloadStatus.RUN;
 
@@ -176,6 +183,7 @@ final class UpdateManager {
      * @param downloadManager DownloadManager.
      */
     private void startUpdateProgress (@NonNull final DownloadManager downloadManager) {
+        Log.d(TAG, "startUpdateProgress");
         final Timer timer = new Timer();
         timer.schedule(
                 getUpdateProgressTask(downloadManager, timer),
@@ -194,6 +202,7 @@ final class UpdateManager {
             @NonNull final DownloadManager downloadManager,
             @NonNull final Timer timer
     ) {
+        Log.d(TAG, "getUpdateProgressTask");
         return new TimerTask() {
             @Override
             public void run () {
@@ -212,10 +221,12 @@ final class UpdateManager {
             @NonNull final DownloadManager downloadManager,
             @NonNull final Timer timer
     ) {
+        Log.d(TAG, "updateProgress");
         final Cursor cursor = downloadManager.query(new DownloadManager.Query().setFilterById(mDownloadId));
         if (cursor != null) {
             if (cursor.moveToFirst()) {
                 int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                Log.d(TAG, "updateProgress status=" + status);
                 switch (status) {
                     case DownloadManager.STATUS_RUNNING: {
                         final long total = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
