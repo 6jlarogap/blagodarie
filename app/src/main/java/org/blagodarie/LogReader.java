@@ -1,18 +1,14 @@
 package org.blagodarie;
 
-import org.blagodarie.sync.SyncAdapter;
-import org.blagodarie.sync.SyncService;
-import org.blagodarie.ui.splash.SplashActivity;
-import org.blagodarie.ui.symptoms.SymptomsActivity;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
 public final class LogReader {
 
-    private LogReader(){}
+    private LogReader () {
+    }
 
-    public static String getLog(){
+    public static String getLog () {
         Process logcat;
         final StringBuilder log = new StringBuilder();
         try {

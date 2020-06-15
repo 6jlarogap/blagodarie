@@ -19,7 +19,7 @@
 
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"/>
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
@@ -44,6 +44,16 @@
             android:name=".ui.symptoms.SymptomsActivity"
             android:screenOrientation="portrait" />
         <activity android:name=".ui.update.UpdateActivity" />
+        <activity
+            android:name=".ui.SendLogActivity"
+            android:textAppearance="@android:style/TextAppearance.Large"
+            android:theme="@android:style/Theme.Dialog"
+            android:windowSoftInputMode="stateHidden">
+            <intent-filter>
+                <action android:name="org.blagodarie.SEND_LOG" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <service android:name="org.blagodarie.authentication.AuthenticatorService">
             <intent-filter>
