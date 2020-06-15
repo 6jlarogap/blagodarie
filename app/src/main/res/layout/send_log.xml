@@ -10,7 +10,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="5dp"
-            android:text="@string/crash_toast_text" />
+            android:text="@string/crash_toast_text"
+            android:textAppearance="@style/TextAppearance.AppCompat.Medium"/>
 
         <ScrollView
             android:id="@+id/svLog"
@@ -31,21 +32,35 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:onClick="@{() -> UserActionListener.onSend()}"
+                    android:text="@string/btn_send" />
+
+                <Button
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:onClick="@{() -> UserActionListener.onCopy()}"
+                    android:text="@string/btn_copy" />
+
+            </LinearLayout>
 
             <Button
-                android:id="@+id/btnCopy"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/btn_copy" />
-
-            <Button
-                android:id="@+id/btnShare"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/btn_send" />
+                android:layout_gravity="center_horizontal"
+                android:onClick="@{() -> UserActionListener.onClose()}"
+                android:text="@string/btn_close" />
 
         </LinearLayout>
 
@@ -56,6 +71,10 @@
         <variable
             name="Log"
             type="String" />
+
+        <variable
+            name="UserActionListener"
+            type="org.blagodarie.ui.log.UserActionListener" />
 
     </data>
 

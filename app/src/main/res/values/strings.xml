@@ -18,6 +18,7 @@
     <string name="btn_share">Поделится</string>
     <string name="btn_continue">Продолжить</string>
     <string name="btn_send">Отправить</string>
+    <string name="btn_close">Закрыть</string>
     <!---->
 
     <!-- Error Messages: prefix="err_msg_" -->
