@@ -7,7 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.view.View;
+import android.util.Log;
 import android.view.Window;
 import android.widget.Toast;
 
@@ -16,27 +16,33 @@ import androidx.databinding.DataBindingUtil;
 import org.blagodarie.LogReader;
 import org.blagodarie.R;
 import org.blagodarie.databinding.SendLogBinding;
+import org.blagodarie.ui.symptoms.SymptomsActivity;
 
 public class SendLogActivity
         extends Activity
         implements UserActionListener {
 
+    private static final String TAG = SendLogActivity.class.getSimpleName();
+
     String mLog;
 
     @Override
     public void onCreate (Bundle savedInstanceState) {
+        Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setFinishOnTouchOutside(false);
         SendLogBinding activityBinding = DataBindingUtil.setContentView(this, R.layout.send_log);
         mLog = LogReader.getLog();
+        Log.d(TAG, "mLog=" + mLog);
         activityBinding.setLog(mLog);
         activityBinding.setUserActionListener(this);
     }
 
     @Override
     public void onSend () {
-        Intent intent = new Intent(Intent.ACTION_SENDTO);
+        Log.d(TAG, "onSend");
+        final Intent intent = new Intent(Intent.ACTION_SENDTO);
         intent.setData(Uri.parse("mailto:")); // only email apps should handle this
         intent.putExtra(Intent.EXTRA_EMAIL, new String[]{"blagodarie.developer@gmail.com"});
         intent.putExtra(Intent.EXTRA_SUBJECT, "Crash report");
@@ -48,6 +54,7 @@ public class SendLogActivity
 
     @Override
     public void onCopy () {
+        Log.d(TAG, "onCopy");
         final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), mLog);
         clipboard.setPrimaryClip(clip);
@@ -56,6 +63,7 @@ public class SendLogActivity
 
     @Override
     public void onClose () {
+        Log.d(TAG, "onClose");
         finish();
     }
 }

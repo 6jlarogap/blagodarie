@@ -46,9 +46,7 @@
         <activity android:name=".ui.update.UpdateActivity" />
         <activity
             android:name=".ui.log.SendLogActivity"
-            android:textAppearance="@android:style/TextAppearance.Large"
-            android:theme="@android:style/Theme.Dialog"
-            android:windowSoftInputMode="stateHidden">
+            android:theme="@android:style/Theme.Dialog">
             <intent-filter>
                 <action android:name="org.blagodarie.SEND_LOG" />
                 <category android:name="android.intent.category.DEFAULT" />
