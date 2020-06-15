@@ -3,20 +3,13 @@ package org.blagodarie;
 import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.content.ContentResolver;
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.multidex.MultiDexApplication;
-
-import java.text.DateFormat;
-import java.text.FieldPosition;
-import java.text.ParseException;
-import java.text.ParsePosition;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
 
 /**
  * @author sergeGabrus
@@ -31,6 +24,7 @@ public final class BlagodarieApp
     public void onCreate () {
         super.onCreate();
         Log.d(TAG, "start application");
+        Thread.setDefaultUncaughtExceptionHandler(this::handleUncaughtException);
     }
 
     public static void requestSync (
@@ -45,5 +39,17 @@ public final class BlagodarieApp
         settingsBundle.putString(AccountManager.KEY_AUTHTOKEN, authToken);
 
         ContentResolver.requestSync(account, authority, settingsBundle);
+    }
+
+    public void handleUncaughtException (Thread thread, Throwable e) {
+        Log.d(TAG, "handleUncaughtException");
+        Log.e(TAG, Log.getStackTraceString(e));
+
+        Intent intent = new Intent();
+        intent.setAction("org.blagodarie.SEND_LOG");
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+
+        System.exit(1);
     }
 }

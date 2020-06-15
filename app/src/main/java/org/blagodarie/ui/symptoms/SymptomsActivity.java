@@ -52,7 +52,6 @@ import org.blagodatie.database.Identifier;
 import org.blagodatie.database.Symptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
 import org.blagodatie.database.UserSymptom;
-import org.w3c.dom.Text;
 
 import java.io.IOException;
 import java.util.ArrayList;
