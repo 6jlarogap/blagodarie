@@ -16,7 +16,6 @@ import androidx.databinding.DataBindingUtil;
 import org.blagodarie.LogReader;
 import org.blagodarie.R;
 import org.blagodarie.databinding.SendLogBinding;
-import org.blagodarie.ui.symptoms.SymptomsActivity;
 
 public class SendLogActivity
         extends Activity
