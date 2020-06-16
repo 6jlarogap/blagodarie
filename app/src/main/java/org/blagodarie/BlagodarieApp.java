@@ -2,6 +2,7 @@ package org.blagodarie;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
+import android.app.Application;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.os.Bundle;
@@ -9,14 +10,13 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.multidex.MultiDexApplication;
 
 /**
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
 public final class BlagodarieApp
-        extends MultiDexApplication {
+        extends Application {
 
     private static final String TAG = BlagodarieApp.class.getSimpleName();
 
