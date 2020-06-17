@@ -10,8 +10,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="5dp"
-            android:text="@string/crash_toast_text"
-            android:textAppearance="@style/TextAppearance.AppCompat.Medium"/>
+            android:text="@string/rqst_send_crash_report"
+            android:textAppearance="@style/TextAppearance.AppCompat.Medium" />
 
         <ScrollView
             android:id="@+id/svLog"
@@ -40,6 +40,7 @@
                 android:orientation="horizontal">
 
                 <Button
+                    style="?android:attr/buttonBarButtonStyle"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -47,6 +48,7 @@
                     android:text="@string/btn_send" />
 
                 <Button
+                    style="?android:attr/buttonBarButtonStyle"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -74,7 +76,7 @@
 
         <variable
             name="UserActionListener"
-            type="org.blagodarie.ui.log.UserActionListener" />
+            type="org.blagodarie.log.UserActionListener" />
 
     </data>
 

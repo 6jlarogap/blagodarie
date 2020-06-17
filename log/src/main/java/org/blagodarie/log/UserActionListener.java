@@ -1,4 +1,4 @@
-package org.blagodarie.ui.log;
+package org.blagodarie.log;
 
 public interface UserActionListener {
     void onSend ();

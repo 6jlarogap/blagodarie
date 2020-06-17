@@ -24,7 +24,6 @@ android {
         release {
             minifyEnabled true
             shrinkResources true
-
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
             resValue "string", "content_provider_authorities", "${APPLICATION_ID}${CONTENT_PROVIDER_AUTHORITIES}"
@@ -35,7 +34,6 @@ android {
 
             minifyEnabled true
             shrinkResources true
-
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
             applicationIdSuffix ".dbg"
@@ -97,6 +95,7 @@ dependencies {
     implementation project(path: ':authentication')
     implementation project(path: ':server')
     implementation project(path: ':database')
+    implementation project(path: ':log')
 
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation "androidx.cardview:cardview:1.0.0"

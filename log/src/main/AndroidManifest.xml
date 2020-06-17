@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.blagodarie.log">
+
+    <application>
+        <activity
+            android:name=".LogActivity"
+            android:theme="@android:style/Theme.Dialog">
+            <intent-filter>
+                <action android:name="org.blagodarie.SEND_LOG" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>
