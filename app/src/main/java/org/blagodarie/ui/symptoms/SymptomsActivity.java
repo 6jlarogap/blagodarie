@@ -607,8 +607,10 @@ public final class SymptomsActivity
                         (dialog, which) -> {
                             final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                             final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), mIncognitoPrivateKey.toString());
-                            clipboard.setPrimaryClip(clip);
-                            Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+                            if (clipboard != null) {
+                                clipboard.setPrimaryClip(clip);
+                                Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+                            }
                         }).
                 setPositiveButton(
                         R.string.btn_cancel,
@@ -623,7 +625,7 @@ public final class SymptomsActivity
         final GetLatestVersionExecutor getLatestVersionExecutor = new GetLatestVersionExecutor(mIncognitoPrivateKey);
         mDisposables.add(
                 Observable.
-                        fromCallable(() -> serverConnector.execute(getLatestVersionExecutor)).
+                        fromCallable(() -> getLatestVersionExecutor.execute(serverConnector)).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(

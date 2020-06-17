@@ -30,6 +30,7 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
+    //Не увеличивать! Уменьшено для поддержки Android < 5.0
     implementation 'com.squareup.okhttp3:okhttp:3.12.1'
     implementation 'androidx.annotation:annotation:1.1.0'
 

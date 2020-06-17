@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.blagodarie.Repository;
+import org.blagodarie.server.ServerApiResponse;
 import org.blagodarie.server.ServerConnector;
 import org.blagodatie.database.Identifier;
 import org.blagodatie.database.Symptom;
@@ -18,12 +19,6 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
-
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-
-import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
 final class SymptomSyncer {
 
@@ -49,28 +44,22 @@ final class SymptomSyncer {
 
 
     final synchronized void sync (
-            @NonNull final String apiBaseUrl,
+            @NonNull final ServerConnector serverConnector,
             @NonNull final Repository repository,
             @NonNull final SharedPreferences sharedPreferences
     ) throws IOException, JSONException {
         Log.d(TAG, "sync");
-        String symptomChecksum = sharedPreferences.getString(PREF_SYMPTOM_CHECKSUM, "");
-        if (symptomChecksum == null) {
-            symptomChecksum = "";
-        }
+        final String symptomChecksum = sharedPreferences.getString(PREF_SYMPTOM_CHECKSUM, "");
 
         final String content = createJsonContent(symptomChecksum);
         Log.d(TAG, "content=" + content);
 
-        final Request request = createRequest(apiBaseUrl, content);
-        Log.d(TAG, "request=" + request);
+        final ServerApiResponse serverApiResponse = serverConnector.sendRequestAndGetResponse("getsymptoms", content);
+        Log.d(TAG, "serverApiResponse=" + serverApiResponse);
 
-        final Response response = ServerConnector.sendRequestAndGetRespone(request);
-        Log.d(TAG, "response.code=" + response.code());
-
-        if (response.code() == 200) {
-            if (response.body() != null) {
-                final String responseBody = response.body().string();
+        if (serverApiResponse.getCode() == 200) {
+            if (serverApiResponse.getBody() != null) {
+                final String responseBody = serverApiResponse.getBody();
                 Log.d(TAG, "responseBody=" + responseBody);
                 final JSONObject responseJSON = new JSONObject(responseBody);
                 final boolean changed = responseJSON.getBoolean("changed");
@@ -93,17 +82,6 @@ final class SymptomSyncer {
                 }
             }
         }
-    }
-
-    private Request createRequest (
-            @NonNull final String apiBaseUrl,
-            @NonNull final String content
-    ) {
-        final RequestBody body = RequestBody.create(JSON_TYPE, content);
-        return new Request.Builder().
-                url(apiBaseUrl + "getsymptoms").
-                post(body).
-                build();
     }
 
     private String createJsonContent (

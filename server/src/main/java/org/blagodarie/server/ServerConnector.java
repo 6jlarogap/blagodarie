@@ -19,6 +19,7 @@ import javax.net.ssl.X509TrustManager;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
@@ -43,12 +44,12 @@ public final class ServerConnector {
             // Create a trust manager that does not validate certificate chains
             final TrustManager[] trustAllCerts = new TrustManager[]{
                     new X509TrustManager() {
-                        @SuppressLint ("TrustAllX509TrustManager")
+                        @SuppressLint("TrustAllX509TrustManager")
                         @Override
                         public void checkClientTrusted (java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
                         }
 
-                        @SuppressLint ("TrustAllX509TrustManager")
+                        @SuppressLint("TrustAllX509TrustManager")
                         @Override
                         public void checkServerTrusted (java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
                         }
@@ -69,7 +70,7 @@ public final class ServerConnector {
 
             builder.sslSocketFactory(sslSocketFactory, (X509TrustManager) trustAllCerts[0]);
             builder.hostnameVerifier(new HostnameVerifier() {
-                @SuppressLint ("BadHostnameVerifier")
+                @SuppressLint("BadHostnameVerifier")
                 @Override
                 public boolean verify (String hostname, SSLSession session) {
                     return true;
@@ -85,7 +86,43 @@ public final class ServerConnector {
         return builder.build();
     }
 
-    public static Response sendRequestAndGetRespone(
+    private Request createRequest (
+            @NonNull final String relativeUrl,
+            @NonNull final String content
+    ) {
+        final RequestBody body = RequestBody.create(JSON_TYPE, content);
+        return new Request.Builder().
+                url(mApiBaseUrl + relativeUrl).
+                post(body).
+                build();
+    }
+
+    private Request createRequest (
+            @NonNull final String relativeUrl
+    ) {
+        return new Request.Builder().
+                url(mApiBaseUrl + relativeUrl).
+                build();
+    }
+
+    public ServerApiResponse sendRequestAndGetResponse (
+            @NonNull final String relativeUrl,
+            @NonNull final String content
+    ) throws IOException {
+        final Request request = createRequest(relativeUrl, content);
+        final Response response = sendRequestAndGetRespone(request);
+        return new ServerApiResponse(response.code(), response.body() != null ? response.body().string() : null);
+    }
+
+    public ServerApiResponse sendRequestAndGetResponse (
+            @NonNull final String relativeUrl
+    ) throws IOException {
+        final Request request = createRequest(relativeUrl);
+        final Response response = sendRequestAndGetRespone(request);
+        return new ServerApiResponse(response.code(), response.body() != null ? response.body().string() : null);
+    }
+
+    public static Response sendRequestAndGetRespone (
             @NonNull final Request request
     ) throws IOException {
         return generateDefaultOkHttp().newCall(request).execute();
