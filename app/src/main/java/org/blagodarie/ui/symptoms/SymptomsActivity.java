@@ -550,7 +550,7 @@ public final class SymptomsActivity
         final IncognitoSignUpFragment.IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpFragment.IncognitoSignUpExecutor(mIncognitoPrivateKey.toString(), mIncognitoPublicKey.toString());
         mDisposables.add(
                 Observable.
-                        fromCallable(() -> serverConnector.execute(signUpExecutor)).
+                        fromCallable(() -> signUpExecutor.execute(serverConnector)).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(
