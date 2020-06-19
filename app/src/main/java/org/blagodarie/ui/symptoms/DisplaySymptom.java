@@ -130,7 +130,6 @@ public final class DisplaySymptom
 
     final void setLastDate (@Nullable final Date lastDate) {
         mLastDate = lastDate;
-        highlightIfNeed();
         notifyPropertyChanged(org.blagodarie.BR.lastDate);
     }
 
@@ -223,21 +222,14 @@ public final class DisplaySymptom
             mUnconfirmedUserSymptom = notConfirmedUserSymptom;
             startConfirmationTimer(UserSymptomSyncer.USER_SYMPTOM_CONFIRMATION_TIME - howLongAgo);
         }
-        highlightIfNeed();
         notifyPropertyChanged(org.blagodarie.BR.notConfirmedUserSymptom);
         notifyPropertyChanged(org.blagodarie.BR.lastDate);
         notifyPropertyChanged(org.blagodarie.BR.userSymptomCount);
     }
 
-    private void highlightIfNeed () {
-        final Date lastDate = getLastDate();
-        if (lastDate != null) {
-            final long howLongAgo = System.currentTimeMillis() - lastDate.getTime();
-            if (howLongAgo <= HIGHLIGHT_TIME) {
-                setHighlight(true);
-                startHighlightTimer(HIGHLIGHT_TIME - howLongAgo);
-            }
-        }
+    final void highlight () {
+        setHighlight(true);
+        startHighlightTimer(HIGHLIGHT_TIME);
     }
 
     /**

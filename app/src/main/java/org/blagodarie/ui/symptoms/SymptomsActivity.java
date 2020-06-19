@@ -458,6 +458,7 @@ public final class SymptomsActivity
             @NonNull final DisplaySymptom displaySymptom
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
+        displaySymptom.highlight();
         final Date currentDate = new Date();
 
         final UserSymptom userSymptom = new UserSymptom(
