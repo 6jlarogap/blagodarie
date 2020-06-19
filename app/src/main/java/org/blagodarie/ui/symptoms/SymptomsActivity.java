@@ -52,7 +52,6 @@ import org.blagodatie.database.Identifier;
 import org.blagodatie.database.Symptom;
 import org.blagodatie.database.SymptomGroupWithSymptoms;
 import org.blagodatie.database.UserSymptom;
-import org.w3c.dom.Text;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -387,12 +386,28 @@ public final class SymptomsActivity
      */
     @Nullable
     private String tryInitUserData () {
+        Log.d(TAG, "tryInitUserData");
         String errorMessage = null;
         //если аккаунт передан
         if (getIntent().hasExtra(EXTRA_ACCOUNT)) {
             //получить аккаунт
             mAccount = getIntent().getParcelableExtra(EXTRA_ACCOUNT);
             Log.d(TAG, "account=" + mAccount);
+
+            //получить приватный анонимный ключ
+            final String incognitoPrivateKey = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY);
+            //если приватный анонимный ключ существует
+            if (incognitoPrivateKey != null) {
+                //попытаться преобразовать строку в UUID
+                try {
+                    mIncognitoPrivateKey = UUID.fromString(incognitoPrivateKey);
+                } catch (IllegalArgumentException e) {
+                    errorMessage = getString(R.string.err_msg_incorrect_incognito_private_key) + e.getLocalizedMessage();
+                }
+            } else {
+                //иначе установить сообщение об ошибке
+                errorMessage = getString(R.string.err_msg_incognito_private_key_is_missing);
+            }
 
             //получить публичный анонимный ключ
             final String incognitoPublicKey = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY);
@@ -411,21 +426,6 @@ public final class SymptomsActivity
 
             final String incognitoPublicKeyTimestamp = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY_TIMESTAMP);
             mIncognitoPublicKeyTimestamp = incognitoPublicKeyTimestamp != null ? Long.parseLong(incognitoPublicKeyTimestamp) : 0L;
-
-            //получить приватный анонимный ключ
-            final String incognitoPrivateKey = AccountManager.get(this).getUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PRIVATE_KEY);
-            //если приватный анонимный ключ существует
-            if (incognitoPrivateKey != null) {
-                //попытаться преобразовать строку в UUID
-                try {
-                    mIncognitoPrivateKey = UUID.fromString(incognitoPrivateKey);
-                } catch (IllegalArgumentException e) {
-                    errorMessage = getString(R.string.err_msg_incorrect_incognito_private_key) + e.getLocalizedMessage();
-                }
-            } else {
-                //иначе установить сообщение об ошибке
-                errorMessage = getString(R.string.err_msg_incognito_private_key_is_missing);
-            }
         } else {
             //иначе установить сообщение об ошибке
             errorMessage = getString(R.string.err_msg_account_not_set);
