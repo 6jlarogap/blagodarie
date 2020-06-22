@@ -1,5 +1,6 @@
 package org.blagodarie.ui.symptoms;
 
+import android.os.Handler;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -15,8 +16,6 @@ import org.blagodatie.database.UserSymptom;
 
 import java.util.Date;
 import java.util.Objects;
-import java.util.Timer;
-import java.util.TimerTask;
 
 /**
  * @author sergeGabrus
@@ -79,16 +78,20 @@ public final class DisplaySymptom
     private final UnconfirmedUserSymptomListener mConfirmUserSymptomListener;
 
     /**
-     * Таймер подтверждения.
+     * Обработчик подтверждения и подсветки.
      */
-    @Nullable
-    private Timer mConfirmationTimer;
+    @NonNull
+    private Handler mConfirmationHandler = new Handler();
 
     /**
-     * Таймер подсветки.
+     * Задача для подтверждения сообщения.
      */
-    @Nullable
-    private Timer mHighlightTimer;
+    private final Runnable mConfirmation = this::confirmUnconfirmedUserSymptom;
+
+    /**
+     * Задача для отключения подсветки.
+     */
+    private final Runnable mHighlighting = () -> setHighlight(false);
 
     public DisplaySymptom (
             @NonNull final Symptom symptom,
@@ -152,8 +155,8 @@ public final class DisplaySymptom
         return mHaveNotSynced;
     }
 
-    private void setHaveNotSynced (boolean mHaveNotSynced) {
-        this.mHaveNotSynced = mHaveNotSynced;
+    private void setHaveNotSynced (boolean haveNotSynced) {
+        mHaveNotSynced = haveNotSynced;
         notifyPropertyChanged(org.blagodarie.BR.haveNotSynced);
     }
 
@@ -162,8 +165,8 @@ public final class DisplaySymptom
         return mHighlight;
     }
 
-    private void setHighlight (boolean mHighlight) {
-        this.mHighlight = mHighlight;
+    private void setHighlight (boolean highlight) {
+        mHighlight = highlight;
         notifyPropertyChanged(org.blagodarie.BR.highlight);
     }
 
@@ -174,23 +177,15 @@ public final class DisplaySymptom
      */
     private void startConfirmationTimer (final long delay) {
         Log.d(TAG, "startConfirmationTimer");
-        if (mConfirmationTimer == null) {
-            mConfirmationTimer = new Timer();
-            mConfirmationTimer.schedule(getConfirmationTask(), delay);
-        }
+        mConfirmationHandler.postDelayed(mConfirmation, delay);
     }
 
     /**
      * Запускает таймер подсветки сообщения.
-     *
-     * @param delay Время таймера.
      */
-    private void startHighlightTimer (final long delay) {
+    private void startHighlightTimer () {
         Log.d(TAG, "startHighlightTimer");
-        if (mHighlightTimer == null) {
-            mHighlightTimer = new Timer();
-            mHighlightTimer.schedule(getHighlightTask(), delay);
-        }
+        mConfirmationHandler.postDelayed(mHighlighting, HIGHLIGHT_TIME);
     }
 
     @Nullable
@@ -229,7 +224,7 @@ public final class DisplaySymptom
 
     final void highlight () {
         setHighlight(true);
-        startHighlightTimer(HIGHLIGHT_TIME);
+        startHighlightTimer();
     }
 
     /**
@@ -264,10 +259,7 @@ public final class DisplaySymptom
      */
     private void clearConfirmationTimer () {
         Log.d(TAG, "clearConfirmationTimer");
-        if (mConfirmationTimer != null) {
-            mConfirmationTimer.cancel();
-            mConfirmationTimer = null;
-        }
+        mConfirmationHandler.removeCallbacks(mConfirmation);
     }
 
     /**
@@ -275,40 +267,7 @@ public final class DisplaySymptom
      */
     private void clearHighlightTimer () {
         Log.d(TAG, "clearHighlightTimer");
-        if (mHighlightTimer != null) {
-            mHighlightTimer.cancel();
-            mHighlightTimer = null;
-        }
-    }
-
-    /**
-     * Создает задачу подтверждения.
-     *
-     * @return Задача подтверждения.
-     */
-    private TimerTask getConfirmationTask () {
-        Log.d(TAG, "getConfirmationTask");
-        return new TimerTask() {
-            @Override
-            public void run () {
-                confirmUnconfirmedUserSymptom();
-            }
-        };
-    }
-
-    /**
-     * Создает задачу подтверждения.
-     *
-     * @return Задача подтверждения.
-     */
-    private TimerTask getHighlightTask () {
-        Log.d(TAG, "getHighlightTask");
-        return new TimerTask() {
-            @Override
-            public void run () {
-                setHighlight(false);
-            }
-        };
+        mConfirmationHandler.removeCallbacks(mHighlighting);
     }
 
     @Override
@@ -362,8 +321,9 @@ public final class DisplaySymptom
                 ", mHaveNotSynced=" + mHaveNotSynced +
                 ", mHighlight=" + mHighlight +
                 ", mConfirmUserSymptomListener=" + mConfirmUserSymptomListener +
-                ", mConfirmationTimer=" + mConfirmationTimer +
-                ", mHighlightTimer=" + mHighlightTimer +
+                ", mConfirmationHandler=" + mConfirmationHandler +
+                ", mConfirmation=" + mConfirmation +
+                ", mHighlighting=" + mHighlighting +
                 '}';
     }
 }
