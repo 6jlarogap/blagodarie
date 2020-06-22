@@ -3,8 +3,6 @@
     <string name="toolbar_title">Благодарие.рф</string>
     <string name="website_url" tools:ignore="TypographyDashes">https://xn--80aabjfhut3aw.xn--p1ai?incognitopublickey=%s</string>
 
-    <string name="crash_toast_text">Пожалуйста, отправьте отчет об ошибке разработчику</string>
-
     <!-- Buttons: prefix="btn_" -->
     <string name="btn_repeat">Повторить</string>
     <string name="btn_update">Обновить</string>
@@ -15,7 +13,6 @@
     <string name="btn_to_cancel">Отменить</string>
     <string name="btn_copy">Скопировать</string>
     <string name="btn_paste">Вставить</string>
-    <string name="btn_share">Поделится</string>
     <string name="btn_continue">Продолжить</string>
     <string name="btn_send">Отправить</string>
     <string name="btn_close">Закрыть</string>
@@ -29,7 +26,6 @@
     <string name="err_msg_no_internet_connection">Отсутствует соединение с интернетом</string>
     <string name="err_msg_no_server_connection">Отсутствует соединение с сервером</string>
     <string name="err_msg_server_connection">Ошибка связи с сервером</string>
-    <string name="err_msg_server_connection1">Ошибка связи с сервером</string>
     <!---->
 
     <!-- Info Messages: prefix="info_msg_" -->

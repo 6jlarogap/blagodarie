@@ -6,16 +6,13 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import org.blagodarie.server.ServerApiExecutor;
+import org.blagodarie.server.ServerApiResponse;
+import org.blagodarie.server.ServerConnector;
 import org.json.JSONObject;
 
 import java.util.UUID;
 
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-
-final class GetLatestVersionExecutor
-        implements ServerApiExecutor<GetLatestVersionExecutor.ApiResult> {
+final class GetLatestVersionExecutor {
 
     private static final String TAG = GetLatestVersionExecutor.class.getSimpleName();
 
@@ -109,21 +106,15 @@ final class GetLatestVersionExecutor
         mIncognitoPrivateKey = incognitoPrivateKey;
     }
 
-    @Override
-    public ApiResult execute (
-            @NonNull final String apiBaseUrl,
-            @NonNull final OkHttpClient okHttpClient
-    ) throws Exception {
+    public ApiResult execute (@NonNull final ServerConnector serverConnector) throws Exception {
         Log.d(TAG, "execute");
         ApiResult apiResult = null;
-        final Request request = new Request.Builder()
-                .url(apiBaseUrl + "getlatestversion?incognito_private_key=" + mIncognitoPrivateKey.toString())
-                .build();
-        Log.d(TAG, "request=" + request);
-        final Response response = okHttpClient.newCall(request).execute();
-        Log.d(TAG, "response.code=" + response.code());
-        if (response.body() != null) {
-            final String responseBody = response.body().string();
+
+        final ServerApiResponse serverApiResponse = serverConnector.sendRequestAndGetResponse("getlatestversion?incognito_private_key=" + mIncognitoPrivateKey.toString());
+        Log.d(TAG, "serverApiResponse=" + serverApiResponse);
+
+        if (serverApiResponse.getBody() != null) {
+            final String responseBody = serverApiResponse.getBody();
             Log.d(TAG, "responseBody=" + responseBody);
             final JSONObject rootJSON = new JSONObject(responseBody);
             final boolean googlePlayUpdate = rootJSON.getBoolean("google_play_update");

@@ -18,7 +18,6 @@ import android.text.style.UnderlineSpan;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -36,13 +35,11 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.blagodarie.BlagodarieApp;
 import org.blagodarie.BuildConfig;
-import org.blagodarie.LogReader;
 import org.blagodarie.R;
 import org.blagodarie.Repository;
 import org.blagodarie.UnauthorizedException;
 import org.blagodarie.authentication.AccountGeneral;
 import org.blagodarie.authentication.IncognitoSignUpFragment;
-import org.blagodarie.databinding.LogDialogBinding;
 import org.blagodarie.databinding.NavHeaderBinding;
 import org.blagodarie.databinding.SymptomsActivityBinding;
 import org.blagodarie.server.ServerConnector;
@@ -66,6 +63,8 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
+
+import static org.blagodarie.log.LogActivity.ACTION_SEND_LOG;
 
 /**
  * @author sergeGabrus
@@ -459,6 +458,7 @@ public final class SymptomsActivity
             @NonNull final DisplaySymptom displaySymptom
     ) {
         Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
+        displaySymptom.highlight();
         final Date currentDate = new Date();
 
         final UserSymptom userSymptom = new UserSymptom(
@@ -551,7 +551,7 @@ public final class SymptomsActivity
         final IncognitoSignUpFragment.IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpFragment.IncognitoSignUpExecutor(mIncognitoPrivateKey.toString(), mIncognitoPublicKey.toString());
         mDisposables.add(
                 Observable.
-                        fromCallable(() -> serverConnector.execute(signUpExecutor)).
+                        fromCallable(() -> signUpExecutor.execute(serverConnector)).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(
@@ -581,36 +581,11 @@ public final class SymptomsActivity
 
     public void showLog (final View view) {
         Log.d(TAG, "showLog");
-        String log = LogReader.getLog();
 
-        final LogDialogBinding logDialogBinding = LogDialogBinding.inflate(getLayoutInflater(), null, false);
-        logDialogBinding.setLog(log);
-        //перемотать в конец
-        logDialogBinding.svLog.post(() -> logDialogBinding.svLog.fullScroll(ScrollView.FOCUS_DOWN));
-
-        new AlertDialog.Builder(this).
-                setTitle(R.string.txt_log).
-                setView(logDialogBinding.getRoot()).
-                setPositiveButton(
-                        R.string.btn_copy,
-                        (dialog, which) -> {
-                            final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                            final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), log);
-                            clipboard.setPrimaryClip(clip);
-                            Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
-                        }).
-                setNeutralButton(
-                        R.string.btn_share,
-                        (dialog, which) -> {
-                            final Intent sendIntent = new Intent();
-                            sendIntent.setAction(Intent.ACTION_SEND);
-                            sendIntent.putExtra(Intent.EXTRA_TEXT, (CharSequence) log);
-                            sendIntent.putExtra(Intent.EXTRA_SUBJECT, "Благодарие журнал");
-                            sendIntent.setType("text/plain");
-                            startActivity(Intent.createChooser(sendIntent, getString(R.string.btn_share)));
-                        }).
-                create().
-                show();
+        final Intent intent = new Intent();
+        intent.setAction(ACTION_SEND_LOG);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
 
     public static Intent createSelfIntent (
@@ -633,8 +608,10 @@ public final class SymptomsActivity
                         (dialog, which) -> {
                             final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                             final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), mIncognitoPrivateKey.toString());
-                            clipboard.setPrimaryClip(clip);
-                            Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+                            if (clipboard != null) {
+                                clipboard.setPrimaryClip(clip);
+                                Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+                            }
                         }).
                 setPositiveButton(
                         R.string.btn_cancel,
@@ -649,7 +626,7 @@ public final class SymptomsActivity
         final GetLatestVersionExecutor getLatestVersionExecutor = new GetLatestVersionExecutor(mIncognitoPrivateKey);
         mDisposables.add(
                 Observable.
-                        fromCallable(() -> serverConnector.execute(getLatestVersionExecutor)).
+                        fromCallable(() -> getLatestVersionExecutor.execute(serverConnector)).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(

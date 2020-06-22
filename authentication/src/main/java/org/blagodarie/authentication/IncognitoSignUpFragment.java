@@ -22,6 +22,7 @@ import androidx.fragment.app.Fragment;
 
 import org.blagodarie.authentication.databinding.IncognitoSignUpFragmentBinding;
 import org.blagodarie.server.ServerApiExecutor;
+import org.blagodarie.server.ServerApiResponse;
 import org.blagodarie.server.ServerConnector;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -33,13 +34,8 @@ import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 
 import static android.app.Activity.RESULT_OK;
-import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
 public final class IncognitoSignUpFragment
         extends Fragment {
@@ -54,8 +50,7 @@ public final class IncognitoSignUpFragment
 
     }
 
-    public static final class IncognitoSignUpExecutor
-            implements ServerApiExecutor<IncognitoSignUpExecutor.ApiResult> {
+    public static final class IncognitoSignUpExecutor {
 
         private static final String TAG = IncognitoSignUpExecutor.class.getSimpleName();
 
@@ -93,26 +88,19 @@ public final class IncognitoSignUpFragment
             mIncognitoPublicKey = incognitoPublicKey;
         }
 
-        @Override
         public IncognitoSignUpExecutor.ApiResult execute (
-                @NonNull final String apiBaseUrl,
-                @NonNull final OkHttpClient okHttpClient
+                @NonNull final ServerConnector serverConnector
         ) throws JSONException, IOException {
             Log.d(TAG, "execute");
             Long userId = null;
             final String content = String.format(JSON_PATTERN, mIncognitoPrivateKey, mIncognitoPublicKey);
             Log.d(TAG, "content=" + content);
-            final RequestBody body = RequestBody.create(JSON_TYPE, content);
-            final Request request = new Request.Builder()
-                    .url(apiBaseUrl + "auth/signup/incognito")
-                    .post(body)
-                    .build();
-            final Response response = okHttpClient.newCall(request).execute();
-            Log.d(TAG, "response.code=" + response.code());
-            if (response.body() != null) {
-                final String responseBody = response.body().string();
-                Log.d(TAG, "responseBody=" + responseBody);
-                if (response.code() == 200) {
+            final ServerApiResponse serverApiResponse = serverConnector.sendRequestAndGetResponse("auth/signup/incognito", content);
+            Log.d(TAG, "serverApiResponse=" + serverApiResponse);
+
+            if (serverApiResponse.getCode() == 200) {
+                if (serverApiResponse.getBody() != null) {
+                    final String responseBody = serverApiResponse.getBody();
                     final JSONObject userJSON = new JSONObject(responseBody);
                     userId = userJSON.getLong("incognito_user_id");
                 }
@@ -153,15 +141,17 @@ public final class IncognitoSignUpFragment
         final View view = getLayoutInflater().inflate(R.layout.enter_incognito_id_dialog, null, false);
 
         final ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
-        final ClipData clipData = clipboard.getPrimaryClip();
-        if (clipData != null) {
-            final ClipData.Item item = clipData.getItemAt(0);
-            final String incognitoIdString = item.getText().toString();
-            try {
-                final UUID incognitoId = UUID.fromString(incognitoIdString);
-                ((EditText) view.findViewById(R.id.etIncognitoId)).setText(incognitoId.toString());
-            } catch (IllegalArgumentException e) {
-                Log.e(TAG, "error=" + e);
+        if (clipboard != null) {
+            final ClipData clipData = clipboard.getPrimaryClip();
+            if (clipData != null) {
+                final ClipData.Item item = clipData.getItemAt(0);
+                final String incognitoIdString = item.getText().toString();
+                try {
+                    final UUID incognitoId = UUID.fromString(incognitoIdString);
+                    ((EditText) view.findViewById(R.id.etIncognitoId)).setText(incognitoId.toString());
+                } catch (IllegalArgumentException e) {
+                    Log.e(TAG, "error=" + e);
+                }
             }
         }
 
@@ -184,7 +174,7 @@ public final class IncognitoSignUpFragment
         alertDialog.show();
 
         alertDialog.getButton(DialogInterface.BUTTON_NEGATIVE).setOnClickListener(v -> {
-            if (clipboard.getPrimaryClip() != null) {
+            if (clipboard != null && clipboard.getPrimaryClip() != null) {
                 final ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
                 final String bufferString = item.getText().toString();
                 ((EditText) view.findViewById(R.id.etIncognitoId)).setText(bufferString);
@@ -203,7 +193,7 @@ public final class IncognitoSignUpFragment
         final IncognitoSignUpExecutor signUpExecutor = new IncognitoSignUpExecutor(incognitoPrivateKey.toString(), incognitoPublicKey.toString());
         mDisposables.add(
                 Observable.
-                        fromCallable(() -> serverConnector.execute(signUpExecutor)).
+                        fromCallable(() -> signUpExecutor.execute(serverConnector)).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(

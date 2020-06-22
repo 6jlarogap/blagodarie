@@ -1,12 +1,11 @@
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 28
-
+    compileSdkVersion 29
 
     defaultConfig {
         minSdkVersion 19
-        targetSdkVersion 28
+        targetSdkVersion 29
         versionCode 1
         versionName "1.0"
 
@@ -21,7 +20,8 @@ android {
         }
         debug {
             debuggable true
-            minifyEnabled false
+
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -30,6 +30,7 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
+    //Не увеличивать! Уменьшено для поддержки Android < 5.0
     implementation 'com.squareup.okhttp3:okhttp:3.12.1'
     implementation 'androidx.annotation:annotation:1.1.0'
 

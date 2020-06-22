@@ -8,6 +8,7 @@ import androidx.core.util.Pair;
 
 import org.blagodarie.Repository;
 import org.blagodarie.UnauthorizedException;
+import org.blagodarie.server.ServerApiResponse;
 import org.blagodarie.server.ServerConnector;
 import org.blagodatie.database.UserSymptom;
 
@@ -19,12 +20,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import java.util.UUID;
-
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-
-import static org.blagodarie.server.ServerConnector.JSON_TYPE;
 
 public final class UserSymptomSyncer {
 
@@ -56,7 +51,7 @@ public final class UserSymptomSyncer {
     final synchronized void sync (
             @NonNull final UUID incognitoId,
             @Nullable final String authToken,
-            @NonNull final String apiBaseUrl,
+            @NonNull final ServerConnector serverConnector,
             @NonNull final Repository repository
     ) throws IOException, UnauthorizedException {
         Log.d(TAG, "sync");
@@ -68,15 +63,12 @@ public final class UserSymptomSyncer {
             final String content = createJsonContent(incognitoId, confirmedUserSymptoms);
             Log.d(TAG, "content=" + content);
 
-            final Request request = createRequest(apiBaseUrl, authToken, content);
-            Log.d(TAG, "request=" + request);
+            final ServerApiResponse serverApiResponse = serverConnector.sendRequestAndGetResponse("addincognitosymptom", content);
+            Log.d(TAG, "serverApiResponse=" + serverApiResponse);
 
-            final Response response = ServerConnector.sendRequestAndGetRespone(request);
-            Log.d(TAG, "response.code=" + response.code());
-
-            if (response.code() == 200) {
+            if (serverApiResponse.getCode() == 200) {
                 repository.deleteUserSymptoms(confirmedUserSymptoms);
-            } else if (response.code() == 401) {
+            } else if (serverApiResponse.getCode() == 401) {
                 throw new UnauthorizedException();
             }
         }
@@ -91,23 +83,6 @@ public final class UserSymptomSyncer {
             }
         }
         return confirmentUserSymptoms;
-    }
-
-    private Request createRequest (
-            @NonNull final String apiBaseUrl,
-            @Nullable final String authToken,
-            @NonNull final String content
-    ) {
-        final RequestBody body = RequestBody.create(JSON_TYPE, content);
-        final Request.Builder requestBuilder = new Request.Builder();
-        if (authToken != null) {
-            requestBuilder.url(apiBaseUrl + "add_user_symptom");
-            requestBuilder.header("Authorization", String.format("Token %s", authToken));
-        } else {
-            requestBuilder.url(apiBaseUrl + "addincognitosymptom");
-        }
-        requestBuilder.post(body);
-        return requestBuilder.build();
     }
 
     private String createJsonContent (

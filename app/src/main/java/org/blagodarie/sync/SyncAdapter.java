@@ -66,13 +66,13 @@ public final class SyncAdapter
     ) throws JSONException, IOException, UnauthorizedException {
         Log.d(TAG, "syncAll");
         final Repository repository = Repository.getInstance(getContext());
-        final String apiBaseUrl = new ServerConnector(getContext()).getApiBaseUrl();
+        final ServerConnector serverConnector = new ServerConnector(getContext());
 
-        //синхронизировать симптомы
+        //синхронизировать справочник симптомов
         SymptomSyncer.
                 getInstance().
                 sync(
-                        apiBaseUrl,
+                        serverConnector,
                         repository,
                         getContext().getSharedPreferences(GENERAL_PREFERENCE, Context.MODE_PRIVATE)
                 );
@@ -83,7 +83,7 @@ public final class SyncAdapter
                 sync(
                         incognitoId,
                         authToken,
-                        apiBaseUrl,
+                        serverConnector,
                         repository
                 );
 

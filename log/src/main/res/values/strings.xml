@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rqst_send_crash_report">Пожалуйста, отправьте отчет об ошибке разработчику</string>
+
+    <string name="btn_send">Отправить</string>
+    <string name="btn_close">Закрыть</string>
+    <string name="btn_copy">Скопировать</string>
+
+    <string name="copied_to_clipboard">Скопировано в буффер обмена</string>
+
+    <string name="txt_log">Журнал</string>
+</resources>

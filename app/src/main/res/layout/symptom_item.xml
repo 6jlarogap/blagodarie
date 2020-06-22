@@ -12,67 +12,52 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_margin="5dp"
-                android:gravity="center"
-                android:text="@{DisplaySymptom.symptomName}"
-                android:textAppearance="@style/TextAppearance.AppCompat.Large" />
-
-            <FrameLayout
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-
-                <LinearLayout
+                <ImageView
+                    android:id="@+id/ivSync"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="start"
-                    android:layout_margin="5dp"
-                    android:orientation="vertical">
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:layout_gravity="center_horizontal"
+                    android:src="@drawable/sync"
+                    android:visibility="@{DisplaySymptom.isHaveNotSynced ? View.VISIBLE : View.INVISIBLE}" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text='@{DisplaySymptom.lastDate != null ? SimpleDateFormat.getDateTimeInstance().format(DisplaySymptom.lastDate) : ""}'
-                        android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                        android:visibility="@{DisplaySymptom.lastDate != null ? View.VISIBLE : View.GONE}" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:visibility="@{DisplaySymptom.isHaveNotSynced ? View.VISIBLE : View.GONE}">
-
-                        <ImageView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center_horizontal"
-                            android:src="@drawable/sync" />
-
-                    </LinearLayout>
-
-                </LinearLayout>
-
-                <LinearLayout
+                <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="end"
+                    android:layout_centerVertical="true"
+                    android:layout_gravity="center"
                     android:layout_margin="5dp"
-                    android:orientation="vertical">
+                    android:layout_toStartOf="@id/ivCancel"
+                    android:layout_toEndOf="@id/ivSync"
+                    android:gravity="center"
+                    android:text="@{DisplaySymptom.symptomName}"
+                    android:textAppearance="@style/TextAppearance.AppCompat.Large" />
 
-                    <androidx.appcompat.widget.AppCompatButton
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:onClick="@{() -> DisplaySymptom.cancelUnconfirmedUserSymptom()}"
-                        android:text="@string/btn_to_cancel"
-                        android:visibility="@{DisplaySymptom.notConfirmedUserSymptom == null ? View.GONE : View.VISIBLE}" />
+                <ImageView
+                    android:id="@+id/ivCancel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:src="@drawable/close_circle"
+                    android:onClick="@{() -> DisplaySymptom.cancelUnconfirmedUserSymptom()}"
+                    android:visibility="@{DisplaySymptom.notConfirmedUserSymptom == null ? View.INVISIBLE : View.VISIBLE}" />
 
-                </LinearLayout>
+            </RelativeLayout>
 
-            </FrameLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:text='@{DisplaySymptom.lastDate != null ? SimpleDateFormat.getDateTimeInstance().format(DisplaySymptom.lastDate) : ""}'
+                android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                android:visibility="@{DisplaySymptom.lastDate != null ? View.VISIBLE : View.GONE}" />
+
 
         </LinearLayout>
 
