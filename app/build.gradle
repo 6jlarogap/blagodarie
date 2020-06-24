@@ -4,7 +4,7 @@ android {
 
     compileSdkVersion 29
 
-    def APPLICATION_ID = "org.blagodarie"
+    def APPLICATION_ID = "blagodarie.health"
 
     def CONTENT_PROVIDER_AUTHORITIES = ".content.provider"
     def FILE_PROVIDER_AUTHORITIES = ".file.provider"
@@ -13,8 +13,8 @@ android {
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 29
-        versionCode 50
-        versionName "0.4.13"
+        versionCode 1
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         //multiDexEnabled true
     }
@@ -44,7 +44,7 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "blagodarie-" + versionName + "-" + buildType.name + ".apk"
+            outputFileName = "health-" + versionName + "-" + buildType.name + ".apk"
         }
         variant.getAssembleProvider().configure() {
             it.doLast {
@@ -62,7 +62,7 @@ android {
                     //скопировать apk в latest
                     copy {
                         from("${projectDir}\\${buildType.name}\\${outputFileName}") {
-                            rename '.*', "blagodarie${dbgSuffix}-latest.apk"
+                            rename '.*', "health${dbgSuffix}-latest.apk"
                         }
                         into "${distDir}${dbgSuffix}"
                     }
@@ -80,8 +80,8 @@ android {
         }
     }
 
-    dataBinding {
-        enabled = true
+    buildFeatures {
+        dataBinding = true
     }
     compileOptions {
         sourceCompatibility = 1.8

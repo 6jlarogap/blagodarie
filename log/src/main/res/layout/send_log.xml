@@ -76,7 +76,7 @@
 
         <variable
             name="UserActionListener"
-            type="org.blagodarie.log.UserActionListener" />
+            type="blagodarie.health.log.UserActionListener" />
 
     </data>
 

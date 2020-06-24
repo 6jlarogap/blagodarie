@@ -24,7 +24,7 @@
 
         <variable
             name="DisplaySymptomGroup"
-            type="org.blagodarie.ui.symptoms.DisplaySymptomGroup" />
+            type="blagodarie.health.ui.symptoms.DisplaySymptomGroup" />
 
     </data>
 

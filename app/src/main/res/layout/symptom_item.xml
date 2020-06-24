@@ -71,7 +71,7 @@
 
         <variable
             name="DisplaySymptom"
-            type="org.blagodarie.ui.symptoms.DisplaySymptom" />
+            type="blagodarie.health.ui.symptoms.DisplaySymptom" />
 
     </data>
 

@@ -66,6 +66,6 @@
 
         <variable
             name="ViewModel"
-            type="org.blagodarie.ui.update.UpdateViewModel" />
+            type="blagodarie.health.ui.update.UpdateViewModel" />
     </data>
 </layout>

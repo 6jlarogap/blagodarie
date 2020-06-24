@@ -7,7 +7,7 @@
         android:id="@+id/drawer_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        tools:context=".ui.symptoms.SymptomsActivity">
+        tools:context="blagodarie.health.ui.symptoms.SymptomsActivity">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -81,12 +81,12 @@
 
     <data>
 
-        <import type="org.blagodarie.BuildConfig" />
+        <import type="blagodarie.health.BuildConfig" />
 
         <import type="android.view.View" />
 
         <variable
             name="ViewModel"
-            type="org.blagodarie.ui.symptoms.SymptomsViewModel" />
+            type="blagodarie.health.ui.symptoms.SymptomsViewModel" />
     </data>
 </layout>

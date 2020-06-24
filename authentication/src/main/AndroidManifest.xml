@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.blagodarie.authentication">
+    package="blagodarie.health.authentication">
 
     <uses-permission
         android:name="android.permission.GET_ACCOUNTS"
@@ -10,7 +10,7 @@
         android:maxSdkVersion="22" />
 
     <application>
-        <activity android:name=".AuthenticationActivity" />
-        <service android:name=".AuthenticatorService" />
+        <activity android:name="blagodarie.health.authentication.AuthenticationActivity" />
+        <service android:name="blagodarie.health.authentication.AuthenticatorService" />
     </application>
 </manifest>
