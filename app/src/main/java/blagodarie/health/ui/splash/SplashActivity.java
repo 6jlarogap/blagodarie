@@ -14,7 +14,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import blagodarie.health.R;
 import blagodarie.health.authentication.AccountGeneral;
 import blagodarie.health.authentication.Authenticator;
-import blagodarie.health.ui.symptoms.SymptomsActivity;
+import blagodarie.health.ui.messages.MessagesActivity;
 
 import java.util.Arrays;
 
@@ -57,7 +57,7 @@ public final class SplashActivity
                     mAccountManager.setUserData(accounts[0], AccountGeneral.USER_DATA_USER_ID, accounts[0].name);
                 }
             }
-            toSymptomsActivity(accounts[0]);
+            toMessagesActivity(accounts[0]);
         } else if (accounts.length > 1) {
             showAccountPicker(accounts);
         } else {
@@ -100,17 +100,17 @@ public final class SplashActivity
                         new ArrayAdapter<>(
                                 getBaseContext(),
                                 android.R.layout.simple_list_item_1, names),
-                        (dialog, which) -> toSymptomsActivity(accounts[which])
+                        (dialog, which) -> toMessagesActivity(accounts[which])
                 ).
                 create().
                 show();
     }
 
-    private void toSymptomsActivity (
+    private void toMessagesActivity (
             @NonNull final Account account
     ) {
-        Log.d(TAG, "toSymptomsActivity account=" + account);
-        startActivity(SymptomsActivity.createSelfIntent(this, account));
+        Log.d(TAG, "toMessagesActivity account=" + account);
+        startActivity(MessagesActivity.createSelfIntent(this, account));
         finish();
     }
 

@@ -1,4 +1,4 @@
-package blagodarie.health.ui.symptoms;
+package blagodarie.health.ui.messages;
 
 import androidx.annotation.NonNull;
 

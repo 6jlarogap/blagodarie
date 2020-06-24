@@ -10,7 +10,7 @@ import androidx.room.Index;
 import java.util.Objects;
 
 @Entity (
-        tableName = "tbl_symptom_group",
+        tableName = "tbl_message_group",
         inheritSuperIndices = true,
         indices = {
                 @Index (value = {"name"}, unique = true),
@@ -18,13 +18,13 @@ import java.util.Objects;
         },
         foreignKeys = {
                 @ForeignKey (
-                        entity = SymptomGroup.class,
+                        entity = MessageGroup.class,
                         parentColumns = "id",
                         childColumns = "parent_id"
                 )
         }
 )
-public final class SymptomGroup
+public final class MessageGroup
         extends BaseEntity {
 
     @NonNull
@@ -35,7 +35,7 @@ public final class SymptomGroup
     @ColumnInfo (name = "parent_id", typeAffinity = ColumnInfo.INTEGER)
     private final Identifier ParentId;
 
-    public SymptomGroup (
+    public MessageGroup (
             @NonNull final Identifier Id,
             @NonNull final String Name,
             @Nullable final Identifier ParentId
@@ -59,7 +59,7 @@ public final class SymptomGroup
     public boolean equals (Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        final SymptomGroup that = (SymptomGroup) o;
+        final MessageGroup that = (MessageGroup) o;
         return getId().equals(that.getId()) &&
                 Name.equals(that.Name) &&
                 Objects.equals(ParentId, that.ParentId);
@@ -73,7 +73,7 @@ public final class SymptomGroup
     @NonNull
     @Override
     public String toString () {
-        return "SymptomGroup{" +
+        return "MessageGroup{" +
                 "Id=" + getId() +
                 ", Name='" + Name + '\'' +
                 ", ParentId=" + ParentId +

@@ -1,4 +1,4 @@
-package blagodarie.health.ui.symptoms;
+package blagodarie.health.ui.messages;
 
 import android.os.Handler;
 import android.util.Log;
@@ -9,10 +9,10 @@ import androidx.databinding.BaseObservable;
 import androidx.databinding.Bindable;
 import androidx.lifecycle.LiveData;
 
-import blagodarie.health.sync.UserSymptomSyncer;
+import blagodarie.health.database.Message;
+import blagodarie.health.sync.UserMessageSyncer;
 import blagodarie.health.database.Identifier;
-import blagodarie.health.database.Symptom;
-import blagodarie.health.database.UserSymptom;
+import blagodarie.health.database.UserMessage;
 
 import java.util.Date;
 import java.util.Objects;
@@ -21,28 +21,28 @@ import java.util.Objects;
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-public final class DisplaySymptom
+public final class DisplayMessage
         extends BaseObservable
-        implements Comparable<DisplaySymptom> {
+        implements Comparable<DisplayMessage> {
 
-    private static final String TAG = DisplaySymptom.class.getSimpleName();
+    private static final String TAG = DisplayMessage.class.getSimpleName();
 
     /**
      * Время подсветки сообщения в миллисекундах. В течении этого времени сообщение нельня еще раз отметить.
      */
     private static final long HIGHLIGHT_TIME = 30000L;
 
-    interface UnconfirmedUserSymptomListener {
-        void onConfirm (@NonNull final DisplaySymptom displaySymptom);
+    interface UnconfirmedUserMessageListener {
+        void onConfirm (@NonNull final DisplayMessage displayMessage);
 
-        void onCancel (@NonNull final UserSymptom canceledUserSymptom);
+        void onCancel (@NonNull final UserMessage canceledUserMessage);
     }
 
     /**
      * Сообщение.
      */
     @NonNull
-    private final Symptom mSymptom;
+    private final Message mMessage;
 
     /**
      * Дата последней отметки.
@@ -53,13 +53,13 @@ public final class DisplaySymptom
     /**
      * Количество отметок.
      */
-    private long mUserSymptomCount = 0;
+    private long mUserMessageCount = 0;
 
     /**
      * Неподтветжденное сообщение.
      */
     @Nullable
-    private UserSymptom mUnconfirmedUserSymptom;
+    private UserMessage mUnconfirmedUserMessage;
 
     /**
      * Имеются ли несинхронизированные сообщения данного типа.
@@ -75,7 +75,7 @@ public final class DisplaySymptom
      * Слушатель подтверждения/отмены сообщения.
      */
     @NonNull
-    private final UnconfirmedUserSymptomListener mConfirmUserSymptomListener;
+    private final UnconfirmedUserMessageListener mUnconfirmedUserMessageListener;
 
     /**
      * Обработчик подтверждения и подсветки.
@@ -86,46 +86,46 @@ public final class DisplaySymptom
     /**
      * Задача для подтверждения сообщения.
      */
-    private final Runnable mConfirmation = this::confirmUnconfirmedUserSymptom;
+    private final Runnable mConfirmation = this::confirmUnconfirmedUserMessage;
 
     /**
      * Задача для отключения подсветки.
      */
     private final Runnable mHighlighting = () -> setHighlight(false);
 
-    public DisplaySymptom (
-            @NonNull final Symptom symptom,
+    public DisplayMessage (
+            @NonNull final Message message,
             @NonNull final LiveData<Boolean> haveNotSynced,
-            @NonNull final LiveData<UserSymptom> notConfirmedUserSymptom,
-            @NonNull final UnconfirmedUserSymptomListener unconfirmedUserSymptomListener
+            @NonNull final LiveData<UserMessage> notConfirmedUserMessage,
+            @NonNull final UnconfirmedUserMessageListener unconfirmedUserMessageListener
     ) {
-        Log.d(TAG, "DisplaySymptom");
-        mSymptom = symptom;
+        Log.d(TAG, "DisplayMessage");
+        mMessage = message;
         haveNotSynced.observeForever(this::setHaveNotSynced);
-        notConfirmedUserSymptom.observeForever(latestUserSymptom -> {
-            if (latestUserSymptom != null && !latestUserSymptom.equals(mUnconfirmedUserSymptom)) {
-                setNotConfirmedUserSymptom(latestUserSymptom);
+        notConfirmedUserMessage.observeForever(latestUserMessage -> {
+            if (latestUserMessage != null && !latestUserMessage.equals(mUnconfirmedUserMessage)) {
+                setNotConfirmedUserMessage(latestUserMessage);
             }
         });
-        mConfirmUserSymptomListener = unconfirmedUserSymptomListener;
+        mUnconfirmedUserMessageListener = unconfirmedUserMessageListener;
     }
 
     @NonNull
-    final Identifier getSymptomId () {
-        return mSymptom.getId();
+    final Identifier getMessageId () {
+        return mMessage.getId();
     }
 
     @NonNull
     @Bindable
-    public final String getSymptomName () {
-        return mSymptom.getName();
+    public final String getMessageName () {
+        return mMessage.getName();
     }
 
     @Nullable
     @Bindable
     public final Date getLastDate () {
-        if (mUnconfirmedUserSymptom != null) {
-            return mUnconfirmedUserSymptom.getTimestamp();
+        if (mUnconfirmedUserMessage != null) {
+            return mUnconfirmedUserMessage.getTimestamp();
         } else {
             return mLastDate;
         }
@@ -137,16 +137,16 @@ public final class DisplaySymptom
     }
 
     @Bindable
-    final long getUserSymptomCount () {
-        long userSymptomCount = mUserSymptomCount;
-        if (mUnconfirmedUserSymptom != null) {
-            userSymptomCount++;
+    final long getUserMessageCount () {
+        long userMessageCount = mUserMessageCount;
+        if (mUnconfirmedUserMessage != null) {
+            userMessageCount++;
         }
-        return userSymptomCount;
+        return userMessageCount;
     }
 
-    final void setUserSymptomCount (final long userSymptomCount) {
-        mUserSymptomCount = userSymptomCount;
+    final void setUserMessageCount (final long userMessageCount) {
+        mUserMessageCount = userMessageCount;
         notifyPropertyChanged(blagodarie.health.BR.lastDate);
     }
 
@@ -190,36 +190,36 @@ public final class DisplaySymptom
 
     @Nullable
     @Bindable
-    public final UserSymptom getNotConfirmedUserSymptom () {
-        return mUnconfirmedUserSymptom;
+    public final UserMessage getNotConfirmedUserMessage () {
+        return mUnconfirmedUserMessage;
     }
 
     /**
      * Очищает неподтвержденный симптом.
      */
-    private void clearNotConfirmedUserSymptom () {
-        mUnconfirmedUserSymptom = null;
-        notifyPropertyChanged(blagodarie.health.BR.notConfirmedUserSymptom);
+    private void clearNotConfirmedUserMessage () {
+        mUnconfirmedUserMessage = null;
+        notifyPropertyChanged(blagodarie.health.BR.notConfirmedUserMessage);
         notifyPropertyChanged(blagodarie.health.BR.lastDate);
-        notifyPropertyChanged(blagodarie.health.BR.userSymptomCount);
+        notifyPropertyChanged(blagodarie.health.BR.userMessageCount);
     }
 
     /**
      * Устанавливает неподтвержденное сообщение.
      *
-     * @param notConfirmedUserSymptom Неподтвержденное сообщение.
+     * @param notConfirmedUserMessage Неподтвержденное сообщение.
      */
-    private void setNotConfirmedUserSymptom (@NonNull final UserSymptom notConfirmedUserSymptom) {
-        Log.d(TAG, "setNotConfirmedUserSymptom notConfirmedUserSymptom=" + notConfirmedUserSymptom);
-        final long howLongAgo = System.currentTimeMillis() - notConfirmedUserSymptom.getTimestamp().getTime();
+    private void setNotConfirmedUserMessage (@NonNull final UserMessage notConfirmedUserMessage) {
+        Log.d(TAG, "setNotConfirmedUserMessage notConfirmedUserMessage=" + notConfirmedUserMessage);
+        final long howLongAgo = System.currentTimeMillis() - notConfirmedUserMessage.getTimestamp().getTime();
         Log.d(TAG, "howLongAgo=" + howLongAgo);
-        if (howLongAgo <= UserSymptomSyncer.USER_SYMPTOM_CONFIRMATION_TIME) {
-            mUnconfirmedUserSymptom = notConfirmedUserSymptom;
-            startConfirmationTimer(UserSymptomSyncer.USER_SYMPTOM_CONFIRMATION_TIME - howLongAgo);
+        if (howLongAgo <= UserMessageSyncer.USER_MESSAGE_CONFIRMATION_TIME) {
+            mUnconfirmedUserMessage = notConfirmedUserMessage;
+            startConfirmationTimer(UserMessageSyncer.USER_MESSAGE_CONFIRMATION_TIME - howLongAgo);
         }
-        notifyPropertyChanged(blagodarie.health.BR.notConfirmedUserSymptom);
+        notifyPropertyChanged(blagodarie.health.BR.notConfirmedUserMessage);
         notifyPropertyChanged(blagodarie.health.BR.lastDate);
-        notifyPropertyChanged(blagodarie.health.BR.userSymptomCount);
+        notifyPropertyChanged(blagodarie.health.BR.userMessageCount);
     }
 
     final void highlight () {
@@ -230,28 +230,28 @@ public final class DisplaySymptom
     /**
      * Подтверждает неподтвержденное сообщение.
      */
-    private void confirmUnconfirmedUserSymptom () {
-        Log.d(TAG, "confirmUnconfirmedUserSymptom");
-        mConfirmUserSymptomListener.onConfirm(this);
+    private void confirmUnconfirmedUserMessage () {
+        Log.d(TAG, "confirmUnconfirmedUserMessage");
+        mUnconfirmedUserMessageListener.onConfirm(this);
         clearConfirmationTimer();
-        clearNotConfirmedUserSymptom();
+        clearNotConfirmedUserMessage();
     }
 
     /**
      * Отменяет неподтвержденное сообщение.
      */
-    public final void cancelUnconfirmedUserSymptom () {
-        Log.d(TAG, "cancelUnconfirmedUserSymptom");
+    public final void cancelUnconfirmedUserMessage () {
+        Log.d(TAG, "cancelUnconfirmedUserMessage");
         clearConfirmationTimer();
 
         setHighlight(false);
         clearHighlightTimer();
 
-        if (mUnconfirmedUserSymptom != null) {
-            mConfirmUserSymptomListener.onCancel(mUnconfirmedUserSymptom);
+        if (mUnconfirmedUserMessage != null) {
+            mUnconfirmedUserMessageListener.onCancel(mUnconfirmedUserMessage);
         }
 
-        clearNotConfirmedUserSymptom();
+        clearNotConfirmedUserMessage();
     }
 
     /**
@@ -271,7 +271,7 @@ public final class DisplaySymptom
     }
 
     @Override
-    public int compareTo (@NonNull final DisplaySymptom o) {
+    public int compareTo (@NonNull final DisplayMessage o) {
         int result;
         if (this == o) {
             result = 0;
@@ -280,7 +280,7 @@ public final class DisplaySymptom
             long otherTimestamp = o.getLastDate() == null ? 0 : o.getLastDate().getTime();
             result = -Long.compare(thisTimestamp, otherTimestamp);
             if (result == 0) {
-                result = this.getSymptomName().compareTo(o.getSymptomName());
+                result = this.getMessageName().compareTo(o.getMessageName());
             }
         }
         return result;
@@ -290,22 +290,22 @@ public final class DisplaySymptom
     public boolean equals (Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        DisplaySymptom that = (DisplaySymptom) o;
-        return mUserSymptomCount == that.mUserSymptomCount &&
+        DisplayMessage that = (DisplayMessage) o;
+        return mUserMessageCount == that.mUserMessageCount &&
                 mHaveNotSynced == that.mHaveNotSynced &&
                 mHighlight == that.mHighlight &&
-                mSymptom.equals(that.mSymptom) &&
+                mMessage.equals(that.mMessage) &&
                 Objects.equals(mLastDate, that.mLastDate) &&
-                Objects.equals(mUnconfirmedUserSymptom, that.mUnconfirmedUserSymptom);
+                Objects.equals(mUnconfirmedUserMessage, that.mUnconfirmedUserMessage);
     }
 
     @Override
     public int hashCode () {
         return Objects.hash(
-                mSymptom,
+                mMessage,
                 mLastDate,
-                mUserSymptomCount,
-                mUnconfirmedUserSymptom,
+                mUserMessageCount,
+                mUnconfirmedUserMessage,
                 mHaveNotSynced,
                 mHighlight
         );
@@ -313,14 +313,14 @@ public final class DisplaySymptom
 
     @Override
     public String toString () {
-        return "DisplaySymptom{" +
-                "mSymptom=" + mSymptom +
+        return "DisplayMessage{" +
+                "mMessage=" + mMessage +
                 ", mLastDate=" + mLastDate +
-                ", mUserSymptomCount=" + mUserSymptomCount +
-                ", mUnconfirmedUserSymptom=" + mUnconfirmedUserSymptom +
+                ", mUserMessageCount=" + mUserMessageCount +
+                ", mUnconfirmedUserMessage=" + mUnconfirmedUserMessage +
                 ", mHaveNotSynced=" + mHaveNotSynced +
                 ", mHighlight=" + mHighlight +
-                ", mConfirmUserSymptomListener=" + mConfirmUserSymptomListener +
+                ", mUnconfirmedUserMessageListener=" + mUnconfirmedUserMessageListener +
                 ", mConfirmationHandler=" + mConfirmationHandler +
                 ", mConfirmation=" + mConfirmation +
                 ", mHighlighting=" + mHighlighting +

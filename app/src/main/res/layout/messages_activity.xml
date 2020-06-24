@@ -7,7 +7,7 @@
         android:id="@+id/drawer_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        tools:context="blagodarie.health.ui.symptoms.SymptomsActivity">
+        tools:context="blagodarie.health.ui.messages.MessagesActivity">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -41,7 +41,7 @@
                 android:orientation="vertical">
 
                 <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvSymptoms"
+                    android:id="@+id/rvMessages"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
@@ -50,7 +50,7 @@
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
                 <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvSymptomGroups"
+                    android:id="@+id/rvMessageGroups"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_gravity="bottom"
@@ -75,7 +75,7 @@
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_gravity="start"
-            app:menu="@menu/symptoms_menu" />
+            app:menu="@menu/messages_menu" />
 
     </androidx.drawerlayout.widget.DrawerLayout>
 
@@ -87,6 +87,6 @@
 
         <variable
             name="ViewModel"
-            type="blagodarie.health.ui.symptoms.SymptomsViewModel" />
+            type="blagodarie.health.ui.messages.MessagesViewModel" />
     </data>
 </layout>

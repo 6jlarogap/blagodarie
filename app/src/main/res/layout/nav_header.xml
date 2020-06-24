@@ -27,7 +27,7 @@
 
         <variable
             name="ViewModel"
-            type="blagodarie.health.ui.symptoms.SymptomsViewModel" />
+            type="blagodarie.health.ui.messages.MessagesViewModel" />
 
     </data>
 </layout>

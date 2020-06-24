@@ -68,8 +68,8 @@ public final class SyncAdapter
         final Repository repository = Repository.getInstance(getContext());
         final ServerConnector serverConnector = new ServerConnector(getContext());
 
-        //синхронизировать справочник симптомов
-        SymptomSyncer.
+        //синхронизировать справочник сообщений
+        MessageSyncer.
                 getInstance().
                 sync(
                         serverConnector,
@@ -77,8 +77,8 @@ public final class SyncAdapter
                         getContext().getSharedPreferences(GENERAL_PREFERENCE, Context.MODE_PRIVATE)
                 );
 
-        //синхронизировать симптомы пользователя
-        UserSymptomSyncer.
+        //синхронизировать сообщения пользователя
+        UserMessageSyncer.
                 getInstance().
                 sync(
                         incognitoId,

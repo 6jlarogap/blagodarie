@@ -7,11 +7,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import blagodarie.health.Repository;
+import blagodarie.health.database.Message;
+import blagodarie.health.database.MessageGroup;
 import blagodarie.health.server.ServerApiResponse;
 import blagodarie.health.server.ServerConnector;
 import blagodarie.health.database.Identifier;
-import blagodarie.health.database.Symptom;
-import blagodarie.health.database.SymptomGroup;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -20,23 +21,23 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 
-final class SymptomSyncer {
+final class MessageSyncer {
 
-    private static final String TAG = SymptomSyncer.class.getSimpleName();
+    private static final String TAG = MessageSyncer.class.getSimpleName();
 
-    private static final String PREF_SYMPTOM_CHECKSUM = "symptomChecksum";
+    private static final String PREF_MESSAGE_CHECKSUM = "messageChecksum";
 
-    private static volatile SymptomSyncer INSTANCE;
+    private static volatile MessageSyncer INSTANCE;
 
-    private SymptomSyncer () {
+    private MessageSyncer () {
     }
 
     @NonNull
-    static SymptomSyncer getInstance () {
+    static MessageSyncer getInstance () {
         Log.d(TAG, "getInstance");
-        synchronized (SymptomSyncer.class) {
+        synchronized (MessageSyncer.class) {
             if (INSTANCE == null) {
-                INSTANCE = new SymptomSyncer();
+                INSTANCE = new MessageSyncer();
             }
         }
         return INSTANCE;
@@ -49,9 +50,13 @@ final class SymptomSyncer {
             @NonNull final SharedPreferences sharedPreferences
     ) throws IOException, JSONException {
         Log.d(TAG, "sync");
-        final String symptomChecksum = sharedPreferences.getString(PREF_SYMPTOM_CHECKSUM, "");
+        String messageChecksum = sharedPreferences.getString(PREF_MESSAGE_CHECKSUM, "");
 
-        final String content = createJsonContent(symptomChecksum);
+        if (messageChecksum == null) {
+            messageChecksum = "";
+        }
+
+        final String content = createJsonContent(messageChecksum);
         Log.d(TAG, "content=" + content);
 
         final ServerApiResponse serverApiResponse = serverConnector.sendRequestAndGetResponse("getsymptoms", content);
@@ -65,20 +70,20 @@ final class SymptomSyncer {
                 final boolean changed = responseJSON.getBoolean("changed");
                 //если есть изменения
                 if (changed) {
-                    //создать SymptomGroup из JSON
-                    final JSONArray symptomGroupJSONArray = responseJSON.getJSONArray("symptom_groups");
-                    final Collection<SymptomGroup> newSymptomGroups = getSymptomGroupsFromJsonArray(symptomGroupJSONArray);
+                    //создать MessageGroup из JSON
+                    final JSONArray messageGroupJSONArray = responseJSON.getJSONArray("symptom_groups");
+                    final Collection<MessageGroup> newMessageGroups = getMessageGroupsFromJsonArray(messageGroupJSONArray);
 
-                    //создать Symptom из JSON
-                    final JSONArray symptomJSONArray = responseJSON.getJSONArray("symptoms");
-                    final Collection<Symptom> newSymptoms = getSymptomsFromJsonArray(symptomJSONArray);
+                    //создать Message из JSON
+                    final JSONArray messageJSONArray = responseJSON.getJSONArray("symptoms");
+                    final Collection<Message> newMessages = getMessagesFromJsonArray(messageJSONArray);
 
                     //обновить справочник симптомов
-                    repository.updateSymptoms(newSymptomGroups, newSymptoms);
+                    repository.updateMessages(newMessageGroups, newMessages);
 
                     //сохранить контрольную сумму
                     final String newChecksum = responseJSON.getString("checksum");
-                    sharedPreferences.edit().putString(PREF_SYMPTOM_CHECKSUM, newChecksum).apply();
+                    sharedPreferences.edit().putString(PREF_MESSAGE_CHECKSUM, newChecksum).apply();
                 }
             }
         }
@@ -115,46 +120,46 @@ final class SymptomSyncer {
     }
 
     @NonNull
-    private Collection<SymptomGroup> getSymptomGroupsFromJsonArray (
-            @NonNull final JSONArray symptomGroupJSONArray
+    private Collection<MessageGroup> getMessageGroupsFromJsonArray (
+            @NonNull final JSONArray messageGroupJSONArray
     ) throws JSONException {
-        final Collection<SymptomGroup> symptomGroups = new HashSet<>();
-        for (int i = 0; i < symptomGroupJSONArray.length(); i++) {
-            final JSONObject symptomGroupJSONObject = symptomGroupJSONArray.getJSONObject(i);
-            final long id = symptomGroupJSONObject.getLong("id");
-            final String name = symptomGroupJSONObject.getString("name");
-            final Long parentId = getNullableLong(symptomGroupJSONObject, "parent_id");
-            final SymptomGroup symptomGroup =
-                    new SymptomGroup(
+        final Collection<MessageGroup> messageGroups = new HashSet<>();
+        for (int i = 0; i < messageGroupJSONArray.length(); i++) {
+            final JSONObject messageGroupJSONObject = messageGroupJSONArray.getJSONObject(i);
+            final long id = messageGroupJSONObject.getLong("id");
+            final String name = messageGroupJSONObject.getString("name");
+            final Long parentId = getNullableLong(messageGroupJSONObject, "parent_id");
+            final MessageGroup messageGroup =
+                    new MessageGroup(
                             Identifier.newInstance(id),
                             name,
                             Identifier.newInstance(parentId)
                     );
-            symptomGroups.add(symptomGroup);
+            messageGroups.add(messageGroup);
         }
-        return symptomGroups;
+        return messageGroups;
     }
 
     @NonNull
-    private Collection<Symptom> getSymptomsFromJsonArray (
-            @NonNull final JSONArray symptomJSONArray
+    private Collection<Message> getMessagesFromJsonArray (
+            @NonNull final JSONArray messageJSONArray
     ) throws JSONException {
-        final Collection<Symptom> symptoms = new HashSet<>();
-        for (int i = 0; i < symptomJSONArray.length(); i++) {
-            final JSONObject symptomJSONObject = symptomJSONArray.getJSONObject(i);
-            final long id = symptomJSONObject.getLong("id");
-            final String name = symptomJSONObject.getString("name");
-            final Long groupId = getNullableLong(symptomJSONObject, "group_id");
-            final Integer order = getNullableInt(symptomJSONObject, "order");
-            final Symptom symptom =
-                    new Symptom(
+        final Collection<Message> messages = new HashSet<>();
+        for (int i = 0; i < messageJSONArray.length(); i++) {
+            final JSONObject messageJSONObject = messageJSONArray.getJSONObject(i);
+            final long id = messageJSONObject.getLong("id");
+            final String name = messageJSONObject.getString("name");
+            final Long groupId = getNullableLong(messageJSONObject, "group_id");
+            final Integer order = getNullableInt(messageJSONObject, "order");
+            final Message message =
+                    new Message(
                             Identifier.newInstance(id),
                             name,
                             Identifier.newInstance(groupId),
                             order
                     );
-            symptoms.add(symptom);
+            messages.add(message);
         }
-        return symptoms;
+        return messages;
     }
 }

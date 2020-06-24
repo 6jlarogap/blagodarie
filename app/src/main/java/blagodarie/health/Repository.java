@@ -6,21 +6,21 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 
-import blagodarie.health.database.HealthDatabase;
-import blagodarie.health.database.Identifier;
-import blagodarie.health.database.LastUserSymptom;
-import blagodarie.health.database.LastUserSymptomDao;
-import blagodarie.health.database.Symptom;
-import blagodarie.health.database.SymptomDao;
-import blagodarie.health.database.SymptomGroup;
-import blagodarie.health.database.SymptomGroupDao;
-import blagodarie.health.database.SymptomGroupWithSymptoms;
-import blagodarie.health.database.UserSymptom;
-import blagodarie.health.database.UserSymptomDao;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+
+import blagodarie.health.database.HealthDatabase;
+import blagodarie.health.database.Identifier;
+import blagodarie.health.database.LastUserMessage;
+import blagodarie.health.database.LastUserMessageDao;
+import blagodarie.health.database.Message;
+import blagodarie.health.database.MessageDao;
+import blagodarie.health.database.MessageGroup;
+import blagodarie.health.database.MessageGroupDao;
+import blagodarie.health.database.MessageGroupWithMessages;
+import blagodarie.health.database.UserMessage;
+import blagodarie.health.database.UserMessageDao;
 
 public final class Repository {
 
@@ -32,25 +32,25 @@ public final class Repository {
     private final HealthDatabase mHealthDatabase;
 
     @NonNull
-    private final SymptomGroupDao mSymptomGroupDao;
+    private final MessageGroupDao mMessageGroupDao;
 
     @NonNull
-    private final SymptomDao mSymptomDao;
+    private final MessageDao mMessageDao;
 
     @NonNull
-    private final UserSymptomDao mUserSymptomDao;
+    private final UserMessageDao mUserMessageDao;
 
     @NonNull
-    private final LastUserSymptomDao mLastUserSymptomDao;
+    private final LastUserMessageDao mLastUserMessageDao;
 
-    private LiveData<List<SymptomGroupWithSymptoms>> mSymptomGroupsWithSymptoms;
+    private LiveData<List<MessageGroupWithMessages>> mMessageGroupsWithMessages;
 
     private Repository (@NonNull final Context context) {
         mHealthDatabase = HealthDatabase.getDatabase(context);
-        mSymptomGroupDao = mHealthDatabase.symptomGroupDao();
-        mSymptomDao = mHealthDatabase.symptomDao();
-        mUserSymptomDao = mHealthDatabase.userSymptomDao();
-        mLastUserSymptomDao = mHealthDatabase.lastUserSymptomDao();
+        mMessageGroupDao = mHealthDatabase.messageGroupDao();
+        mMessageDao = mHealthDatabase.messageDao();
+        mUserMessageDao = mHealthDatabase.userMessageDao();
+        mLastUserMessageDao = mHealthDatabase.lastUserMessageDao();
     }
 
     public static Repository getInstance (@NonNull final Context context) {
@@ -64,106 +64,106 @@ public final class Repository {
         return INSTANCE;
     }
 
-    public final LiveData<Boolean> isHaveNotSyncedUserSymptoms (
+    public final LiveData<Boolean> isHaveNotSyncedUserMessages (
             @NonNull final UUID incognitoId,
-            @NonNull final Identifier symptomId
+            @NonNull final Identifier messageId
     ) {
-        Log.d(TAG, "isHaveNotSyncedUserSymptoms");
-        return mUserSymptomDao.isHaveNotSynced(incognitoId, symptomId);
+        Log.d(TAG, "isHaveNotSyncedUserMessages");
+        return mUserMessageDao.isHaveNotSynced(incognitoId, messageId);
     }
 
 
-    public final LiveData<UserSymptom> getLatestUserSymptom (
+    public final LiveData<UserMessage> getLatestUserMessage (
             @NonNull final UUID incognitoId,
-            @NonNull final Identifier symptomId
+            @NonNull final Identifier messageId
     ) {
-        Log.d(TAG, "getLatestUserSymptom");
-        return mUserSymptomDao.getLatestUserSymptom(incognitoId, symptomId);
+        Log.d(TAG, "getLatestUserMessage");
+        return mUserMessageDao.getLatestUserMessage(incognitoId, messageId);
     }
 
-    public final List<UserSymptom> getNotSyncedUserSymptoms (@NonNull final UUID incognitoId) {
-        Log.d(TAG, "getNotSyncedUserSymptoms");
-        return mUserSymptomDao.getNotSynced(incognitoId);
+    public final List<UserMessage> getNotSyncedUserMessages (@NonNull final UUID incognitoId) {
+        Log.d(TAG, "getNotSyncedUserMessages");
+        return mUserMessageDao.getNotSynced(incognitoId);
     }
 
-    public final void updateLastUserSymptom (@NonNull final UserSymptom userSymptom) {
-        Log.d(TAG, "updateLastUserSymptom");
+    public final void updateLastUserMessage (@NonNull final UserMessage userMessage) {
+        Log.d(TAG, "updateLastUserMessage");
         //выполнить в транзакции
         mHealthDatabase.runInTransaction(() -> {
-            //получить lastUserSymptom, соответствующий userSymptom
-            LastUserSymptom lastUserSymptom = mLastUserSymptomDao.get(userSymptom.getIncognitoId(), userSymptom.getSymptomId());
+            //получить lastUserMessage, соответствующий userMessage
+            LastUserMessage lastUserMessage = mLastUserMessageDao.get(userMessage.getIncognitoId(), userMessage.getMessageId());
             //если существует
-            if (lastUserSymptom != null) {
+            if (lastUserMessage != null) {
                 //обновить данные
-                lastUserSymptom.setTimestamp(userSymptom.getTimestamp());
-                lastUserSymptom.setSymptomsCount(lastUserSymptom.getSymptomsCount() + 1);
-                if (userSymptom.getLatitude() != null &&
-                        userSymptom.getLongitude() != null) {
-                    lastUserSymptom.setLatitude(userSymptom.getLatitude());
-                    lastUserSymptom.setLongitude(userSymptom.getLongitude());
+                lastUserMessage.setTimestamp(userMessage.getTimestamp());
+                lastUserMessage.setMessagesCount(lastUserMessage.getMessagesCount() + 1);
+                if (userMessage.getLatitude() != null &&
+                        userMessage.getLongitude() != null) {
+                    lastUserMessage.setLatitude(userMessage.getLatitude());
+                    lastUserMessage.setLongitude(userMessage.getLongitude());
                 }
-                mLastUserSymptomDao.update(lastUserSymptom);
+                mLastUserMessageDao.update(lastUserMessage);
             } else {
-                //иначе создать новый lastUserSymptom
-                lastUserSymptom = new LastUserSymptom(
-                        userSymptom.getIncognitoId(),
-                        userSymptom.getSymptomId(),
-                        userSymptom.getTimestamp(),
-                        userSymptom.getLatitude(),
-                        userSymptom.getLongitude()
+                //иначе создать новый lastUserMessage
+                lastUserMessage = new LastUserMessage(
+                        userMessage.getIncognitoId(),
+                        userMessage.getMessageId(),
+                        userMessage.getTimestamp(),
+                        userMessage.getLatitude(),
+                        userMessage.getLongitude()
                 );
-                mLastUserSymptomDao.insert(lastUserSymptom);
+                mLastUserMessageDao.insert(lastUserMessage);
             }
         });
     }
 
-    public final void deleteUserSymptom (@NonNull final UserSymptom userSymptom) {
-        Log.d(TAG, "deleteUserSymptom");
-        mUserSymptomDao.delete(userSymptom);
+    public final void deleteUserMessage (@NonNull final UserMessage userMessage) {
+        Log.d(TAG, "deleteUserMessage");
+        mUserMessageDao.delete(userMessage);
     }
 
-    public final void insertUserSymptomAndSetId (@NonNull final UserSymptom userSymptom) {
-        Log.d(TAG, "insertUserSymptomAndSetId");
-        mUserSymptomDao.insertAndSetId(userSymptom);
+    public final void insertUserMessageAndSetId (@NonNull final UserMessage userMessage) {
+        Log.d(TAG, "insertUserMessageAndSetId");
+        mUserMessageDao.insertAndSetId(userMessage);
     }
 
-    public final LastUserSymptom getLastUserSymptom (
+    public final LastUserMessage getLastUserMessage (
             @NonNull final UUID incognitoId,
-            @NonNull final Identifier symptomId
+            @NonNull final Identifier messageId
     ) {
-        Log.d(TAG, "getLastUserSymptom");
-        return mLastUserSymptomDao.get(incognitoId, symptomId);
+        Log.d(TAG, "getLastUserMessage");
+        return mLastUserMessageDao.get(incognitoId, messageId);
     }
 
-    public final void deleteUserSymptoms (@NonNull final Collection<UserSymptom> userSymptoms) {
-        Log.d(TAG, "deleteUserSymptoms");
-        mUserSymptomDao.delete(userSymptoms);
+    public final void deleteUserMessages (@NonNull final Collection<UserMessage> userMessages) {
+        Log.d(TAG, "deleteUserMessages");
+        mUserMessageDao.delete(userMessages);
     }
 
-    public final void updateSymptoms (
-            @NonNull final Collection<SymptomGroup> newSymptomGroups,
-            @NonNull final Collection<Symptom> newSymptoms
+    public final void updateMessages (
+            @NonNull final Collection<MessageGroup> newMessageGroups,
+            @NonNull final Collection<Message> newMessages
     ) {
-        Log.d(TAG, "updateSymptoms");
+        Log.d(TAG, "updateMessages");
         mHealthDatabase.runInTransaction(() -> {
             mHealthDatabase.deferForeignKeys();
             //удалить все симптомы
-            mSymptomDao.deleteAll();
+            mMessageDao.deleteAll();
             //удалить все группы симптомов
-            mSymptomGroupDao.deleteAll();
+            mMessageGroupDao.deleteAll();
             //вставить новые группы
-            mSymptomGroupDao.insert(newSymptomGroups);
+            mMessageGroupDao.insert(newMessageGroups);
             //вставить новые симптомы
-            mSymptomDao.insert(newSymptoms);
+            mMessageDao.insert(newMessages);
         });
     }
 
-    public final LiveData<List<SymptomGroupWithSymptoms>> getSymptomGroupsWithSymptoms () {
-        Log.d(TAG, "getSymptomGroupsWithSymptoms");
-        if (mSymptomGroupsWithSymptoms == null) {
-            mSymptomGroupsWithSymptoms = mSymptomGroupDao.getSymptomCatalog();
+    public final LiveData<List<MessageGroupWithMessages>> getMessageGroupsWithMessages () {
+        Log.d(TAG, "getMessageGroupsWithMessages");
+        if (mMessageGroupsWithMessages == null) {
+            mMessageGroupsWithMessages = mMessageGroupDao.getMessageCatalog();
         }
-        return mSymptomGroupsWithSymptoms;
+        return mMessageGroupsWithMessages;
     }
 
 }

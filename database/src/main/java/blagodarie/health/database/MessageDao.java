@@ -8,12 +8,12 @@ import androidx.room.Query;
 import java.util.Collection;
 
 @Dao
-public interface SymptomDao {
+public interface MessageDao {
 
     @Insert (onConflict = OnConflictStrategy.IGNORE)
-    void insert (final Collection<Symptom> symptoms);
+    void insert (final Collection<Message> messages);
 
-    @Query ("DELETE FROM tbl_symptom")
+    @Query ("DELETE FROM tbl_message")
     void deleteAll ();
 
 }

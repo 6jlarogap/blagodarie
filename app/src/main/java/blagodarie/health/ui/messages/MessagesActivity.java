@@ -1,4 +1,4 @@
-package blagodarie.health.ui.symptoms;
+package blagodarie.health.ui.messages;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -33,29 +33,28 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import blagodarie.health.HealthApp;
-import blagodarie.health.BuildConfig;
-import blagodarie.health.R;
-import blagodarie.health.Repository;
-import blagodarie.health.UnauthorizedException;
-import blagodarie.health.authentication.AccountGeneral;
-import blagodarie.health.authentication.IncognitoSignUpFragment;
-import blagodarie.health.databinding.NavHeaderBinding;
-import blagodarie.health.databinding.SymptomsActivityBinding;
-import blagodarie.health.server.ServerConnector;
-import blagodarie.health.sync.SyncService;
-import blagodarie.health.ui.update.UpdateActivity;
-import blagodarie.health.database.Identifier;
-import blagodarie.health.database.Symptom;
-import blagodarie.health.database.SymptomGroupWithSymptoms;
-import blagodarie.health.database.UserSymptom;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+import blagodarie.health.BuildConfig;
+import blagodarie.health.HealthApp;
+import blagodarie.health.R;
+import blagodarie.health.Repository;
+import blagodarie.health.UnauthorizedException;
+import blagodarie.health.authentication.AccountGeneral;
+import blagodarie.health.authentication.IncognitoSignUpFragment;
+import blagodarie.health.database.Identifier;
+import blagodarie.health.database.Message;
+import blagodarie.health.database.MessageGroupWithMessages;
+import blagodarie.health.database.UserMessage;
+import blagodarie.health.databinding.MessagesActivityBinding;
+import blagodarie.health.databinding.NavHeaderBinding;
+import blagodarie.health.server.ServerConnector;
+import blagodarie.health.sync.SyncService;
+import blagodarie.health.ui.update.UpdateActivity;
 import io.reactivex.Completable;
 import io.reactivex.CompletableObserver;
 import io.reactivex.Observable;
@@ -70,14 +69,14 @@ import static blagodarie.health.log.LogActivity.ACTION_SEND_LOG;
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-public final class SymptomsActivity
+public final class MessagesActivity
         extends AppCompatActivity {
 
-    private static final String TAG = SymptomsActivity.class.getSimpleName();
+    private static final String TAG = MessagesActivity.class.getSimpleName();
 
-    private static final String NEW_VERSION_NOTIFICATION_PREFERENCE = "blagodarie.health.ui.update.preference.newVersionNotification";
+    private static final String NEW_VERSION_NOTIFICATION_PREFERENCE = "blagodarie.health.ui.messages.preference.newVersionNotification";
 
-    private static final String EXTRA_ACCOUNT = "blagodarie.health.ui.symptoms.ACCOUNT";
+    private static final String EXTRA_ACCOUNT = "blagodarie.health.ui.messages.ACCOUNT";
 
     private Account mAccount;
 
@@ -87,15 +86,15 @@ public final class SymptomsActivity
 
     private Long mIncognitoPublicKeyTimestamp;
 
-    private SymptomsViewModel mViewModel;
+    private MessagesViewModel mViewModel;
 
     private CompositeDisposable mDisposables = new CompositeDisposable();
 
-    private SymptomGroupsAdapter mSymptomGroupsAdapter;
+    private MessageGroupsAdapter mMessageGroupsAdapter;
 
-    private SymptomsAdapter mSymptomsAdapter;
+    private MessagesAdapter mMessagesAdapter;
 
-    private SymptomsActivityBinding mActivityBinding;
+    private MessagesActivityBinding mActivityBinding;
 
     private Repository mRepository;
 
@@ -154,9 +153,9 @@ public final class SymptomsActivity
 
             setupToolbar();
 
-            mRepository.getSymptomGroupsWithSymptoms().observe(
+            mRepository.getMessageGroupsWithMessages().observe(
                     this,
-                    this::updateSymptomCatalogIfNeed
+                    this::updateMessageCatalogIfNeed
             );
         } else {
             //иначе показать сообщение об ошибке и завершить Activity
@@ -188,42 +187,42 @@ public final class SymptomsActivity
         });
     }
 
-    private void updateSymptomCatalogIfNeed (
-            @Nullable final List<SymptomGroupWithSymptoms> newSymptomCatalog
+    private void updateMessageCatalogIfNeed (
+            @Nullable final List<MessageGroupWithMessages> newMessageCatalog
     ) {
-        Log.d(TAG, "updateSymptomCatalogIfNeed");
-        if (newSymptomCatalog != null) {
-            if (!mViewModel.getSymptomCatalog().equals(newSymptomCatalog)) {
-                mViewModel.setSymptomCatalog(newSymptomCatalog);
+        Log.d(TAG, "updateMessageCatalogIfNeed");
+        if (newMessageCatalog != null) {
+            if (!mViewModel.getMessageCatalog().equals(newMessageCatalog)) {
+                mViewModel.setMessageCatalog(newMessageCatalog);
                 //создать отображаемые группы
-                final List<DisplaySymptomGroup> newDisplaySymptomGroups = createDisplaySymptomGroups(newSymptomCatalog);
+                final List<DisplayMessageGroup> newDisplayMessageGroups = createDisplayMessageGroups(newMessageCatalog);
 
                 //запомнить идентификатор выбранной группы
-                final Identifier selectedGroupId = mViewModel.getSelectedSymptomGroupId();
+                final Identifier selectedGroupId = mViewModel.getSelectedMessageGroupId();
 
                 //задать новые данные
-                mViewModel.setDisplaySymptomGroups(newDisplaySymptomGroups);
+                mViewModel.setDisplayMessageGroups(newDisplayMessageGroups);
 
                 //загрузить последние пользовательские данные о симптомах
                 mViewModel.loadLastValues(mIncognitoPrivateKey, () -> {
-                    orderSymptomCatalog();
+                    orderMessageCatalog();
                     //восстановить выбранную группу
-                    if (mViewModel.getDisplaySymptomGroups().size() > 0) {
+                    if (mViewModel.getDisplayMessageGroups().size() > 0) {
                         //по-умолчанию выделить первую группу
                         int selectedGroupIndex = 0;
 
                         //если существует идентификатор выбранной группы
                         if (selectedGroupId != null) {
                             //найти группу с выбранным идентификатором в новом списке
-                            for (int i = 0; i < mViewModel.getDisplaySymptomGroups().size() && selectedGroupIndex == 0; i++) {
-                                if (mViewModel.getDisplaySymptomGroups().get(i).getSymptomGroupId().equals(selectedGroupId)) {
+                            for (int i = 0; i < mViewModel.getDisplayMessageGroups().size() && selectedGroupIndex == 0; i++) {
+                                if (mViewModel.getDisplayMessageGroups().get(i).getMessageGroupId().equals(selectedGroupId)) {
                                     selectedGroupIndex = i;
                                 }
                             }
                         }
 
                         //показать симптомы для выбранной группы
-                        showSymptomsForGroup(mViewModel.getDisplaySymptomGroups().get(selectedGroupIndex));
+                        showMessagesForGroup(mViewModel.getDisplayMessageGroups().get(selectedGroupIndex));
                     }
                 });
             }
@@ -234,20 +233,20 @@ public final class SymptomsActivity
         Log.d(TAG, "initViewModel");
 
         //создаем фабрику
-        final SymptomsViewModel.Factory factory = new SymptomsViewModel.Factory(
+        final MessagesViewModel.Factory factory = new MessagesViewModel.Factory(
                 getApplication(),
                 mIncognitoPublicKey.toString()
         );
 
         //создаем UpdateViewModel
-        mViewModel = new ViewModelProvider(this, factory).get(SymptomsViewModel.class);
+        mViewModel = new ViewModelProvider(this, factory).get(MessagesViewModel.class);
 
     }
 
     private void initBinding () {
-        mActivityBinding = DataBindingUtil.setContentView(this, R.layout.symptoms_activity);
+        mActivityBinding = DataBindingUtil.setContentView(this, R.layout.messages_activity);
         mActivityBinding.setViewModel(mViewModel);
-        mActivityBinding.rvSymptomGroups.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
+        mActivityBinding.rvMessageGroups.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
     }
 
     @Override
@@ -257,31 +256,34 @@ public final class SymptomsActivity
         checkLatestVersion();
         getAuthTokenAndRequestSync();
 
-        orderSymptomCatalog();
+        orderMessageCatalog();
     }
 
-    private void orderSymptomCatalog () {
-        orderSymptomGroups();
-        orderSymptoms();
+    private void orderMessageCatalog () {
+        Log.d(TAG, "orderMessageCatalog");
+        orderMessageGroups();
+        orderMessages();
     }
 
-    private void orderSymptomGroups () {
-        mViewModel.orderDisplaySymptomGroups();
-        if (mSymptomGroupsAdapter != null) {
-            mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
+    private void orderMessageGroups () {
+        Log.d(TAG, "orderMessageGroups");
+        mViewModel.orderDisplayMessageGroups();
+        if (mMessageGroupsAdapter != null) {
+            mMessageGroupsAdapter.setData(mViewModel.getDisplayMessageGroups());
         }
-        if (mActivityBinding.rvSymptomGroups.getLayoutManager() != null) {
-            mActivityBinding.rvSymptomGroups.getLayoutManager().scrollToPosition(0);
+        if (mActivityBinding.rvMessageGroups.getLayoutManager() != null) {
+            mActivityBinding.rvMessageGroups.getLayoutManager().scrollToPosition(0);
         }
     }
 
-    private void orderSymptoms () {
-        mViewModel.orderDisplaySymptoms();
-        if (mSymptomsAdapter != null) {
-            mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
+    private void orderMessages () {
+        Log.d(TAG, "orderMessages");
+        mViewModel.orderDisplayMessages();
+        if (mMessagesAdapter != null) {
+            mMessagesAdapter.setData(mViewModel.getDisplayMessages());
         }
-        if (mActivityBinding.rvSymptoms.getLayoutManager() != null) {
-            mActivityBinding.rvSymptoms.getLayoutManager().scrollToPosition(0);
+        if (mActivityBinding.rvMessages.getLayoutManager() != null) {
+            mActivityBinding.rvMessages.getLayoutManager().scrollToPosition(0);
         }
     }
 
@@ -304,50 +306,50 @@ public final class SymptomsActivity
         super.onDestroy();
     }
 
-    private List<DisplaySymptomGroup> createDisplaySymptomGroups (
-            @NonNull final List<SymptomGroupWithSymptoms> symptomGroups
+    private List<DisplayMessageGroup> createDisplayMessageGroups (
+            @NonNull final List<MessageGroupWithMessages> messageGroups
     ) {
-        Log.d(TAG, "createDisplaySymptomGroups");
-        final List<DisplaySymptomGroup> displaySymptomGroups = new ArrayList<>();
-        for (SymptomGroupWithSymptoms symptomGroupWithSymptoms : symptomGroups) {
-            displaySymptomGroups.add(
-                    new DisplaySymptomGroup(
-                            symptomGroupWithSymptoms.getSymptomGroup().getId(),
-                            symptomGroupWithSymptoms.getSymptomGroup().getName(),
-                            createDisplaySymptoms(symptomGroupWithSymptoms.getSymptoms())
+        Log.d(TAG, "createDisplayMessageGroups");
+        final List<DisplayMessageGroup> displayMessageGroups = new ArrayList<>();
+        for (MessageGroupWithMessages messageGroupWithMessages : messageGroups) {
+            displayMessageGroups.add(
+                    new DisplayMessageGroup(
+                            messageGroupWithMessages.getMessageGroup().getId(),
+                            messageGroupWithMessages.getMessageGroup().getName(),
+                            createDisplayMessages(messageGroupWithMessages.getmMessages())
                     )
             );
         }
-        return displaySymptomGroups;
+        return displayMessageGroups;
     }
 
-    private List<DisplaySymptom> createDisplaySymptoms (
-            @NonNull final List<Symptom> symptoms
+    private List<DisplayMessage> createDisplayMessages (
+            @NonNull final List<Message> messages
     ) {
-        Log.d(TAG, "createDisplaySymptoms");
-        final List<DisplaySymptom> displaySymptoms = new ArrayList<>();
-        for (Symptom symptom : symptoms) {
-            displaySymptoms.add(
-                    new DisplaySymptom(
-                            symptom,
-                            mRepository.isHaveNotSyncedUserSymptoms(mIncognitoPrivateKey, symptom.getId()),
-                            mRepository.getLatestUserSymptom(mIncognitoPrivateKey, symptom.getId()),
-                            new DisplaySymptom.UnconfirmedUserSymptomListener() {
+        Log.d(TAG, "createDisplayMessages");
+        final List<DisplayMessage> displayMessages = new ArrayList<>();
+        for (Message message : messages) {
+            displayMessages.add(
+                    new DisplayMessage(
+                            message,
+                            mRepository.isHaveNotSyncedUserMessages(mIncognitoPrivateKey, message.getId()),
+                            mRepository.getLatestUserMessage(mIncognitoPrivateKey, message.getId()),
+                            new DisplayMessage.UnconfirmedUserMessageListener() {
                                 @Override
-                                public void onConfirm (@NonNull final DisplaySymptom displaySymptom) {
-                                    updateLastUserSymptom(displaySymptom);
+                                public void onConfirm (@NonNull final DisplayMessage displayMessage) {
+                                    updateLastUserMessage(displayMessage);
                                     getAuthTokenAndRequestSync();
                                 }
 
                                 @Override
-                                public void onCancel (@NonNull final UserSymptom canceledUserSymptom) {
-                                    deleteNotConfirmedUserSymptom(canceledUserSymptom);
+                                public void onCancel (@NonNull final UserMessage canceledUserMessage) {
+                                    deleteNotConfirmedUserMessage(canceledUserMessage);
                                 }
                             }
                     )
             );
         }
-        return displaySymptoms;
+        return displayMessages;
     }
 
     private void setupToolbar () {
@@ -432,68 +434,69 @@ public final class SymptomsActivity
         return errorMessage;
     }
 
-    public void showSymptomsForGroup (
-            @NonNull final DisplaySymptomGroup displaySymptomGroup
+    public void showMessagesForGroup (
+            @NonNull final DisplayMessageGroup displayMessageGroup
     ) {
-        mViewModel.setSelectedDisplaySymptomGroup(displaySymptomGroup);
-        mViewModel.setDisplaySymptoms(displaySymptomGroup.getDisplaySymptoms());
+        Log.d(TAG, "showMessagesForGroup");
+        mViewModel.setSelectedDisplayMessageGroup(displayMessageGroup);
+        mViewModel.setDisplayMessages(displayMessageGroup.getDisplayMessages());
 
-        if (mSymptomGroupsAdapter == null) {
-            mSymptomGroupsAdapter = new SymptomGroupsAdapter(mViewModel.getDisplaySymptomGroups(), this::showSymptomsForGroup);
-            mActivityBinding.rvSymptomGroups.setAdapter(mSymptomGroupsAdapter);
+        if (mMessageGroupsAdapter == null) {
+            mMessageGroupsAdapter = new MessageGroupsAdapter(mViewModel.getDisplayMessageGroups(), this::showMessagesForGroup);
+            mActivityBinding.rvMessageGroups.setAdapter(mMessageGroupsAdapter);
         } else {
-            mSymptomGroupsAdapter.setData(mViewModel.getDisplaySymptomGroups());
+            mMessageGroupsAdapter.setData(mViewModel.getDisplayMessageGroups());
         }
-        if (mSymptomsAdapter == null) {
-            mSymptomsAdapter = new SymptomsAdapter(mViewModel.getDisplaySymptoms(), this::createUserSymptom);
-            mActivityBinding.rvSymptoms.setAdapter(mSymptomsAdapter);
+        if (mMessagesAdapter == null) {
+            mMessagesAdapter = new MessagesAdapter(mViewModel.getDisplayMessages(), this::createUserMessage);
+            mActivityBinding.rvMessages.setAdapter(mMessagesAdapter);
         } else {
-            mSymptomsAdapter.setData(mViewModel.getDisplaySymptoms());
+            mMessagesAdapter.setData(mViewModel.getDisplayMessages());
         }
 
-        orderSymptoms();
+        orderMessages();
     }
 
-    public void createUserSymptom (
-            @NonNull final DisplaySymptom displaySymptom
+    public void createUserMessage (
+            @NonNull final DisplayMessage displayMessage
     ) {
-        Log.d(TAG, "createUserSymptom displaySymptom" + displaySymptom);
-        displaySymptom.highlight();
+        Log.d(TAG, "createUserMessage displayMessage" + displayMessage);
+        displayMessage.highlight();
         final Date currentDate = new Date();
 
-        final UserSymptom userSymptom = new UserSymptom(
+        final UserMessage userMessage = new UserMessage(
                 mIncognitoPrivateKey,
-                displaySymptom.getSymptomId(),
+                displayMessage.getMessageId(),
                 currentDate,
                 null,
                 null);
 
         Completable.
-                fromAction(() -> mRepository.insertUserSymptomAndSetId(userSymptom)).
+                fromAction(() -> mRepository.insertUserMessageAndSetId(userMessage)).
                 subscribeOn(Schedulers.io()).
                 observeOn(AndroidSchedulers.mainThread()).
                 subscribe();
     }
 
-    private void deleteNotConfirmedUserSymptom (
-            @NonNull final UserSymptom canceledUserSymptom
+    private void deleteNotConfirmedUserMessage (
+            @NonNull final UserMessage canceledUserMessage
     ) {
-        Log.d(TAG, "deleteNotConfirmedUserSymptom canceledUserSymptom=" + canceledUserSymptom);
+        Log.d(TAG, "deleteNotConfirmedUserMessage canceledUserMessage=" + canceledUserMessage);
         Completable.
-                fromAction(() -> mRepository.deleteUserSymptom(canceledUserSymptom)).
+                fromAction(() -> mRepository.deleteUserMessage(canceledUserMessage)).
                 subscribeOn(Schedulers.io()).
                 observeOn(AndroidSchedulers.mainThread()).
                 subscribe();
     }
 
-    private void updateLastUserSymptom (
-            @NonNull final DisplaySymptom displaySymptom
+    private void updateLastUserMessage (
+            @NonNull final DisplayMessage displayMessage
     ) {
-        Log.d(TAG, "updateLastUserSymptom displaySymptom=" + displaySymptom);
-        final UserSymptom userSymptom = displaySymptom.getNotConfirmedUserSymptom();
-        if (userSymptom != null) {
+        Log.d(TAG, "updateLastUserMessage displayMessage=" + displayMessage);
+        final UserMessage userMessage = displayMessage.getNotConfirmedUserMessage();
+        if (userMessage != null) {
             Completable.
-                    fromAction(() -> mRepository.updateLastUserSymptom(userSymptom)).
+                    fromAction(() -> mRepository.updateLastUserMessage(userMessage)).
                     subscribeOn(Schedulers.io()).
                     observeOn(AndroidSchedulers.mainThread()).
                     subscribe(new CompletableObserver() {
@@ -504,8 +507,8 @@ public final class SymptomsActivity
 
                         @Override
                         public void onComplete () {
-                            displaySymptom.setLastDate(userSymptom.getTimestamp());
-                            displaySymptom.setUserSymptomCount(displaySymptom.getUserSymptomCount() + 1);
+                            displayMessage.setLastDate(userMessage.getTimestamp());
+                            displayMessage.setUserMessageCount(displayMessage.getUserMessageCount() + 1);
                         }
 
                         @Override
@@ -593,7 +596,7 @@ public final class SymptomsActivity
             @NonNull final Account account
     ) {
         Log.d(TAG, "createSelfIntent account=" + account);
-        final Intent intent = new Intent(context, SymptomsActivity.class);
+        final Intent intent = new Intent(context, MessagesActivity.class);
         intent.putExtra(EXTRA_ACCOUNT, account);
         return intent;
     }

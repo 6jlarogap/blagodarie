@@ -11,21 +11,21 @@ import java.util.Collection;
 import java.util.List;
 
 @Dao
-public interface SymptomGroupDao {
+public interface MessageGroupDao {
 
     @Insert (onConflict = OnConflictStrategy.IGNORE)
-    void insert (final Collection<SymptomGroup> symptomGroups);
+    void insert (final Collection<MessageGroup> messageGroups);
 
-    @Query ("DELETE FROM tbl_symptom_group")
+    @Query ("DELETE FROM tbl_message_group")
     void deleteAll ();
 
     @Transaction
     @Query ("SELECT * " +
-            "FROM tbl_symptom_group sg " +
+            "FROM tbl_message_group sg " +
             "WHERE EXISTS (SELECT * " +
-            "              FROM tbl_symptom s " +
+            "              FROM tbl_message s " +
             "              WHERE s.group_id = sg.id) " +
             "ORDER BY id")
-    LiveData<List<SymptomGroupWithSymptoms>> getSymptomCatalog ();
+    LiveData<List<MessageGroupWithMessages>> getMessageCatalog ();
 
 }

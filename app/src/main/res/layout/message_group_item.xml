@@ -5,7 +5,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="5dp"
-        android:background="@{DisplaySymptomGroup.selected ? @android:color/holo_green_light : @android:color/white}">
+        android:background="@{DisplayMessageGroup.selected ? @android:color/holo_green_light : @android:color/white}">
 
         <TextView
             android:layout_width="wrap_content"
@@ -15,7 +15,7 @@
             android:gravity="center"
             android:maxWidth="200dp"
             android:minLines="2"
-            android:text="@{DisplaySymptomGroup.symptomGroupName}"
+            android:text="@{DisplayMessageGroup.messageGroupName}"
             android:textAppearance="@style/TextAppearance.AppCompat.Medium" />
 
     </androidx.cardview.widget.CardView>
@@ -23,8 +23,8 @@
     <data>
 
         <variable
-            name="DisplaySymptomGroup"
-            type="blagodarie.health.ui.symptoms.DisplaySymptomGroup" />
+            name="DisplayMessageGroup"
+            type="blagodarie.health.ui.messages.DisplayMessageGroup" />
 
     </data>
 

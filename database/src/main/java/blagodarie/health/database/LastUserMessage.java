@@ -9,96 +9,87 @@ import androidx.room.Ignore;
 import androidx.room.Index;
 
 import java.util.Date;
-import java.util.Objects;
 import java.util.UUID;
 
-/**
- * @author sergeGabrus
- * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
- */
 @Entity (
-        tableName = "tbl_user_symptom",
-        inheritSuperIndices = true,
+        tableName = "tbl_last_user_message",
+        primaryKeys = {"incognito_id", "message_id"},
         indices = {
-                @Index (value = {"symptom_id"})
+                @Index (value = {"message_id"})
         },
         foreignKeys = {
                 @ForeignKey (
-                        entity = Symptom.class,
+                        entity = Message.class,
                         parentColumns = "id",
-                        childColumns = "symptom_id"
+                        childColumns = "message_id"
                 )
         }
 )
-public final class UserSymptom
-        extends BaseEntity {
+public final class LastUserMessage {
 
     @NonNull
     @ColumnInfo (name = "incognito_id", typeAffinity = ColumnInfo.TEXT)
     private final UUID IncognitoId;
 
     @NonNull
-    @ColumnInfo (name = "symptom_id", typeAffinity = ColumnInfo.INTEGER)
-    private final Identifier SymptomId;
+    @ColumnInfo (name = "message_id", typeAffinity = ColumnInfo.INTEGER)
+    private final Identifier MessageId;
 
     @NonNull
     @ColumnInfo (name = "timestamp", typeAffinity = ColumnInfo.TEXT)
-    private final Date Timestamp;
+    private Date Timestamp;
 
     @Nullable
     @ColumnInfo (name = "latitude")
-    private final Double Latitude;
+    private Double Latitude;
 
     @Nullable
     @ColumnInfo (name = "longitude")
-    private final Double Longitude;
+    private Double Longitude;
 
-    UserSymptom (
-            @NonNull final Identifier Id,
+    @NonNull
+    @ColumnInfo (name = "messages_count", defaultValue = "1")
+    private Long MessagesCount = 1L;
+
+    LastUserMessage (
             @NonNull final UUID IncognitoId,
-            @NonNull final Identifier SymptomId,
+            @NonNull final Identifier MessageId,
             @NonNull final Date Timestamp,
             @Nullable final Double Latitude,
-            @Nullable final Double Longitude
+            @Nullable final Double Longitude,
+            @NonNull final Long MessagesCount
     ) {
-        super(Id);
         this.IncognitoId = IncognitoId;
-        this.SymptomId = SymptomId;
+        this.MessageId = MessageId;
         this.Timestamp = Timestamp;
         this.Latitude = Latitude;
         this.Longitude = Longitude;
+        this.MessagesCount = MessagesCount;
     }
 
     @Ignore
-    public UserSymptom (
+    public LastUserMessage (
             @NonNull final UUID IncognitoId,
-            @NonNull final Identifier SymptomId,
+            @NonNull final Identifier MessageId,
             @NonNull final Date Timestamp,
             @Nullable final Double Latitude,
             @Nullable final Double Longitude
     ) {
-        super(Identifier.newInstance(null));
         this.IncognitoId = IncognitoId;
-        this.SymptomId = SymptomId;
+        this.MessageId = MessageId;
         this.Timestamp = Timestamp;
         this.Latitude = Latitude;
         this.Longitude = Longitude;
     }
 
-    @Override
     @NonNull
-    public Identifier getId(){
-        return super.getId();
-    }
-
-    @NonNull
-    public UUID getIncognitoId () {
+    final UUID getIncognitoId () {
         return IncognitoId;
     }
 
     @NonNull
-    public final Identifier getSymptomId () {
-        return SymptomId;
+    public final Identifier getMessageId () {
+        return MessageId;
     }
 
     @NonNull
@@ -106,9 +97,17 @@ public final class UserSymptom
         return Timestamp;
     }
 
+    public final void setTimestamp (@NonNull final Date timestamp) {
+        Timestamp = timestamp;
+    }
+
     @Nullable
     public final Double getLatitude () {
         return Latitude;
+    }
+
+    public final void setLatitude (@NonNull final Double latitude) {
+        Latitude = latitude;
     }
 
     @Nullable
@@ -116,33 +115,29 @@ public final class UserSymptom
         return Longitude;
     }
 
-    @Override
-    public boolean equals (Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        UserSymptom that = (UserSymptom) o;
-        return IncognitoId.equals(that.IncognitoId) &&
-                SymptomId.equals(that.SymptomId) &&
-                Timestamp.equals(that.Timestamp) &&
-                Objects.equals(Latitude, that.Latitude) &&
-                Objects.equals(Longitude, that.Longitude);
+    public final void setLongitude (@NonNull final Double longitude) {
+        Longitude = longitude;
     }
 
-    @Override
-    public int hashCode () {
-        return Objects.hash(IncognitoId, SymptomId, Timestamp, Latitude, Longitude);
+    @NonNull
+    public final Long getMessagesCount () {
+        return MessagesCount;
+    }
+
+    public final void setMessagesCount (@NonNull final Long messagesCount) {
+        MessagesCount = messagesCount;
     }
 
     @NonNull
     @Override
     public String toString () {
-        return "UserSymptom{" +
-                "Id=" + getId() +
-                ", IncognitoId=" + IncognitoId +
-                ", SymptomId=" + SymptomId +
+        return "LastUserMessage{" +
+                "IncognitoId=" + IncognitoId +
+                ", MessageId=" + MessageId +
                 ", Timestamp=" + Timestamp +
                 ", Latitude=" + Latitude +
                 ", Longitude=" + Longitude +
+                ", MessagesCount=" + MessagesCount +
                 '}';
     }
 }

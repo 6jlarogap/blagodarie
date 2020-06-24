@@ -41,7 +41,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".ui.symptoms.SymptomsActivity"
+            android:name=".ui.messages.MessagesActivity"
             android:screenOrientation="portrait" />
         <activity android:name=".ui.update.UpdateActivity" />
 

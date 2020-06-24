@@ -8,9 +8,9 @@ import androidx.core.util.Pair;
 
 import blagodarie.health.Repository;
 import blagodarie.health.UnauthorizedException;
+import blagodarie.health.database.UserMessage;
 import blagodarie.health.server.ServerApiResponse;
 import blagodarie.health.server.ServerConnector;
-import blagodarie.health.database.UserSymptom;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -21,28 +21,28 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.UUID;
 
-public final class UserSymptomSyncer {
+public final class UserMessageSyncer {
 
-    private static final String TAG = UserSymptomSyncer.class.getSimpleName();
+    private static final String TAG = UserMessageSyncer.class.getSimpleName();
 
     /**
      * Время подтверждения сообщения в миллисекундах. В течении этого времени сообщение можно отменить.
      */
-    public static final long USER_SYMPTOM_CONFIRMATION_TIME = 3000L;
+    public static final long USER_MESSAGE_CONFIRMATION_TIME = 3000L;
 
-    private static final String USER_SYMPTOM_JSON_PATTERN = "{\"symptom_id\":%s,\"timestamp\":%d,\"timezone\":\"%s\",\"latitude\":%f,\"longitude\":%f}";
+    private static final String USER_MESSAGE_JSON_PATTERN = "{\"symptom_id\":%s,\"message_id\":%s,\"timestamp\":%d,\"timezone\":\"%s\",\"latitude\":%f,\"longitude\":%f}";// TODO: 24.06.2020 после перехода убрать symptom_id
 
-    private static volatile UserSymptomSyncer INSTANCE;
+    private static volatile UserMessageSyncer INSTANCE;
 
-    private UserSymptomSyncer () {
+    private UserMessageSyncer () {
     }
 
     @NonNull
-    static UserSymptomSyncer getInstance () {
+    static UserMessageSyncer getInstance () {
         Log.d(TAG, "getInstance");
-        synchronized (UserSymptomSyncer.class) {
+        synchronized (UserMessageSyncer.class) {
             if (INSTANCE == null) {
-                INSTANCE = new UserSymptomSyncer();
+                INSTANCE = new UserMessageSyncer();
             }
         }
         return INSTANCE;
@@ -55,57 +55,57 @@ public final class UserSymptomSyncer {
             @NonNull final Repository repository
     ) throws IOException, UnauthorizedException {
         Log.d(TAG, "sync");
-        final List<UserSymptom> notSyncedUserSymtpoms = repository.getNotSyncedUserSymptoms(incognitoId);
-        Log.d(TAG, "notSyncedUserSymtpoms.size=" + notSyncedUserSymtpoms.size());
-        final List<UserSymptom> confirmedUserSymptoms = excludeUnconfirmed(notSyncedUserSymtpoms);
-        Log.d(TAG, "confirmedUserSymptoms.size=" + confirmedUserSymptoms.size());
-        if (confirmedUserSymptoms.size() > 0) {
-            final String content = createJsonContent(incognitoId, confirmedUserSymptoms);
+        final List<UserMessage> notSyncedUserMessages = repository.getNotSyncedUserMessages(incognitoId);
+        Log.d(TAG, "notSyncedUserMessages.size=" + notSyncedUserMessages.size());
+        final List<UserMessage> confirmedUserMessages = excludeUnconfirmed(notSyncedUserMessages);
+        Log.d(TAG, "confirmedUserMessages.size=" + confirmedUserMessages.size());
+        if (confirmedUserMessages.size() > 0) {
+            final String content = createJsonContent(incognitoId, confirmedUserMessages);
             Log.d(TAG, "content=" + content);
 
             final ServerApiResponse serverApiResponse = serverConnector.sendRequestAndGetResponse("addincognitosymptom", content);
             Log.d(TAG, "serverApiResponse=" + serverApiResponse);
 
             if (serverApiResponse.getCode() == 200) {
-                repository.deleteUserSymptoms(confirmedUserSymptoms);
+                repository.deleteUserMessages(confirmedUserMessages);
             } else if (serverApiResponse.getCode() == 401) {
                 throw new UnauthorizedException();
             }
         }
     }
 
-    private List<UserSymptom> excludeUnconfirmed (@NonNull final List<UserSymptom> userSymptoms){
-        final List<UserSymptom> confirmentUserSymptoms = new ArrayList<>();
-        for (UserSymptom userSymptom : userSymptoms){
-            final long howLongAgo = System.currentTimeMillis() - userSymptom.getTimestamp().getTime();
-            if (howLongAgo > UserSymptomSyncer.USER_SYMPTOM_CONFIRMATION_TIME) {
-                confirmentUserSymptoms.add(userSymptom);
+    private List<UserMessage> excludeUnconfirmed (@NonNull final List<UserMessage> userMessages){
+        final List<UserMessage> confirmentUserMessages = new ArrayList<>();
+        for (UserMessage userMessage : userMessages){
+            final long howLongAgo = System.currentTimeMillis() - userMessage.getTimestamp().getTime();
+            if (howLongAgo > UserMessageSyncer.USER_MESSAGE_CONFIRMATION_TIME) {
+                confirmentUserMessages.add(userMessage);
             }
         }
-        return confirmentUserSymptoms;
+        return confirmentUserMessages;
     }
 
     private String createJsonContent (
             @NonNull final UUID incognitoId,
-            @NonNull final Collection<UserSymptom> userSymptoms
+            @NonNull final Collection<UserMessage> userMessages
     ) {
         final StringBuilder content = new StringBuilder();
         content.append(String.format(Locale.ENGLISH, "{\"incognito_id\":\"%s\",\"user_symptoms\":[", incognitoId));
 
         boolean isFirst = true;
-        for (UserSymptom userSymptom : userSymptoms) {
+        for (UserMessage userMessage : userMessages) {
             if (!isFirst) {
                 content.append(',');
             } else {
                 isFirst = false;
             }
-            Double latitude = userSymptom.getLatitude();
-            Double longitude = userSymptom.getLongitude();
+            Double latitude = userMessage.getLatitude();
+            Double longitude = userMessage.getLongitude();
 
             if (latitude != null && longitude != null) {
                 Pair<Double, Double> obfuscatedLocation = LocationObfuscator.obfuscate(
-                        userSymptom.getLatitude(),
-                        userSymptom.getLongitude(),
+                        userMessage.getLatitude(),
+                        userMessage.getLongitude(),
                         2);
                 latitude = obfuscatedLocation.first;
                 longitude = obfuscatedLocation.second;
@@ -114,10 +114,11 @@ public final class UserSymptomSyncer {
             content.append(
                     String.format(
                             Locale.ENGLISH,
-                            USER_SYMPTOM_JSON_PATTERN,
-                            userSymptom.getSymptomId(),
-                            (userSymptom.getTimestamp().getTime() / 1000),
-                            sdfTimeZone.format(userSymptom.getTimestamp()),
+                            USER_MESSAGE_JSON_PATTERN,
+                            userMessage.getMessageId(),
+                            userMessage.getMessageId(),
+                            (userMessage.getTimestamp().getTime() / 1000),
+                            sdfTimeZone.format(userMessage.getTimestamp()),
                             latitude,
                             longitude
                     )

@@ -1,4 +1,4 @@
-package blagodarie.health.ui.symptoms;
+package blagodarie.health.ui.messages;
 
 import android.net.Uri;
 import android.util.Log;

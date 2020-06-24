@@ -1,4 +1,4 @@
-package blagodarie.health.ui.symptoms;
+package blagodarie.health.ui.messages;
 
 import androidx.annotation.NonNull;
 
@@ -6,8 +6,8 @@ import androidx.annotation.NonNull;
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-interface DisplaySymptomClickListener {
+interface DisplayMessageClickListener {
     void onClick (
-            @NonNull final DisplaySymptom displaySymptom
+            @NonNull final DisplayMessage displayMessage
     );
 }

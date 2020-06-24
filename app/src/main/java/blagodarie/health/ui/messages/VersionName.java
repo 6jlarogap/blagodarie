@@ -1,4 +1,4 @@
-package blagodarie.health.ui.symptoms;
+package blagodarie.health.ui.messages;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

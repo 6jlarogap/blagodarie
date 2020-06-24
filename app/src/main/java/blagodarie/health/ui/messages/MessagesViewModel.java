@@ -1,4 +1,4 @@
-package blagodarie.health.ui.symptoms;
+package blagodarie.health.ui.messages;
 
 import android.app.Application;
 import android.util.Log;
@@ -15,8 +15,8 @@ import androidx.lifecycle.ViewModelProvider;
 
 import blagodarie.health.Repository;
 import blagodarie.health.database.Identifier;
-import blagodarie.health.database.LastUserSymptom;
-import blagodarie.health.database.SymptomGroupWithSymptoms;
+import blagodarie.health.database.LastUserMessage;
+import blagodarie.health.database.MessageGroupWithMessages;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -35,16 +35,16 @@ import io.reactivex.schedulers.Schedulers;
  * @author sergeGabrus
  * @link https://github.com/6jlarogap/blagodarie/blob/master/LICENSE License
  */
-public final class SymptomsViewModel
+public final class MessagesViewModel
         extends AndroidViewModel {
 
-    private static final String TAG = SymptomsViewModel.class.getSimpleName();
+    private static final String TAG = MessagesViewModel.class.getSimpleName();
 
     @NonNull
-    private List<DisplaySymptomGroup> mDisplaySymptomGroups = new ArrayList<>();
+    private List<DisplayMessageGroup> mDisplayMessageGroups = new ArrayList<>();
 
     @NonNull
-    private List<DisplaySymptom> mDisplaySymptoms = new ArrayList<>();
+    private List<DisplayMessage> mDisplayMessages = new ArrayList<>();
 
     @NonNull
     private final Repository mRepository;
@@ -53,7 +53,7 @@ public final class SymptomsViewModel
     private final CompositeDisposable mDisposables = new CompositeDisposable();
 
     @NonNull
-    private List<SymptomGroupWithSymptoms> mSymptomCatalog = new ArrayList<>();
+    private List<MessageGroupWithMessages> mMessageCatalog = new ArrayList<>();
 
     @NonNull
     private final ObservableField<String> mIncognitoPublicKey;
@@ -62,7 +62,7 @@ public final class SymptomsViewModel
     private final ObservableBoolean mShowNoServerConnectionErrMsg = new ObservableBoolean(false);
 
     @Keep
-    public SymptomsViewModel (
+    public MessagesViewModel (
             @NonNull final Application application,
             @NonNull final String incognitoPublicKey
     ) {
@@ -84,24 +84,24 @@ public final class SymptomsViewModel
             @NonNull final UUID incognitoId,
             @NonNull final Action action
     ) {
-        final Collection<DisplaySymptom> allDisplaySymptoms = new ArrayList<>();
-        for (DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups) {
-            allDisplaySymptoms.addAll(displaySymptomGroup.getDisplaySymptoms());
+        final Collection<DisplayMessage> allDisplayMessages = new ArrayList<>();
+        for (DisplayMessageGroup displayMessageGroup : mDisplayMessageGroups) {
+            allDisplayMessages.addAll(displayMessageGroup.getDisplayMessages());
         }
 
         mDisposables.add(
                 Observable.
-                        fromIterable(allDisplaySymptoms).
-                        map(displaySymptom -> new Pair<>(displaySymptom, mRepository.getLastUserSymptom(incognitoId, displaySymptom.getSymptomId()))).
+                        fromIterable(allDisplayMessages).
+                        map(displayMessage -> new Pair<>(displayMessage, mRepository.getLastUserMessage(incognitoId, displayMessage.getMessageId()))).
                         subscribeOn(Schedulers.io()).
                         observeOn(AndroidSchedulers.mainThread()).
                         subscribe(
-                                displaySymptomWithLastUserSymptom -> {
-                                    final DisplaySymptom displaySymptom = displaySymptomWithLastUserSymptom.first;
-                                    final LastUserSymptom lastUserSymptom = displaySymptomWithLastUserSymptom.second;
-                                    if (displaySymptom != null && lastUserSymptom != null) {
-                                        displaySymptom.setLastDate(lastUserSymptom.getTimestamp());
-                                        displaySymptom.setUserSymptomCount(lastUserSymptom.getSymptomsCount());
+                                displayMessageWithLastUserMessage -> {
+                                    final DisplayMessage displayMessage = displayMessageWithLastUserMessage.first;
+                                    final LastUserMessage lastUserMessage = displayMessageWithLastUserMessage.second;
+                                    if (displayMessage != null && lastUserMessage != null) {
+                                        displayMessage.setLastDate(lastUserMessage.getTimestamp());
+                                        displayMessage.setUserMessageCount(lastUserMessage.getMessagesCount());
                                     }
                                 },
                                 throwable -> {
@@ -111,74 +111,74 @@ public final class SymptomsViewModel
     }
 
     @NonNull
-    final List<DisplaySymptom> getDisplaySymptoms () {
-        return mDisplaySymptoms;
+    final List<DisplayMessage> getDisplayMessages () {
+        return mDisplayMessages;
     }
 
     @NonNull
-    final List<DisplaySymptomGroup> getDisplaySymptomGroups () {
-        return mDisplaySymptomGroups;
+    final List<DisplayMessageGroup> getDisplayMessageGroups () {
+        return mDisplayMessageGroups;
     }
 
     @Nullable
-    final Identifier getSelectedSymptomGroupId () {
-        for (DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups) {
-            if (displaySymptomGroup.isSelected()) {
-                return displaySymptomGroup.getSymptomGroupId();
+    final Identifier getSelectedMessageGroupId () {
+        for (DisplayMessageGroup displayMessageGroup : mDisplayMessageGroups) {
+            if (displayMessageGroup.isSelected()) {
+                return displayMessageGroup.getMessageGroupId();
             }
         }
         return null;
     }
 
-    final void setSelectedDisplaySymptomGroup (@Nullable final DisplaySymptomGroup selectedGroup) {
-        for (DisplaySymptomGroup displaySymptomGroup : mDisplaySymptomGroups) {
-            displaySymptomGroup.setSelected(displaySymptomGroup.equals(selectedGroup));
+    final void setSelectedDisplayMessageGroup (@Nullable final DisplayMessageGroup selectedGroup) {
+        for (DisplayMessageGroup displayMessageGroup : mDisplayMessageGroups) {
+            displayMessageGroup.setSelected(displayMessageGroup.equals(selectedGroup));
         }
     }
 
-    final void setDisplaySymptoms (@NonNull final List<DisplaySymptom> displaySymptoms) {
-        mDisplaySymptoms = displaySymptoms;
+    final void setDisplayMessages (@NonNull final List<DisplayMessage> displayMessages) {
+        mDisplayMessages = displayMessages;
     }
 
-    final void setDisplaySymptomGroups (@NonNull final List<DisplaySymptomGroup> displaySymptomGroups) {
-        mDisplaySymptomGroups = displaySymptomGroups;
+    final void setDisplayMessageGroups (@NonNull final List<DisplayMessageGroup> displayMessageGroups) {
+        mDisplayMessageGroups = displayMessageGroups;
     }
 
     @NonNull
-    List<SymptomGroupWithSymptoms> getSymptomCatalog () {
-        return mSymptomCatalog;
+    List<MessageGroupWithMessages> getMessageCatalog () {
+        return mMessageCatalog;
     }
 
-    final void setSymptomCatalog (@NonNull final List<SymptomGroupWithSymptoms> symptomCatalog) {
-        mSymptomCatalog = symptomCatalog;
+    final void setMessageCatalog (@NonNull final List<MessageGroupWithMessages> messageCatalog) {
+        mMessageCatalog = messageCatalog;
     }
 
-    final void orderDisplaySymptoms () {
+    final void orderDisplayMessages () {
         Collections.sort(
-                mDisplaySymptoms,
+                mDisplayMessages,
                 (o1, o2) -> {
-                    long difference = o2.getUserSymptomCount() - o1.getUserSymptomCount();
+                    long difference = o2.getUserMessageCount() - o1.getUserMessageCount();
                     if (difference < 0) {
                         return -1;
                     } else if (difference > 0) {
                         return 1;
                     } else {
-                        return o1.getSymptomName().compareTo(o2.getSymptomName());
+                        return o1.getMessageName().compareTo(o2.getMessageName());
                     }
                 });
     }
 
-    final void orderDisplaySymptomGroups () {
+    final void orderDisplayMessageGroups () {
         Collections.sort(
-                mDisplaySymptomGroups,
+                mDisplayMessageGroups,
                 (o1, o2) -> {
-                    long difference = o2.getUserSymptomCount() - o1.getUserSymptomCount();
+                    long difference = o2.getUserMessageCount() - o1.getUserMessageCount();
                     if (difference < 0) {
                         return -1;
                     } else if (difference > 0) {
                         return 1;
                     } else {
-                        return o1.getSymptomGroupName().compareTo(o2.getSymptomGroupName());
+                        return o1.getMessageGroupName().compareTo(o2.getMessageGroupName());
                     }
                 });
     }

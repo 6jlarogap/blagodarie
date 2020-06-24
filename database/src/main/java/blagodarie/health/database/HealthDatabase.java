@@ -12,12 +12,12 @@ import androidx.sqlite.db.SimpleSQLiteQuery;
 
 @Database(
         entities = {
-                SymptomGroup.class,
-                Symptom.class,
-                UserSymptom.class,
-                LastUserSymptom.class
+                MessageGroup.class,
+                Message.class,
+                UserMessage.class,
+                LastUserMessage.class
         },
-        version = 5)
+        version = 1)
 @TypeConverters({Converters.class})
 public abstract class HealthDatabase
         extends RoomDatabase {
@@ -62,11 +62,11 @@ public abstract class HealthDatabase
         query(QUERY_DEFER_FOREIGN_KEYS);
     }
 
-    public abstract SymptomGroupDao symptomGroupDao ();
+    public abstract MessageGroupDao messageGroupDao ();
 
-    public abstract SymptomDao symptomDao ();
+    public abstract MessageDao messageDao ();
 
-    public abstract UserSymptomDao userSymptomDao ();
+    public abstract UserMessageDao userMessageDao ();
 
-    public abstract LastUserSymptomDao lastUserSymptomDao ();
+    public abstract LastUserMessageDao lastUserMessageDao ();
 }

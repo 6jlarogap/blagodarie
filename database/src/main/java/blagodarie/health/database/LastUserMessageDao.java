@@ -9,18 +9,18 @@ import androidx.room.Update;
 import java.util.UUID;
 
 @Dao
-public interface LastUserSymptomDao {
+public interface LastUserMessageDao {
 
     @Insert (onConflict = OnConflictStrategy.IGNORE)
-    void insert(final LastUserSymptom lastUserSymptom);
+    void insert(final LastUserMessage lastUserMessage);
 
     @Update(onConflict = OnConflictStrategy.IGNORE)
-    void update(final LastUserSymptom lastUserSymptom);
+    void update(final LastUserMessage lastUserMessage);
 
     @Query ("SELECT * " +
-            "FROM tbl_last_user_symptom " +
+            "FROM tbl_last_user_message " +
             "WHERE incognito_id = :incognitoId " +
-            "AND symptom_id = :symptomId")
-    LastUserSymptom get (final UUID incognitoId, final Identifier symptomId);
+            "AND message_id = :messageId")
+    LastUserMessage get (final UUID incognitoId, final Identifier messageId);
 
 }
