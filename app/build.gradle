@@ -16,6 +16,7 @@ android {
         versionCode 1
         versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        project.ext.set("archivesBaseName", "health-" + defaultConfig.versionName);
         //multiDexEnabled true
     }
 
@@ -43,9 +44,9 @@ android {
     }
 
     applicationVariants.all { variant ->
-        variant.outputs.all {
+        /*variant.outputs.all {
             outputFileName = "health-" + versionName + "-" + buildType.name + ".apk"
-        }
+        }*/
         variant.getAssembleProvider().configure() {
             it.doLast {
                 variant.outputs.all {
@@ -80,8 +81,8 @@ android {
         }
     }
 
-    buildFeatures {
-        dataBinding = true
+    dataBinding {
+        enabled = true
     }
     compileOptions {
         sourceCompatibility = 1.8
