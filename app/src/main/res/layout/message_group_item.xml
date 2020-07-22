@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="5dp"
+        android:background="@{DisplayMessageGroup.selected ? @android:color/holo_green_light : @android:color/white}">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_margin="5dp"
+            android:gravity="center"
+            android:maxWidth="200dp"
+            android:minLines="2"
+            android:text="@{DisplayMessageGroup.messageGroupName}"
+            android:textAppearance="@style/TextAppearance.AppCompat.Medium" />
+
+    </androidx.cardview.widget.CardView>
+
+    <data>
+
+        <variable
+            name="DisplayMessageGroup"
+            type="blagodarie.health.ui.messages.DisplayMessageGroup" />
+
+    </data>
+
+</layout>

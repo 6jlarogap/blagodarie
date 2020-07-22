@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="5dp"
+        android:background="@{DisplayMessage.highlight ? @android:color/holo_green_light : @android:color/white}">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <ImageView
+                    android:id="@+id/ivSync"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:layout_gravity="center_horizontal"
+                    android:src="@drawable/sync"
+                    android:visibility="@{DisplayMessage.isHaveNotSynced ? View.VISIBLE : View.INVISIBLE}" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_gravity="center"
+                    android:layout_margin="5dp"
+                    android:layout_toStartOf="@id/ivCancel"
+                    android:layout_toEndOf="@id/ivSync"
+                    android:gravity="center"
+                    android:text="@{DisplayMessage.messageName}"
+                    android:textAppearance="@style/TextAppearance.AppCompat.Large" />
+
+                <ImageView
+                    android:id="@+id/ivCancel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:src="@drawable/close_circle"
+                    android:onClick="@{() -> DisplayMessage.cancelUnconfirmedUserMessage()}"
+                    android:visibility="@{DisplayMessage.notConfirmedUserMessage == null ? View.INVISIBLE : View.VISIBLE}" />
+
+            </RelativeLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:text='@{DisplayMessage.lastDate != null ? SimpleDateFormat.getDateTimeInstance().format(DisplayMessage.lastDate) : ""}'
+                android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                android:visibility="@{DisplayMessage.lastDate != null ? View.VISIBLE : View.GONE}" />
+
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <import type="java.text.SimpleDateFormat" />
+
+        <variable
+            name="DisplayMessage"
+            type="blagodarie.health.ui.messages.DisplayMessage" />
+
+    </data>
+
+</layout>

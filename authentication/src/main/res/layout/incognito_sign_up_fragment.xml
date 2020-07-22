@@ -49,7 +49,7 @@
 
         <variable
             name="IncognitoSignUpUserActionListener"
-            type="org.blagodarie.authentication.IncognitoSignUpFragment.IncognitoSignUpUserAction" />
+            type="blagodarie.health.authentication.IncognitoSignUpFragment.IncognitoSignUpUserAction" />
     </data>
 
 </layout>
