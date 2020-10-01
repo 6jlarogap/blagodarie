@@ -23,7 +23,7 @@ public final class Identifier
     }
 
     @Nullable
-    final Long getValue () {
+    public final Long getValue () {
         return mValue;
     }
 
