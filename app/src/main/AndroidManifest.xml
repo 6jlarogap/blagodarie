@@ -44,6 +44,7 @@
             android:name=".ui.messages.MessagesActivity"
             android:screenOrientation="portrait" />
         <activity android:name=".ui.update.UpdateActivity" />
+        <activity android:name=".ui.usermessages.UserMessagesActivity" />
 
         <service android:name=".authentication.AuthenticatorService">
             <intent-filter>

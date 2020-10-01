@@ -55,6 +55,7 @@ import blagodarie.health.databinding.NavHeaderBinding;
 import blagodarie.health.server.ServerConnector;
 import blagodarie.health.sync.SyncService;
 import blagodarie.health.ui.update.UpdateActivity;
+import blagodarie.health.ui.usermessages.UserMessagesActivity;
 import io.reactivex.Completable;
 import io.reactivex.CompletableObserver;
 import io.reactivex.Observable;
@@ -448,13 +449,20 @@ public final class MessagesActivity
             mMessageGroupsAdapter.setData(mViewModel.getDisplayMessageGroups());
         }
         if (mMessagesAdapter == null) {
-            mMessagesAdapter = new MessagesAdapter(mViewModel.getDisplayMessages(), this::createUserMessage);
+            mMessagesAdapter = new MessagesAdapter(mViewModel.getDisplayMessages(), this::createUserMessage, this::onMessageClick);
             mActivityBinding.rvMessages.setAdapter(mMessagesAdapter);
         } else {
             mMessagesAdapter.setData(mViewModel.getDisplayMessages());
         }
 
         orderMessages();
+    }
+
+    public void onMessageClick (final long messageId) {
+        final Intent intent = new Intent(this, UserMessagesActivity.class);
+        intent.putExtra("message_id", messageId);
+        intent.putExtra("incognito_public_key", mIncognitoPublicKey);
+        startActivity(intent);
     }
 
     public void createUserMessage (

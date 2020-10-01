@@ -44,19 +44,31 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:src="@drawable/close_circle"
                     android:onClick="@{() -> DisplayMessage.cancelUnconfirmedUserMessage()}"
+                    android:src="@drawable/close_circle"
                     android:visibility="@{DisplayMessage.notConfirmedUserMessage == null ? View.INVISIBLE : View.VISIBLE}" />
 
             </RelativeLayout>
 
-            <TextView
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_margin="5dp"
-                android:text='@{DisplayMessage.lastDate != null ? SimpleDateFormat.getDateTimeInstance().format(DisplayMessage.lastDate) : ""}'
-                android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                android:visibility="@{DisplayMessage.lastDate != null ? View.VISIBLE : View.GONE}" />
+                android:visibility="@{DisplayMessage.lastDate != null ? View.VISIBLE : View.GONE}">
+
+                <ImageView
+                    android:id="@+id/ivUserMessages"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@drawable/text" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:text='@{DisplayMessage.lastDate != null ? SimpleDateFormat.getDateTimeInstance().format(DisplayMessage.lastDate) : ""}'
+                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+
+            </LinearLayout>
 
 
         </LinearLayout>

@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'androidx.navigation.safeargs'
 
 android {
 
@@ -13,8 +14,8 @@ android {
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 30
-        versionCode 52
-        versionName "0.4.15"
+        versionCode 53
+        versionName "0.4.16"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         project.ext.set("archivesBaseName", "health-" + defaultConfig.versionName);
         //multiDexEnabled true
@@ -98,6 +99,7 @@ dependencies {
     implementation project(path: ':database')
     implementation project(path: ':log')
 
+    implementation "android.arch.paging:runtime:1.0.1"
     implementation 'androidx.appcompat:appcompat:1.2.0'
     implementation "androidx.cardview:cardview:1.0.0"
     implementation "androidx.constraintlayout:constraintlayout:2.0.1"

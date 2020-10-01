@@ -9,11 +9,11 @@ import androidx.databinding.DataBindingUtil;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
-import blagodarie.health.R;
-import blagodarie.health.databinding.MessageItemBinding;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import blagodarie.health.R;
+import blagodarie.health.databinding.MessageItemBinding;
 
 /**
  * @author sergeGabrus
@@ -22,18 +22,27 @@ import java.util.List;
 final class MessagesAdapter
         extends RecyclerView.Adapter<MessagesAdapter.MessageViewHolder> {
 
+    interface OnUserMessagesListClickListener {
+        void onClick (final long messageId);
+    }
+
     @NonNull
     private final List<DisplayMessage> mDisplayMessages = new ArrayList<>();
 
     @NonNull
     private final DisplayMessageClickListener mDisplayMessageClickListener;
 
+    @NonNull
+    private final OnUserMessagesListClickListener mOnUserMessagesListClickListener;
+
     MessagesAdapter (
             @NonNull final List<DisplayMessage> displayMessages,
-            @NonNull final DisplayMessageClickListener displayMessageClickListener
+            @NonNull final DisplayMessageClickListener displayMessageClickListener,
+            @NonNull final OnUserMessagesListClickListener onUserMessagesListClickListener
     ) {
         mDisplayMessages.addAll(displayMessages);
         mDisplayMessageClickListener = displayMessageClickListener;
+        mOnUserMessagesListClickListener = onUserMessagesListClickListener;
     }
 
     @NonNull
@@ -48,11 +57,15 @@ final class MessagesAdapter
     public void onBindViewHolder (@NonNull MessageViewHolder holder, int position) {
         final DisplayMessage displayMessage = mDisplayMessages.get(position);
         if (displayMessage != null) {
-            holder.bind(displayMessage, v -> {
-                if (!displayMessage.isHighlight()) {
-                    mDisplayMessageClickListener.onClick(displayMessage);
-                }
-            });
+            holder.bind(
+                    displayMessage,
+                    v -> {
+                        if (!displayMessage.isHighlight()) {
+                            mDisplayMessageClickListener.onClick(displayMessage);
+                        }
+                    },
+                    mOnUserMessagesListClickListener
+            );
         }
     }
 
@@ -81,10 +94,16 @@ final class MessagesAdapter
 
         void bind (
                 @NonNull final DisplayMessage displayMessage,
-                @NonNull final View.OnClickListener onClickListener
+                @NonNull final View.OnClickListener onClickListener,
+                @NonNull final OnUserMessagesListClickListener onUserMessagesListClickListener
         ) {
             itemView.setOnClickListener(onClickListener);
             mBinding.setDisplayMessage(displayMessage);
+            mBinding.ivUserMessages.setOnClickListener(v -> {
+                if (displayMessage.getMessageId().getValue() != null) {
+                    onUserMessagesListClickListener.onClick(displayMessage.getMessageId().getValue());
+                }
+            });
         }
     }
 
