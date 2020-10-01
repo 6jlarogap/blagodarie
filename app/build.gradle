@@ -14,8 +14,8 @@ android {
         applicationId APPLICATION_ID
         minSdkVersion 19
         targetSdkVersion 30
-        versionCode 52
-        versionName "0.4.15"
+        versionCode 53
+        versionName "0.4.16"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         project.ext.set("archivesBaseName", "health-" + defaultConfig.versionName);
         //multiDexEnabled true
