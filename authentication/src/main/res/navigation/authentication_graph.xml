@@ -7,7 +7,7 @@
 
     <fragment
         android:id="@+id/greetingFragment"
-        android:name="org.blagodarie.authentication.GreetingFragment"
+        android:name="blagodarie.health.authentication.GreetingFragment"
         android:label="GreetingFragment">
         <action
             android:id="@+id/action_greetingFragment_to_signUpFragment"
@@ -15,7 +15,7 @@
     </fragment>
     <fragment
         android:id="@+id/startFragment"
-        android:name="org.blagodarie.authentication.StartFragment"
+        android:name="blagodarie.health.authentication.StartFragment"
         android:label="StartFragment">
         <action
             android:id="@+id/action_startFragment_to_greetingFragment"
@@ -29,7 +29,7 @@
     </fragment>
     <fragment
         android:id="@+id/signInFragment"
-        android:name="org.blagodarie.authentication.SignInFragment"
+        android:name="blagodarie.health.authentication.SignInFragment"
         android:label="SignInFragment" >
         <argument
             android:name="user_id"
@@ -37,10 +37,10 @@
     </fragment>
     <fragment
         android:id="@+id/signUpFragment"
-        android:name="org.blagodarie.authentication.SignUpFragment"
+        android:name="blagodarie.health.authentication.SignUpFragment"
         android:label="SignUpFragment" />
     <fragment
         android:id="@+id/incognitoSignUpFragment"
-        android:name="org.blagodarie.authentication.IncognitoSignUpFragment"
+        android:name="blagodarie.health.authentication.IncognitoSignUpFragment"
         android:label="IncognitoSignUpFragment" />
 </navigation>

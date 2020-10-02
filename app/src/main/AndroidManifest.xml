@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.blagodarie">
+    package="blagodarie.health">
 
     <uses-permission
         android:name="android.permission.GET_ACCOUNTS"
@@ -24,7 +24,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
-        android:name=".BlagodarieApp"
+        android:name=".HealthApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -41,19 +41,12 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".ui.symptoms.SymptomsActivity"
+            android:name=".ui.messages.MessagesActivity"
             android:screenOrientation="portrait" />
         <activity android:name=".ui.update.UpdateActivity" />
-        <activity
-            android:name=".ui.log.SendLogActivity"
-            android:theme="@android:style/Theme.Dialog">
-            <intent-filter>
-                <action android:name="org.blagodarie.SEND_LOG" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
+        <activity android:name=".ui.usermessages.UserMessagesActivity" />
 
-        <service android:name="org.blagodarie.authentication.AuthenticatorService">
+        <service android:name=".authentication.AuthenticatorService">
             <intent-filter>
                 <action android:name="android.accounts.AccountAuthenticator" />
             </intent-filter>
@@ -84,7 +77,7 @@
         </provider>
 
         <provider
-            android:name="org.blagodarie.sync.StubProvider"
+            android:name=".sync.StubProvider"
             android:authorities="@string/content_provider_authorities"
             android:exported="false"
             android:syncable="true" />

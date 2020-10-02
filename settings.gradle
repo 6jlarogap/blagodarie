@@ -1,2 +1,3 @@
+include ':log'
 include ':app', ':authentication', ':server', ':database'
 rootProject.name='blagodarie'
