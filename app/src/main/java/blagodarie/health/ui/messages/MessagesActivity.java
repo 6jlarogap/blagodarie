@@ -171,7 +171,6 @@ public final class MessagesActivity
         mDrawerLayout.setStatusBarBackground(R.color.colorPrimaryDark);
 
         NavHeaderBinding binding = DataBindingUtil.inflate(getLayoutInflater(), R.layout.nav_header, null, false);
-        binding.setViewModel(mViewModel);
         mActivityBinding.nvNavigation.addHeaderView(binding.getRoot());
 
         mActivityBinding.nvNavigation.setNavigationItemSelectedListener(menuItem -> {
@@ -179,8 +178,8 @@ public final class MessagesActivity
                 case R.id.miShowIncognitoPrivateKey:
                     showIncognitoPrivateKeyDialog();
                     break;
-                case R.id.miUpdateIncognitoPublicKey:
-                    updateIncognitoPublicKey();
+                case R.id.miShowIncognitoPublicKey:
+                    showIncognitoPublicKeyDialog();
                     break;
             }
             mDrawerLayout.closeDrawers();
@@ -360,7 +359,7 @@ public final class MessagesActivity
         if (actionBar != null) {
             actionBar.setTitle(null);
             final String title = getString(R.string.app_name);
-            final SpannableString spannableTitle = new SpannableString(title + " " + BuildConfig.VERSION_NAME);
+            final SpannableString spannableTitle = new SpannableString(title);
             spannableTitle.setSpan(new UnderlineSpan(), 0, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             final TextView tvTitle = findViewById(R.id.tvTitle);
             tvTitle.setText(spannableTitle);
@@ -377,6 +376,9 @@ public final class MessagesActivity
                 mDrawerLayout.openDrawer(GravityCompat.START);
                 return true;
             case R.id.miShowIncognitoPrivateKey:
+                mDrawerLayout.openDrawer(GravityCompat.START);
+                return true;
+            case R.id.miShowIncognitoPublicKey:
                 mDrawerLayout.openDrawer(GravityCompat.START);
                 return true;
         }
@@ -613,7 +615,7 @@ public final class MessagesActivity
         Log.d(TAG, "showIncognitoPrivateKeyDialog");
         new AlertDialog.Builder(this).
                 setTitle(R.string.incognito_private_key).
-                setMessage(String.format(getString(R.string.txt_incognito_private_key), mIncognitoPrivateKey.toString())).
+                setMessage(getString(R.string.txt_incognito_private_key, mIncognitoPrivateKey.toString())).
                 setNegativeButton(
                         R.string.btn_copy,
                         (dialog, which) -> {
@@ -627,6 +629,30 @@ public final class MessagesActivity
                 setPositiveButton(
                         R.string.btn_cancel,
                         null).
+                create().
+                show();
+    }
+
+    public void showIncognitoPublicKeyDialog () {
+        Log.d(TAG, "showIncognitoPublicKeyDialog");
+        new AlertDialog.Builder(this).
+                setTitle(R.string.incognito_public_key).
+                setMessage(getString(R.string.your_incognito_public_key, mIncognitoPublicKey.toString())).
+                setNegativeButton(
+                        R.string.btn_copy,
+                        (dialog, which) -> {
+                            final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                            final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), mIncognitoPublicKey.toString());
+                            if (clipboard != null) {
+                                clipboard.setPrimaryClip(clip);
+                                Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+                            }
+                        }).
+                setPositiveButton(
+                        R.string.btn_cancel,
+                        null).
+                setNeutralButton(R.string.btn_update,
+                        ((dialog, which) -> updateIncognitoPublicKey())).
                 create().
                 show();
     }

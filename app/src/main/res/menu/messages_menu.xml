@@ -6,7 +6,7 @@
         android:title="@string/show_incognito_private_key" />
 
     <item
-        android:id="@+id/miUpdateIncognitoPublicKey"
-        android:title="@string/update_incognito_public_key" />
+        android:id="@+id/miShowIncognitoPublicKey"
+        android:title="@string/show_incognito_public_key" />
 
 </menu>

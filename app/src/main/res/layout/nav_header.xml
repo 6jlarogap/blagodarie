@@ -12,22 +12,13 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/your_incognito_public_key"
-            android:textAppearance="@style/TextAppearance.AppCompat.Body2" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@{ViewModel.incognitoPublicKey}"
-            android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+            android:text="@{String.format(@string/txt_version, BuildConfig.VERSION_NAME)}" />
 
     </LinearLayout>
 
     <data>
 
-        <variable
-            name="ViewModel"
-            type="blagodarie.health.ui.messages.MessagesViewModel" />
+        <import type="blagodarie.health.BuildConfig" />
 
     </data>
 </layout>
