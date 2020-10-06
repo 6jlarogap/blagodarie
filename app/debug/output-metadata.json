@@ -11,10 +11,10 @@
       "type": "SINGLE",
       "filters": [],
       "properties": [],
-      "versionCode": 53,
-      "versionName": "0.4.16",
+      "versionCode": 54,
+      "versionName": "0.4.17",
       "enabled": true,
-      "outputFile": "health-0.4.16-debug.apk"
+      "outputFile": "health-0.4.17-debug.apk"
     }
   ]
 }

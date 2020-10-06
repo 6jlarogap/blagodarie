@@ -33,6 +33,11 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.play.core.appupdate.AppUpdateInfo;
+import com.google.android.play.core.appupdate.AppUpdateManager;
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
+import com.google.android.play.core.tasks.Task;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -171,7 +176,6 @@ public final class MessagesActivity
         mDrawerLayout.setStatusBarBackground(R.color.colorPrimaryDark);
 
         NavHeaderBinding binding = DataBindingUtil.inflate(getLayoutInflater(), R.layout.nav_header, null, false);
-        binding.setViewModel(mViewModel);
         mActivityBinding.nvNavigation.addHeaderView(binding.getRoot());
 
         mActivityBinding.nvNavigation.setNavigationItemSelectedListener(menuItem -> {
@@ -179,8 +183,8 @@ public final class MessagesActivity
                 case R.id.miShowIncognitoPrivateKey:
                     showIncognitoPrivateKeyDialog();
                     break;
-                case R.id.miUpdateIncognitoPublicKey:
-                    updateIncognitoPublicKey();
+                case R.id.miShowIncognitoPublicKey:
+                    showIncognitoPublicKeyDialog();
                     break;
             }
             mDrawerLayout.closeDrawers();
@@ -360,7 +364,7 @@ public final class MessagesActivity
         if (actionBar != null) {
             actionBar.setTitle(null);
             final String title = getString(R.string.app_name);
-            final SpannableString spannableTitle = new SpannableString(title + " " + BuildConfig.VERSION_NAME);
+            final SpannableString spannableTitle = new SpannableString(title);
             spannableTitle.setSpan(new UnderlineSpan(), 0, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             final TextView tvTitle = findViewById(R.id.tvTitle);
             tvTitle.setText(spannableTitle);
@@ -377,6 +381,9 @@ public final class MessagesActivity
                 mDrawerLayout.openDrawer(GravityCompat.START);
                 return true;
             case R.id.miShowIncognitoPrivateKey:
+                mDrawerLayout.openDrawer(GravityCompat.START);
+                return true;
+            case R.id.miShowIncognitoPublicKey:
                 mDrawerLayout.openDrawer(GravityCompat.START);
                 return true;
         }
@@ -613,7 +620,7 @@ public final class MessagesActivity
         Log.d(TAG, "showIncognitoPrivateKeyDialog");
         new AlertDialog.Builder(this).
                 setTitle(R.string.incognito_private_key).
-                setMessage(String.format(getString(R.string.txt_incognito_private_key), mIncognitoPrivateKey.toString())).
+                setMessage(getString(R.string.txt_incognito_private_key, mIncognitoPrivateKey.toString())).
                 setNegativeButton(
                         R.string.btn_copy,
                         (dialog, which) -> {
@@ -627,6 +634,30 @@ public final class MessagesActivity
                 setPositiveButton(
                         R.string.btn_cancel,
                         null).
+                create().
+                show();
+    }
+
+    public void showIncognitoPublicKeyDialog () {
+        Log.d(TAG, "showIncognitoPublicKeyDialog");
+        new AlertDialog.Builder(this).
+                setTitle(R.string.incognito_public_key).
+                setMessage(getString(R.string.your_incognito_public_key, mIncognitoPublicKey.toString())).
+                setNegativeButton(
+                        R.string.btn_copy,
+                        (dialog, which) -> {
+                            final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                            final ClipData clip = ClipData.newPlainText(getString(R.string.txt_log), mIncognitoPublicKey.toString());
+                            if (clipboard != null) {
+                                clipboard.setPrimaryClip(clip);
+                                Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+                            }
+                        }).
+                setPositiveButton(
+                        R.string.btn_cancel,
+                        null).
+                setNeutralButton(R.string.btn_update,
+                        ((dialog, which) -> updateIncognitoPublicKey())).
                 create().
                 show();
     }
@@ -650,29 +681,33 @@ public final class MessagesActivity
                                         mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, mIncognitoPublicKey.toString());
                                         mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY_TIMESTAMP, mIncognitoPublicKeyTimestamp.toString());
                                     }
-                                    if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
-                                        final Update update = Update.determine(apiResult.getVersionName());
-                                        switch (update) {
-                                            case OPTIONAL:
-                                                if (!getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).contains(apiResult.getVersionName().toString())) {
-                                                    showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), update, apiResult.getVersionName(), apiResult.getUri(), apiResult.getPlayMarketUri());
+                                    if (apiResult.isGooglePlayUpdate()) {
+                                        checkUpdateOnMarket(apiResult.getPlayMarketUri());
+                                    } else {
+                                        if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
+                                            final Update update = Update.determine(apiResult.getVersionName());
+                                            switch (update) {
+                                                case OPTIONAL:
+                                                    if (!getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).contains(apiResult.getVersionName().toString())) {
+                                                        showUpdateVersionDialog(update, apiResult.getVersionName(), apiResult.getUri());
+                                                        getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
+                                                                edit().
+                                                                putString(apiResult.getVersionName().toString(), "").
+                                                                apply();
+                                                    }
+                                                    break;
+                                                case MANDATORY:
+                                                    showUpdateVersionDialog(update, apiResult.getVersionName(), apiResult.getUri());
                                                     getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
                                                             edit().
                                                             putString(apiResult.getVersionName().toString(), "").
                                                             apply();
-                                                }
-                                                break;
-                                            case MANDATORY:
-                                                showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), update, apiResult.getVersionName(), apiResult.getUri(), apiResult.getPlayMarketUri());
-                                                getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
-                                                        edit().
-                                                        putString(apiResult.getVersionName().toString(), "").
-                                                        apply();
-                                                break;
-                                            case NO:
-                                                break;
-                                            default:
-                                                Log.e(TAG, "Indefinite update type");
+                                                    break;
+                                                case NO:
+                                                    break;
+                                                default:
+                                                    Log.e(TAG, "Indefinite update type");
+                                            }
                                         }
                                     }
                                 },
@@ -686,11 +721,9 @@ public final class MessagesActivity
     }
 
     private void showUpdateVersionDialog (
-            final boolean googlePlayUpdate,
             @NonNull final Update update,
             @NonNull final VersionName versionName,
-            @NonNull final Uri latestVersionUri,
-            @NonNull final Uri playMarketUri
+            @NonNull final Uri latestVersionUri
     ) {
         Log.d(TAG, "showUpdateVersionDialog");
         new AlertDialog.
@@ -700,11 +733,7 @@ public final class MessagesActivity
                 setPositiveButton(
                         R.string.btn_update,
                         (dialog, which) -> {
-                            if (googlePlayUpdate) {
-                                toPlayMarket(playMarketUri);
-                            } else {
-                                toIndependentUpdate(versionName, latestVersionUri);
-                            }
+                            toIndependentUpdate(versionName, latestVersionUri);
                         }).
                 setNegativeButton(
                         update == Update.MANDATORY ? R.string.btn_finish : R.string.btn_cancel,
@@ -715,6 +744,41 @@ public final class MessagesActivity
                         }).
                 create().
                 show();
+    }
+
+    private void checkUpdateOnMarket (@NonNull final Uri playMarketUri) {
+        Log.d(TAG, "checkUpdateOnMarket");
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            final AppUpdateManager appUpdateManager = AppUpdateManagerFactory.create(this);
+
+            final Task<AppUpdateInfo> appUpdateInfoTask = appUpdateManager.getAppUpdateInfo();
+
+            appUpdateInfoTask.addOnSuccessListener(appUpdateInfo -> {
+                if (appUpdateInfo.availableVersionCode() > BuildConfig.VERSION_CODE) {
+                    if (!getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).contains(String.valueOf(appUpdateInfo.availableVersionCode()))) {
+                        new AlertDialog.
+                                Builder(this).
+                                setTitle(R.string.info_msg_update_available).
+                                setMessage(getString(R.string.qstn_want_load_new_version, String.valueOf(appUpdateInfo.availableVersionCode()))).
+                                setPositiveButton(
+                                        R.string.btn_update,
+                                        (dialogInterface, i) -> {
+                                            final Intent intent = new Intent(Intent.ACTION_VIEW);
+                                            intent.setData(playMarketUri);
+                                            startActivity(intent);
+                                        }).
+                                setNegativeButton(android.R.string.cancel, null).
+                                create().
+                                show();
+                        getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
+                                edit().
+                                putInt(String.valueOf(appUpdateInfo.availableVersionCode()), appUpdateInfo.availableVersionCode()).
+                                apply();
+
+                    }
+                }
+            });
+        }
     }
 
     public void toPlayMarket (@NonNull final Uri playMarketUri) {
