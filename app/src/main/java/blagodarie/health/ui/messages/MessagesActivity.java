@@ -681,29 +681,33 @@ public final class MessagesActivity
                                         mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY, mIncognitoPublicKey.toString());
                                         mAccountManager.setUserData(mAccount, AccountGeneral.USER_DATA_INCOGNITO_PUBLIC_KEY_TIMESTAMP, mIncognitoPublicKeyTimestamp.toString());
                                     }
-                                    if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
-                                        final Update update = Update.determine(apiResult.getVersionName());
-                                        switch (update) {
-                                            case OPTIONAL:
-                                                if (!getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).contains(apiResult.getVersionName().toString())) {
-                                                    showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), update, apiResult.getVersionName(), apiResult.getUri(), apiResult.getPlayMarketUri());
+                                    if (apiResult.isGooglePlayUpdate()) {
+                                        checkUpdateOnMarket(apiResult.getPlayMarketUri());
+                                    } else {
+                                        if (BuildConfig.VERSION_CODE < apiResult.getVersionCode()) {
+                                            final Update update = Update.determine(apiResult.getVersionName());
+                                            switch (update) {
+                                                case OPTIONAL:
+                                                    if (!getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).contains(apiResult.getVersionName().toString())) {
+                                                        showUpdateVersionDialog(update, apiResult.getVersionName(), apiResult.getUri());
+                                                        getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
+                                                                edit().
+                                                                putString(apiResult.getVersionName().toString(), "").
+                                                                apply();
+                                                    }
+                                                    break;
+                                                case MANDATORY:
+                                                    showUpdateVersionDialog(update, apiResult.getVersionName(), apiResult.getUri());
                                                     getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
                                                             edit().
                                                             putString(apiResult.getVersionName().toString(), "").
                                                             apply();
-                                                }
-                                                break;
-                                            case MANDATORY:
-                                                showUpdateVersionDialog(apiResult.isGooglePlayUpdate(), update, apiResult.getVersionName(), apiResult.getUri(), apiResult.getPlayMarketUri());
-                                                getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
-                                                        edit().
-                                                        putString(apiResult.getVersionName().toString(), "").
-                                                        apply();
-                                                break;
-                                            case NO:
-                                                break;
-                                            default:
-                                                Log.e(TAG, "Indefinite update type");
+                                                    break;
+                                                case NO:
+                                                    break;
+                                                default:
+                                                    Log.e(TAG, "Indefinite update type");
+                                            }
                                         }
                                     }
                                 },
@@ -717,11 +721,9 @@ public final class MessagesActivity
     }
 
     private void showUpdateVersionDialog (
-            final boolean googlePlayUpdate,
             @NonNull final Update update,
             @NonNull final VersionName versionName,
-            @NonNull final Uri latestVersionUri,
-            @NonNull final Uri playMarketUri
+            @NonNull final Uri latestVersionUri
     ) {
         Log.d(TAG, "showUpdateVersionDialog");
         new AlertDialog.
@@ -731,11 +733,7 @@ public final class MessagesActivity
                 setPositiveButton(
                         R.string.btn_update,
                         (dialog, which) -> {
-                            if (googlePlayUpdate) {
-                                checkUpdateOnMarket(playMarketUri);
-                            } else {
-                                toIndependentUpdate(versionName, latestVersionUri);
-                            }
+                            toIndependentUpdate(versionName, latestVersionUri);
                         }).
                 setNegativeButton(
                         update == Update.MANDATORY ? R.string.btn_finish : R.string.btn_cancel,
@@ -748,7 +746,7 @@ public final class MessagesActivity
                 show();
     }
 
-    private void checkUpdateOnMarket(@NonNull final Uri playMarketUri){
+    private void checkUpdateOnMarket (@NonNull final Uri playMarketUri) {
         Log.d(TAG, "checkUpdateOnMarket");
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             final AppUpdateManager appUpdateManager = AppUpdateManagerFactory.create(this);
