@@ -33,6 +33,11 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.play.core.appupdate.AppUpdateInfo;
+import com.google.android.play.core.appupdate.AppUpdateManager;
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
+import com.google.android.play.core.tasks.Task;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -727,7 +732,7 @@ public final class MessagesActivity
                         R.string.btn_update,
                         (dialog, which) -> {
                             if (googlePlayUpdate) {
-                                toPlayMarket(playMarketUri);
+                                checkUpdateOnMarket(playMarketUri);
                             } else {
                                 toIndependentUpdate(versionName, latestVersionUri);
                             }
@@ -741,6 +746,41 @@ public final class MessagesActivity
                         }).
                 create().
                 show();
+    }
+
+    private void checkUpdateOnMarket(@NonNull final Uri playMarketUri){
+        Log.d(TAG, "checkUpdateOnMarket");
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            final AppUpdateManager appUpdateManager = AppUpdateManagerFactory.create(this);
+
+            final Task<AppUpdateInfo> appUpdateInfoTask = appUpdateManager.getAppUpdateInfo();
+
+            appUpdateInfoTask.addOnSuccessListener(appUpdateInfo -> {
+                if (appUpdateInfo.availableVersionCode() > BuildConfig.VERSION_CODE) {
+                    if (!getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).contains(String.valueOf(appUpdateInfo.availableVersionCode()))) {
+                        new AlertDialog.
+                                Builder(this).
+                                setTitle(R.string.info_msg_update_available).
+                                setMessage(getString(R.string.qstn_want_load_new_version, String.valueOf(appUpdateInfo.availableVersionCode()))).
+                                setPositiveButton(
+                                        R.string.btn_update,
+                                        (dialogInterface, i) -> {
+                                            final Intent intent = new Intent(Intent.ACTION_VIEW);
+                                            intent.setData(playMarketUri);
+                                            startActivity(intent);
+                                        }).
+                                setNegativeButton(android.R.string.cancel, null).
+                                create().
+                                show();
+                        getSharedPreferences(NEW_VERSION_NOTIFICATION_PREFERENCE, Context.MODE_PRIVATE).
+                                edit().
+                                putInt(String.valueOf(appUpdateInfo.availableVersionCode()), appUpdateInfo.availableVersionCode()).
+                                apply();
+
+                    }
+                }
+            });
+        }
     }
 
     public void toPlayMarket (@NonNull final Uri playMarketUri) {
