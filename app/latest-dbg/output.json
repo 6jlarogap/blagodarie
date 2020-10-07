@@ -1,1 +1,20 @@
-[{"outputType":{"type":"APK"},"apkData":{"type":"MAIN","splits":[],"versionCode":52,"versionName":"0.4.15","enabled":true,"outputFile":"health-0.4.15-debug.apk","fullName":"debug","baseName":"debug","dirName":""},"path":"health-0.4.15-debug.apk","properties":{}}]
+{
+  "version": 1,
+  "artifactType": {
+    "type": "APK",
+    "kind": "Directory"
+  },
+  "applicationId": "org.blagodarie.dbg",
+  "variantName": "debug",
+  "elements": [
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "properties": [],
+      "versionCode": 54,
+      "versionName": "0.4.17",
+      "enabled": true,
+      "outputFile": "health-0.4.17-debug.apk"
+    }
+  ]
+}
