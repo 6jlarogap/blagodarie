@@ -52,7 +52,7 @@ android {
             it.doLast {
                 variant.outputs.all {
                     println("copy apk to latest")
-                    println("${projectDir}\\${buildType.name}\\output.json")
+                    println("${projectDir}\\${buildType.name}\\output-metadata.json")
 
                     def distDir = "/latest"
 
@@ -71,7 +71,7 @@ android {
 
                     //скопировать output.json в latest
                     copy {
-                        from("${projectDir}\\${buildType.name}\\output.json") {
+                        from("${projectDir}\\${buildType.name}\\output-metadata.json") {
                             rename '.*', "output.json"
                         }
                         into "${distDir}${dbgSuffix}"
