@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Самочувствие</string>
-    <string name="website_url" tools:ignore="TypographyDashes">https://health.blagodarie.org?incognitopublickey=%s</string>
+    <string name="website_url" tools:ignore="TypographyDashes">https://health.blagoroda.org?incognitopublickey=%s</string>
 
     <!-- Buttons: prefix="btn_" -->
     <string name="btn_repeat">Повторить</string>
