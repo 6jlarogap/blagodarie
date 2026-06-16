@@ -6,7 +6,14 @@
   function toArray(value) {
     if (!value) return [];
     if (value instanceof LiteQuery) return value.toArray();
-    if (typeof value === 'string') return Array.prototype.slice.call(document.querySelectorAll(value));
+    if (typeof value === 'string') {
+      var idMatch = value.match(/^#([A-Za-z0-9_-]+)$/);
+      if (idMatch) {
+        var element = document.getElementById(idMatch[1]);
+        return element ? [element] : [];
+      }
+      return Array.prototype.slice.call(document.querySelectorAll(value));
+    }
     if (value === window || value === document || value.nodeType) return [value];
     if (typeof value.length === 'number') return Array.prototype.slice.call(value);
     return [value];
