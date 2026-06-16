@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<head>
+<!--     <style> body { margin: 0; } </style> -->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.1.min.js"></script>
+
+    <!-- Для авторизации страницы через телеграм бот: js, css (начало) -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js"></script>
+    <link type="text/css" rel="stylesheet" href="css/funcs.cfeff327ed20d9fb.css" />
+    <!--    js/local_settings.js может и не быть (ничего страшного).
+            Для запуска функций в funcs.js из других доменов
+    -->
+    <script type="text/javascript" src="js/local_settings.js?v=20260616T154240Z"></script>
+    <script type="text/javascript" src="js/funcs.f0cb25c0e5bd3999.js?v=20260616T154240Z"></script>
+    <!-- Для авторизации страницы через телеграм бот: js, css (конец) -->
+
+
+    <title>Игра знакомств</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    <style>
+        .clickable { cursor: unset !important }
+    </style>
+  <script type="module" crossorigin src="/assets/index-BaX132i6.20da024679ab21cc.js"></script>
+</head>
+
+<body>
+    <div id="3d-graph" style="margin: 0;width: 100%;"></div>
+
+    <div id="graph_legend" style="margin: auto; width: 100%; display:none">
+        <br />
+        <table style= "width: 100%;">
+            <col width="20%" />
+            <col width="27%" />
+            <col width="6%" />
+            <col width="27%" />
+            <col width="20%" />
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:#cca300"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:#cca300">Знакомство</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:green"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:green">Доверие</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:darkorange"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:darkorange">Симпатия</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:blueviolet"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:blueviolet">Приглашение в игру</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:red"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:red">Недоверие</td>
+                <td></td>
+            </tr>
+<!--
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:lightgray"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:lightgray">Скрыт</td>
+                <td></td>
+            </tr>
+-->
+        </table>
+    </div>
+
+    <!-- Для авторизации страницы через телеграм бот: html (начало) -->
+    <div id="dialogModal" class="d-modal">
+        <div class="d-modal-content">
+            <span class="d-modal-close">&times;</span>
+            <span id="dialogText"><span>
+        </div>
+    </div>
+    <!-- Для авторизации страницы через телеграм бот: html (конец) -->
+
+    <!-- Меню с кнопками -->
+    <div class="menu-wrapper">
+        <div class="menu">
+            <h3 class="menu__title"><span class="menu__title-span"></span></h3>
+            <div class="menu__btns">
+                <div class="btn--trust--wrap display--none">
+                    <button id="id_btn_trust" class="menu__btn__trust btn--trust" value="Доверие"><span class="btn--trust--caption"></span></button>
+                    <input type="hidden" name="trust-or-thank" value="trust" />
+                    <br /><br />
+                </div>
+                <div class="btn--goto-trust--wrap display--none">
+                    <button id="id_btn_trust_goto" class="menu__btn btn--goto-trust">Перейти</button>
+                    <br /><br />
+                </div>
+                <button class="menu__btn btn--collapse display--none"><span class="btn--collapse--caption">Свернуть/Развернуть</span></button>
+                <button class="menu__btn btn--goto-gen display--none">Перейти</button>
+            </div>
+            <div class="menu__close-wrap">
+                <div class="menu__close"></div>
+            </div>
+        </div>
+    </div>
+</body>

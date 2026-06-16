@@ -1,0 +1,143 @@
+<html>
+    <head>
+        <title>WebSocket demo</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <style type="text/css">
+            body {
+                font-family: "Courier New", sans-serif;
+                text-align: center;
+            }
+            .buttons {
+                font-size: 1em;
+                display: flex;
+                justify-content: center;
+            }
+            .button {
+                line-height: 1;
+                padding: 2rem;
+                margin: 2rem;
+                border: medium solid;
+                min-height: 1em;
+                min-width: 1em;
+            }
+            .button {
+                cursor: pointer;
+                user-select: none;
+            }
+            .login {
+                color: red;
+            }
+            .thank {
+                color: green;
+            }
+            .state {
+                font-size: 1em;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="buttons">
+            <!-- minus, red -->
+            <div class="login button">Login</div>
+            <div class="thank button">Thank</div>
+        </div>
+        <div class="state">
+            <span class="users"></span>
+        </div>
+        <br />
+        Who am I:
+        <input type="text" name="who_am_i" class="who_am_i" value="user_1_uuid" size="40" maxlength="50" />
+        <br /><br />
+        I thank:&nbsp;
+        <input type="text" name="i_thank" class="i_thank" value="user_1_uuid" size="40" maxlength="50" />
+        <script>
+            const settings = {
+                wss_server: "wss://wss-dev.blagodarie.org/"
+            }
+
+            function numSessionsUsersStr(data) {
+                return data.n_sessions.toString() + 
+                    " session(s), " +
+                    data.n_users.toString() +
+                    " users(s) online";
+            }
+            var login = document.querySelector('.login'),
+                thank = document.querySelector('.thank'),
+                users = document.querySelector('.users'),
+                websocket = new WebSocket(settings.wss_server);
+
+            login.onclick = function (event) {
+                var who_am_i = document.querySelector('.who_am_i');
+                websocket.send(JSON.stringify({
+                    action: 'login',
+                    user_uuid: who_am_i.value
+                }));
+            }
+            thank.onclick = function (event) {
+                var who_am_i = document.querySelector('.who_am_i');
+                var i_thank = document.querySelector('.i_thank');
+                websocket.send(JSON.stringify({
+                    action: 'addoperation',
+                    //
+                    // Это отправляется на websocket server сразу после
+                    // успешного /api/addoperation. Они должны быть во фронте.
+                    // Если с этим проблемы, верну их в /api/addoperation
+                    //
+                    // У зарегистрированного пользователя:
+                    //
+                    user_id_from: who_am_i.value,
+                    last_name_from: "Пупкин",
+                    first_name_from: "Вася",
+                    photo_url_from: "https://domain.org/photos/basya002.jpg",
+                    //
+                    // Кому отправлена операция
+                    //
+                    user_id_to: i_thank.value,
+                    operation_type_id: 1,
+                    comment: "Спасибо за помощь"
+                }));
+            }
+
+            websocket.onmessage = function (event) {
+                var mes;
+                data = JSON.parse(event.data);
+                switch (data.event) {
+                    case 'connect':
+                        mes = numSessionsUsersStr(data)
+                        mes = 'a session connected, ' + mes
+                        users.textContent = mes
+                        console.log(mes)
+                        break;
+
+                    case 'login':
+                        mes = numSessionsUsersStr(data)
+                        mes = 'a user ' + data.user_uuid + ' logged in, ' + mes
+                        users.textContent = mes
+                        console.log(mes)
+                        break;
+
+                    case 'addoperation':
+                        mes = numSessionsUsersStr(data)
+                        mes = 'Operation on me, look at console, ' + mes
+                        users.textContent = mes
+                        console.log(mes)
+                        console.log(data)
+                        break;
+
+                    case 'disconnect':
+                        mes = 'a session disconnected, '
+                        if (data.logged_out_user_uuid) {
+                            mes += data.logged_out_user_uuid + " logged out, "
+                        }
+                        mes += numSessionsUsersStr(data)
+                        users.textContent = mes
+                        console.log(mes)
+                        break;
+                    default:
+                        console.error(
+                            "unsupported event", data);
+                }
+            };
+        </script>
+    </body>
+</html>

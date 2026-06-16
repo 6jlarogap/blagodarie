@@ -1,0 +1,22 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div id="content" class="colM delete-confirmation">
+    <form method="post" action="/admin/merge_symptoms/">
+        {% csrf_token %}
+        <h2>Симптомы:</h2>
+        <div>
+            <input type="hidden" name="symptom_src_pk" value="{{ symptom_src.pk }}" />
+            <ul><li><big>{{symptom_src.name}}</big></li></ul>
+            <input type="hidden" name="symptom_dst_pk" value="{{ symptom_dst.pk }}" />
+            <ul><li><big>{{ symptom_dst.name }}</big></li></ul>
+        </div>
+        <h2>будут объединены в <u style='color:green;'>{{ symptom_dst.name }}</u></h2>
+        <h2>Симптом <u>{{ symptom_src.name }}</u> будет удален</h2>
+        <h2>Выполнять?</h2>
+        <input type="submit" value="Да, объединить">
+        <a href="/admin/contact/symptom/" class="button cancel-link">Нет, назад к симптомам</a>
+    </form>    
+    <br class="clear">
+    <div id="footer"></div>
+</div>
+{% endblock %}

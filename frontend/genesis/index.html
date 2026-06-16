@@ -1,0 +1,50 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ru">
+  <head>
+    <meta property="og:title" content="БлагоРода"/>
+    <meta property="og:description" content="БлагоРода"/>
+    <meta property="og:image" content="./images/ic_launcher.png" />
+    <meta property="og:type" content="page"/>
+    <meta property="og:url" content= "https://genesis.meetgame.us.to/" />
+    <meta http-equiv="content-type" content="application/xhtml+xml; charset=utf-8" />
+    <meta name="viewport" content="width=device-width">
+    <link rel="shortcut icon" href="./images/ic_launcher.png" type="image/x-icon">
+    <meta name="google-signin-client_id" content="1040490348184-banrg8accupfj3ptg8vrvd6p412jrkgp.apps.googleusercontent.com">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+      integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w==" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/stacktrace-js@2.0.2/stacktrace.min.js"></script>
+    <script src="https://unpkg.com/validator@latest/validator.min.js"></script>
+    <link rel="stylesheet" href="style.978d2a33c36f2f4f.css">
+    <link rel="manifest" href="./manifest.json">
+  </head>
+  <body>
+    <svg xmlns="http://www.w3.org/2000/svg" id="main"></svg>
+    <div class="pagination_block" style="display: none;">
+      <div class="d-flex align-items-center">
+        <a href="javascript:prevPage()" id="btn_prev">&lt;</a>
+          Страница: <span id="page"></span>
+        <a href="javascript:nextPage()" id="btn_next">&gt;</a>
+      </div>
+      <div class="d-flex flex-column align-items-center justify-content-center">
+        <select class="pagination_select" onchange="url.searchParams.set('q', this.value); url.searchParams.set('f', 0); window.location.href = url.href;">
+          <option>Профилей из чата на странице</option>
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+        </select>
+          <p class="pagination_count" style="margin:0;font-weight: 500;"></p>
+      </div>
+    </div>
+
+    <script src="https://apis.google.com/js/platform.js?onload=renderButton" async defer></script>
+    <script src="d3js/d3.v7.min.69faba9d2fffc70c.js"></script>
+
+  <!--    local_settings.js может и не быть (ничего страшного)
+  -->
+  <script defer src="local_settings.js"></script>
+  <script defer src="funcs.f0cb25c0e5bd3999.js" charset="utf-8"></script>
+  <script defer src="code.7a046200df23597e.js" charset="utf-8"></script>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+# Secrets and deployment-local settings
+/app/app/local_settings.py
+/telegram-bot/settings_local.py
+*.pem
+*.key
+id_rsa*
+
+# Runtime data
+/app/media/
+/audit/
+/telegram-bot-api/
+/telegram-bot/ENV/
+/telegram-bot/tmp/
+/venv-app/
+
+# Python/runtime caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Frontend dependencies and local build caches
+node_modules/
+.vite/
+.cache/
+
+# Local editor/system files
+.DS_Store
+*.swp
+*.swo

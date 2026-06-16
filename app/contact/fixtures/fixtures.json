@@ -1,0 +1,171 @@
+[
+  {
+    "model": "contact.keytype",
+    "pk": 1,
+    "fields": {
+      "title": "PhoneNumber"
+    }
+  },
+  {
+    "model": "contact.keytype",
+    "pk": 2,
+    "fields": {
+      "title": "Email"
+    }
+  },
+  {
+    "model": "contact.keytype",
+    "pk": 4,
+    "fields": {
+      "title": "Banking Details"
+    }
+  },
+  {
+    "model": "contact.keytype",
+    "pk": 5,
+    "fields": {
+      "title": "Link"
+    }
+  },
+  {
+    "model": "contact.keytype",
+    "pk": 6,
+    "fields": {
+      "title": "Other"
+    }
+  },
+
+  {
+    "model": "contact.operationtype",
+    "pk": 1,
+    "fields": {
+      "title": "Thank"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 2,
+    "fields": {
+      "title": "Mistrust"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 3,
+    "fields": {
+      "title": "Trust"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 4,
+    "fields": {
+      "title": "Nullify attitude"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 5,
+    "fields": {
+      "title": "Trust and thank"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 6,
+    "fields": {
+      "title": "Father"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 7,
+    "fields": {
+      "title": "Not Parent"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 8,
+    "fields": {
+      "title": "Mother"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 9,
+    "fields": {
+      "title": "Set Father"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 10,
+    "fields": {
+      "title": "Set Mother"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 11,
+    "fields": {
+      "title": "Set Acquaintance"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 12,
+    "fields": {
+      "title": "Took Part in Acquaintance Game or invited somebody"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 13,
+    "fields": {
+      "title": "Revoked Part in Acquaintance Game"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 14,
+    "fields": {
+      "title": "Set Sympathy"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 15,
+    "fields": {
+      "title": "Revoke Sympathy and Interest"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 16,
+    "fields": {
+      "title": "Revoke Sympathy only"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 17,
+    "fields": {
+      "title": "Hide User from Meet Game"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 18,
+    "fields": {
+      "title": "Show User at Meet Game"
+    }
+  },
+  {
+    "model": "contact.operationtype",
+    "pk": 19,
+    "fields": {
+      "title": "User voted in an offer"
+    }
+  }
+]

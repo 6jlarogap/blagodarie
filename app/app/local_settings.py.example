@@ -1,0 +1,88 @@
+DEBUG = False
+ADMIN_ENABLED = False
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# Секретный ключ Django, например, назначенный, при создании проекта,
+# можно и изменить тогда назначенный
+#
+SECRET_KEY = 'secret'
+
+MEDIA_ROOT = '/path/to/media/'
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'blagodarie', 
+        'USER': 'blagodarie',
+        'PASSWORD': 'пароль',
+        'HOST': '',
+        'PORT': '',
+    },
+}
+
+# Полезно для несоторых вызовов, которые кэшируются
+#
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+# Webhook ключ от github репозитория. Webhook обеспечивает при каждом
+# push в репозиторий отправку запроса для получения данных о версии
+# мобильного приложения.
+#
+GITHUB_WEBHOOK_SECRET = 'secret'
+
+# Webhook ключ от github репозитория приложения Rating.
+# Webhook обеспечивает при каждом push в репозиторий
+# отправку запроса для получения данных о версии
+# мобильного приложения.
+#
+RATING_GITHUB_WEBHOOK_SECRET = 'secret'
+
+# Для телеграм авторизации. Неправильный или отсутсвующий токен
+# не позволит авторизацию через телеграм
+#
+TELEGRAM_BOT_TOKEN = 'secret'
+
+# Отсутствующий (ложный) FCM_SERVER_KEY:
+#   апи не будет отправлять push уведомления
+# Неправильный FCM_SERVER_KEY:
+#   push уведомления не будут приняты
+#
+FCM_SERVER_KEY = 'secret'
+
+# Требуется для oauth аутентификации
+#
+FRONTEND_ROOT = 'https://blagodarie.org/'
+
+# Относительный путь к settings.FRONTEND_ROOT,
+# куда ouauth2 callback возвращает пользователя
+# на frontend.
+#
+# Это согласовывается с разработчиком front-end
+#
+REDIRECT_FROM_CALLBACK = 'oauth-landing'
+
+# Это надо полностью переписать в local_settings.py:
+#
+OAUTH_PROVIDERS = {
+    'yandex': {
+        'client_id': 'not_secret',
+        'client_secret': 'secret',
+    },
+    'vk': {
+        'client_id': 'not_secret',
+        'client_secret': 'secret',
+    },
+    'odnoklassniki': {
+        'client_id': 'not_secret',
+        'client_secret': 'secret',
+        'public_key': 'another_secret',
+    },
+}

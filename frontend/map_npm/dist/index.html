@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ru" lang="ru">
+<head>
+    <title>Игра знакомств | Доверие</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.1.min.js"></script>
+
+    <link rel="stylesheet" href="css/style.b1f090af3a5cbdbd.css" />
+
+    <!-- Для авторизации страницы через телеграм бот: js, css (начало) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js"></script>
+    <link rel="stylesheet" href="css/funcs.cfeff327ed20d9fb.css" />
+    <!--    js/local_settings.js может и не быть (ничего страшного).
+            Для запуска функций в funcs.js из других доменов
+    -->
+    <script type="text/javascript" src="js/local_settings.js?v=20260616T154240Z"></script>
+    <script type="text/javascript" src="js/funcs.f0cb25c0e5bd3999.js?v=20260616T154240Z"></script>
+    <!-- Для авторизации страницы через телеграм бот: js, css (конец) -->
+
+
+  <script type="module" crossorigin src="/assets/index-CiK9ZceY.ec5a8cbf78aff2f6.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CC6Dz5n8.7e5ffe99f1288c19.css">
+</head>
+<body style="margin:0">
+
+    <div style="margin:auto; width: 70%;text-align:center;">
+        <span id="id_subtitle_"></span>
+        <span id="id_address_"></span>
+    </div>
+    <div id="id_block_form" style="margin:auto; width:70%;text-align:center; display: none">
+        <hr />
+        <form action="" method="get" id="id_form">
+            <span id="id_showed_also"></span>
+            <input type="hidden" name="uuid" value="" />
+            <input type="checkbox" name="participants" id="id_participants">
+            <label for="id_participants">Активные</label>&nbsp;
+
+            <input type="checkbox" name="owned" id="id_owned">
+            <label for="id_owned">Не активные</label>&nbsp;
+
+            <input type="submit" value="обновить" id="id_submit">
+        </form>
+        <hr />
+    </div>
+
+    <div id="id_meet_filters" style="margin:auto; width:90%;text-align:center; display: none;">
+        <table style="margin:auto; width:100%;">
+            <tr>
+                <td id="id_meet_filters_gender" align="center" style="display: none">
+                    <label for="id_gender">Пол:</label>
+                    <select name="gender" id="id_gender">
+                        <option value="" selected>любой</option>
+                        <option value="m">Муж.</option>
+                        <option value="f">Жен.</option>
+                    </select>
+                </td>
+                <td align="center">
+                    <label for="id_older">Возраст, <b>от</b>:</label>
+                    <br />
+                    <select name="older" id="id_older">
+                        <option value="" selected>любого</option>
+                        <option value="20">20 лет</option>
+                        <option value="30">30 лет</option>
+                        <option value="40">40 лет</option>
+                        <option value="50">50 лет</option>
+                        <option value="60">60 лет</option>
+                    </select>
+                </td>
+                <td align="center">
+                    <label for="id_younger">Возраст, <b>до</b>:</label>
+                    <br />
+                    <select name="younger" id="id_younger">
+                        <option value="" selected>любого</option>
+                        <option value="20">20 лет</option>
+                        <option value="30">30 лет</option>
+                        <option value="40">40 лет</option>
+                        <option value="50">50 лет</option>
+                        <option value="60">60 лет</option>
+                    </select>
+                </td>
+                <td id="id_meet_filters_status" align="center" style="display: none">
+                    <label for="id_status">Статус:</label>
+                    <br />
+                    <select name="status" id="id_status">
+                        <option value="" selected>Все</option>
+                        <option value="new">Новые</option>
+                        <option value="interests">Просмотрено</option>
+                        <option value="sympas">Симпатии</option>
+                        <option value="hidden">Скрытые</option>
+                    </select>
+                </td>
+                <td id="id_meet_filters_coords" valign="center" align="center" style="display: none">
+                    <img src="images/geo-alt.svg"
+                    onclick="alert('Для указания Вашего местоположения - дважды нажмите на нужное место на карте.')"
+                    title="Для указания Вашего местоположения - дважды нажмите на нужное место на карте.">
+                </td>
+                <td id="id_meet_filters_with_offer" align="center" style="display: none">
+                    <label for="id_with_offers">Показать<br />предложения:<br />
+                    <input type="checkbox" name="with_offers" id="id_with_offers" checked>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin:auto;width: 100%" id="progress"><div id="progress-bar"></div></div>
+    <div style="margin:auto;width: 100%; height:85vh" id="map"></div>
+    <div id="id_horz_bar_1" style= "background-color: #EBEBEB; width: 100%;text-align:center; display: none;">
+        <br /><br />
+            Найдите на карте место, где Вы находитесь, — и по тому месту <b><i>двойной</i> клик</b>
+            (<b><i>двойной</i> тап</b> на мобильном устройстве). Вам будет предложено сохранить Ваши координаты.
+        <br /><br />
+    </div>
+    <div id="3d-graph" style="margin: auto;width:100%;display: none;"></div>
+    <div id="graph_legend" style="margin: auto; width: 95%;display: none;">
+        <br />
+        <table style= "width: 100%;">
+            <col width="20%" />
+            <col width="27%" />
+            <col width="6%" />
+            <col width="27%" />
+            <col width="20%" />
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:#cca300"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:#cca300">Знакомство</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:green"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:green">Доверие</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:darkorange"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:darkorange">Симпатия</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:blueviolet"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:blueviolet">Приглашение в игру</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:red"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:red">Недоверие</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="text-align:right;color:lightgray"><big><b>&mdash;&mdash;&mdash;&mdash;&mdash;&gt;</b></big></td>
+                <td></td>
+                <td style="text-align:left;color:lightgray">Скрыт</td>
+                <td></td>
+            </tr>
+        </table>
+        <br />
+    </div>
+    <div id="id_horz_bar_2" style= "background-color: #EBEBEB; width: 100%;text-align:center; display: none;">
+    <br /><br /><br /><br /><br />
+    </div>
+    <div id="id_legend" style="margin: auto; width: 95%; display: none;"></div>
+
+    <!-- Диалоговое окно после скрытия пользователя.
+    -->
+    <div id="id_dialog_hide_user" class="f-modal">
+        <div class="m-modal-content">
+            <span class="f-modal-close">&times;</span>
+            <div id="id_dialog_hide_question" class="dialog_hide_question" style="text-align:center;" >ЭТО ВОПРОС</div>
+            <table width="100%" cellspacing="10" cellpadding="5" class="table_dialog_hide">
+                <col width="34%" />
+                <col width="33%" />
+                <col width="33%" />
+                <tr>
+                    <td style="display: none">
+                        <input type="hidden" name="hide_user_id" value="" />
+                    </td>
+                    <td align="center"><button class="m-modal-button" id="id_hide_user_ok"><big>OK</big></button></td>
+                    <td align="center"><button class="m-modal-button" id="id_hide_user_cancel"><big>Oтмена</big></button></td>
+                    <td align="center"><button class="m-modal-button" id="id_hide_user_mistrust"><big>Недоверие</big></button></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Диалоговое окно авторизации.
+        Применяется совместно с funcs.{js, css}
+    -->
+    <div id="dialogModal" class="d-modal">
+        <div class="d-modal-content">
+            <span class="d-modal-close">&times;</span>
+            <span id="dialogText"><span>
+        </div>
+    </div>
+
+</body>
+</html>

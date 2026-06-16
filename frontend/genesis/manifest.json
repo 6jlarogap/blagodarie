@@ -1,0 +1,17 @@
+{
+    "name": "БлагоДари.РФ",
+    "short_name": "БлагоДари",
+    "theme_color": "#fff",
+    "background_color": "#fff",
+    "display": "standalone",
+    "orientation": "portrait",
+    "start_url": ".",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+          "src": "./images/ic_launcher.png",
+          "sizes": "144x144",
+          "type": "image/png"
+        }
+    ]
+}

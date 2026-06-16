@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<head>
+<!--     <style> body { margin: 0; } </style> -->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.1.min.js"></script>
+
+    <!-- Для авторизации страницы через телеграм бот: js, css (начало) -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js"></script>
+    <link type="text/css" rel="stylesheet" href="css/funcs.cfeff327ed20d9fb.css" />
+    <!--    js/local_settings.js может и не быть (ничего страшного).
+            Для запуска функций в funcs.js из других доменов
+    -->
+    <script type="text/javascript" src="js/local_settings.js?v=20260616T154240Z"></script>
+    <script type="text/javascript" src="js/funcs.f0cb25c0e5bd3999.js?v=20260616T154240Z"></script>
+    <!-- Для авторизации страницы через телеграм бот: js, css (конец) -->
+
+
+    <title>Благо Рода</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    <style>
+        .clickable { cursor: unset !important }
+    </style>
+  <script type="module" crossorigin src="/assets/index-CKyl77MJ.0c5abb19413ac7fb.js"></script>
+</head>
+
+<body>
+    <div id="3d-graph" style="margin: 0;width: 100%;height: 100%"></div>
+
+    <!-- Для авторизации страницы через телеграм бот: html (начало) -->
+    <div id="dialogModal" class="d-modal">
+        <div class="d-modal-content">
+            <span class="d-modal-close">&times;</span>
+            <span id="dialogText"><span>
+        </div>
+    </div>
+    <!-- Для авторизации страницы через телеграм бот: html (конец) -->
+
+    <!-- Для формы задания нового родственника -->
+    <div id="id_form_parent_wrap" class="f-modal">
+        <div class="f-modal-content">
+            <span class="f-modal-close">&times;</span>
+            <h3><span id="id_form_parent_caption" class="caption_new_relative" ></span></h3>
+            <table width="100%" cellspacing="8" cellpadding="4" class="table_new_relative">
+                <col width="40%" />
+                <col width="40%" />
+                <col width="20%" />
+                <tr>
+                    <td colspan="2">
+                        ФИО:<br />
+                        <input type="text" id="id_parent_name" name="parent_name" class= 'parent_name' style="width:100%;">
+                    </td>
+                    <td>
+                        <span id="id_p_relative_m"><input name="parent_gender" type="radio" value="m" id="id_relative_m" /> <span id="id_caption_relative_m">Father</span></span><br />
+                        <span id="id_p_relative_f"><input name="parent_gender" type="radio" value="f" id="id_relative_f" /> <span id="id_caption_relative_f">Mother</span></span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        Дата рождения:<br />
+                        <input type="text" id="id_parent_dob" name="parent_dob" class= 'parent_dob' style="width:100%;">
+                    </td>
+                    <td>
+                        Дата смерти:<br />
+                        <input type="text" id="id_parent_dod" name="parent_dod" class= 'parent_dod' style="width:100%;">
+                    </td>
+                    <td>
+                        в формате:<br />
+                        <i>ДД.ММ.ГГГГ</i> или <i>ММ.ГГГГ</i> или <i>ГГГГ</i>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        Комментарий:<br />
+                        <textarea id="id_parent_comment" name="parent_comment" class= 'parent_comment' rows="2" style="width:100%;"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <input type="button" class="f-modal-button" id="id_form_parent_btn_ok" value="OK" />
+                    </td>
+                    <td align="right">
+                        <input type="button" class="f-modal-button" id="id_form_parent_btn_cancel" value="Отмена" />
+                    </td>
+                </tr>
+            </table>
+            <input type="hidden" name="parent_what" value="smth" />
+        </div>
+    </div>
+    <!-- Для формы задания нового родственника (конец) -->
+
+    <!-- Меню с кнопками -->
+    <div class="menu-wrapper">
+        <div class="menu">
+            <h3 class="menu__title"><span class="menu__title-span"></span></h3>
+            <div class="menu__btns">
+                <div class="btn--trust--wrap display--none">
+                    <button id="id_btn_trust" class="menu__btn__trust btn--trust" value="Доверие"><span class="btn--trust--caption"></span></button>
+                    <input type="hidden" name="trust-or-thank" value="trust" />
+                    <br /><br />
+                </div>
+                <div class="btn--goto-trust--wrap display--none">
+                    <button id="id_btn_trust_goto" class="menu__btn btn--goto-trust">Перейти</button>
+                    <br /><br />
+                </div>
+                <button class="menu__btn btn--collapse display--none"><span class="btn--collapse--caption">Свернуть/Развернуть</span></button>
+                <button class="menu__btn btn--goto-gen display--none">Перейти</button>
+                <button  id="id_btn_profile" class="menu__btn btn--profile">Профиль</button>
+                <div class="add--relatives-br display--none">
+                    <br /><span  class="his-her-outer" ><span class="his-her-span">Его (её)</span><big> <u>новый</u></big> родственник:</span><br /><br />
+                </div>
+                <button class="menu__btn btn--parents display--none"><span class="btn--parents--caption">Родители</span></button>
+                <button class="menu__btn btn--child display--none">Сын/Дочь</button>
+                <button class="menu__btn btn--brosis display--none">Брат/Сестра</button>
+                <div class="add--relatives-close display--none">
+                    <br />
+                    <button class="menu__btn btn--add--relatives--close">Закрыть</button>
+                </div>
+            </div>
+            <div class="menu__close-wrap">
+                <div class="menu__close"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Форма папа/мама/ребенок... -->
+    <div class="new-relative">
+    </div>
+    <!-- Форма папа/мама/ребенок... конец -->
+</body>
