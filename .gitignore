@@ -28,3 +28,7 @@ node_modules/
 .DS_Store
 *.swp
 *.swo
+
+# Local agent context files
+/AGENTS.md
+/CODE_INDEX.md
