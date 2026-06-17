@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${CODE_INDEX_SKIP:-}" == "1" ]]; then
+  exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+needs_reindex=0
+while IFS= read -r path; do
+  case "$path" in
+    CODE_INDEX.md|*/CODE_INDEX.md)
+      ;;
+    scripts/code_index.py|scripts/reindex.sh|.githooks/*|*.py|*.js|*.mjs|*.cjs|*.java|*.md|*.sh)
+      needs_reindex=1
+      break
+      ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACMR)
+
+if [[ "$needs_reindex" == "1" ]]; then
+  bash scripts/reindex.sh --quiet
+fi

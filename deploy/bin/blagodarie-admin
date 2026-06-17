@@ -1,0 +1,296 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SRC=/home/vdrzd/projects/blagodarie
+DST=/srv/blagodarie
+MAINT_USER=vdrzd
+MAINT_GROUP=doverabot-maint
+SERVICE_USER=blagodarie
+SERVICE_GROUP=blagodarie
+
+NGINX_SITES_SRC="$SRC/deploy/nginx/sites-available"
+NGINX_SITES_AVAILABLE=/etc/nginx/sites-available
+NGINX_SITES_ENABLED=/etc/nginx/sites-enabled
+NGINX_SITE_FILES=(
+  api.doverabot.ru
+  default
+  doverabot.ru
+)
+
+RSYNC_EXCLUDES=(
+  --exclude '/.git/'
+  --exclude '/app/app/local_settings.py'
+  --exclude '/app/app/__pycache__/'
+  --exclude '/app/media/'
+  --exclude '/audit/'
+  --exclude '/telegram-bot/settings_local.py'
+  --exclude '/telegram-bot/ENV/'
+  --exclude '/telegram-bot/tmp/'
+  --exclude '/telegram-bot-api/'
+  --exclude '/venv-app/'
+  --exclude '**/__pycache__/'
+  --exclude '*.pyc'
+  --exclude '*.pyo'
+)
+
+FIND_EXCLUDES=(
+  "$DST/app/app/local_settings.py"
+  "$DST/app/app/__pycache__"
+  "$DST/app/app/__pycache__/*"
+  "$DST/app/contact/__pycache__"
+  "$DST/app/contact/__pycache__/*"
+  "$DST/app/restthumbnails/__pycache__"
+  "$DST/app/restthumbnails/__pycache__/*"
+  "$DST/app/users/__pycache__"
+  "$DST/app/users/__pycache__/*"
+  "$DST/app/wote/__pycache__"
+  "$DST/app/wote/__pycache__/*"
+  "$DST/app/media"
+  "$DST/app/media/*"
+  "$DST/audit"
+  "$DST/audit/*"
+  "$DST/telegram-bot/settings_local.py"
+  "$DST/telegram-bot/__pycache__"
+  "$DST/telegram-bot/__pycache__/*"
+  "$DST/telegram-bot/ENV"
+  "$DST/telegram-bot/ENV/*"
+  "$DST/telegram-bot/tmp"
+  "$DST/telegram-bot/tmp/*"
+  "$DST/telegram-bot-api"
+  "$DST/telegram-bot-api/*"
+  "$DST/venv-app"
+  "$DST/venv-app/*"
+)
+
+find_prune_args() {
+  local args=()
+  local pattern
+  for pattern in "${FIND_EXCLUDES[@]}"; do
+    args+=( -path "$pattern" -o )
+  done
+  unset "args[$((${#args[@]} - 1))]"
+  printf '%s\0' "${args[@]}"
+}
+
+require_workspace() {
+  if [ ! -d "$SRC/.git" ]; then
+    echo "Missing git workspace: $SRC" >&2
+    exit 1
+  fi
+}
+
+restore_protected_runtime() {
+  local secret
+  for secret in \
+    "$DST/app/app/local_settings.py" \
+    "$DST/telegram-bot/settings_local.py"; do
+    if [ -e "$secret" ]; then
+      chown "$SERVICE_USER:$SERVICE_GROUP" "$secret"
+      chmod 0640 "$secret"
+    fi
+  done
+
+  local runtime
+  for runtime in \
+    "$DST/app/media" \
+    "$DST/app/contact/__pycache__" \
+    "$DST/app/restthumbnails/__pycache__" \
+    "$DST/app/app/__pycache__" \
+    "$DST/app/users/__pycache__" \
+    "$DST/app/wote/__pycache__" \
+    "$DST/audit" \
+    "$DST/telegram-bot/__pycache__" \
+    "$DST/telegram-bot/ENV" \
+    "$DST/telegram-bot/tmp" \
+    "$DST/telegram-bot-api" \
+    "$DST/venv-app"; do
+    if [ -e "$runtime" ]; then
+      chown -R "$SERVICE_USER:$SERVICE_GROUP" "$runtime"
+    fi
+  done
+}
+
+apply_source_permissions() {
+  local args=()
+  local raw=()
+  local item
+  while IFS= read -r -d '' item; do
+    raw+=( "$item" )
+  done < <(find_prune_args)
+
+  find "$DST" \( "${raw[@]}" \) -prune -o -type l -exec chown -h "$MAINT_USER:$MAINT_GROUP" {} +
+  find "$DST" \( "${raw[@]}" \) -prune -o ! -type l -exec chown "$MAINT_USER:$MAINT_GROUP" {} +
+  find "$DST" \( "${raw[@]}" \) -prune -o -type d -exec chmod 2775 {} +
+  find "$DST" \( "${raw[@]}" \) -prune -o -type f -exec chmod u+rw,g+rw,o+r {} +
+  find "$DST" \( "${raw[@]}" \) -prune -o -type f -perm /111 -exec chmod a+x {} +
+  restore_protected_runtime
+}
+
+sync_source() {
+  require_workspace
+  rsync -a --delete --delete-delay \
+    --chown="$MAINT_USER:$MAINT_GROUP" \
+    "${RSYNC_EXCLUDES[@]}" \
+    "$SRC/" "$DST/"
+  apply_source_permissions
+}
+
+deploy_dry_run() {
+  require_workspace
+  rsync -ani --delete --delete-delay \
+    "${RSYNC_EXCLUDES[@]}" \
+    "$SRC/" "$DST/"
+}
+
+check_django() {
+  cd "$DST/app"
+  "$DST/venv-app/bin/python" manage.py check --deploy
+}
+
+install_nginx_sites() {
+  require_workspace
+
+  local site
+  local src_site
+  local available_site
+  local enabled_site
+  for site in "${NGINX_SITE_FILES[@]}"; do
+    src_site="$NGINX_SITES_SRC/$site"
+    if [ ! -f "$src_site" ]; then
+      echo "Missing tracked nginx site config: $src_site" >&2
+      exit 1
+    fi
+  done
+
+  for site in "${NGINX_SITE_FILES[@]}"; do
+    src_site="$NGINX_SITES_SRC/$site"
+    available_site="$NGINX_SITES_AVAILABLE/$site"
+    enabled_site="$NGINX_SITES_ENABLED/$site"
+
+    install -o root -g root -m 0644 "$src_site" "$available_site"
+    if [ -L "$enabled_site" ]; then
+      ln -sfn "$available_site" "$enabled_site"
+    elif [ -e "$enabled_site" ]; then
+      echo "Refusing to replace non-symlink nginx enabled site: $enabled_site" >&2
+      exit 1
+    else
+      ln -s "$available_site" "$enabled_site"
+    fi
+  done
+
+  nginx -t
+  systemctl reload nginx
+}
+
+case "${1:-}" in
+  deploy-dry-run)
+    deploy_dry_run
+    ;;
+  sync)
+    sync_source
+    ;;
+  deploy-static)
+    sync_source
+    nginx -t
+    systemctl reload nginx
+    ;;
+  deploy-web)
+    sync_source
+    check_django
+    systemctl restart blagodarie-gunicorn.service
+    nginx -t
+    systemctl reload nginx
+    ;;
+  deploy-bot)
+    sync_source
+    systemctl restart telegram-bot.service
+    ;;
+  deploy)
+    sync_source
+    check_django
+    nginx -t
+    systemctl reload nginx
+    systemctl restart blagodarie-gunicorn.service
+    systemctl restart telegram-bot.service
+    ;;
+  check-django)
+    check_django
+    ;;
+  migrate)
+    check_django
+    cd "$DST/app"
+    "$DST/venv-app/bin/python" manage.py migrate
+    ;;
+  collectstatic)
+    cd "$DST/app"
+    "$DST/venv-app/bin/python" manage.py collectstatic --noinput
+    apply_source_permissions
+    ;;
+  install-nginx-sites)
+    install_nginx_sites
+    ;;
+  nginx-test)
+    nginx -t
+    ;;
+  reload-nginx)
+    nginx -t
+    systemctl reload nginx
+    ;;
+  restart-web)
+    check_django
+    systemctl restart blagodarie-gunicorn.service
+    ;;
+  restart-bot)
+    systemctl restart telegram-bot.service
+    ;;
+  restart-all)
+    check_django
+    nginx -t
+    systemctl reload nginx
+    systemctl restart blagodarie-gunicorn.service
+    systemctl restart telegram-bot.service
+    ;;
+  status)
+    systemctl --no-pager --plain status nginx blagodarie-gunicorn.service telegram-bot.service
+    ;;
+  is-active)
+    systemctl --no-pager --plain is-active nginx blagodarie-gunicorn.service telegram-bot.service
+    ;;
+  logs-web)
+    journalctl -u blagodarie-gunicorn.service -n "${2:-120}" --no-pager
+    ;;
+  logs-bot)
+    journalctl -u telegram-bot.service -n "${2:-120}" --no-pager
+    ;;
+  logs-nginx)
+    journalctl -u nginx.service -n "${2:-120}" --no-pager
+    ;;
+  *)
+    cat >&2 <<'USAGE'
+Usage: sudo -n /usr/local/sbin/blagodarie-admin COMMAND
+
+Commands:
+  deploy-dry-run       Show live changes that deploy would make
+  sync                 Sync workspace to /srv without restarting services
+  deploy-static        Sync and reload nginx
+  deploy-web           Sync, Django check, restart web, reload nginx
+  deploy-bot           Sync and restart Telegram bot
+  deploy               Sync, checks, reload nginx, restart web and bot
+  check-django         Run manage.py check --deploy
+  migrate              Run Django checks then migrations
+  collectstatic        Run Django collectstatic
+  install-nginx-sites  Install tracked nginx site configs, test, and reload nginx
+  nginx-test           Validate nginx config
+  reload-nginx         Validate and reload nginx
+  restart-web          Django check and restart gunicorn
+  restart-bot          Restart Telegram bot
+  restart-all          Check/reload/restart nginx, web, and bot
+  status               Show service status
+  is-active            Print nginx/web/bot active state
+  logs-web [n]         Show recent web logs
+  logs-bot [n]         Show recent bot logs
+  logs-nginx [n]       Show recent nginx logs
+USAGE
+    exit 2
+    ;;
+esac

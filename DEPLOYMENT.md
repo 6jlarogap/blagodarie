@@ -19,10 +19,18 @@ After editing source here, deploy with the root-owned wrapper:
 sudo -n /usr/local/sbin/blagodarie-admin deploy
 ```
 
-If the wrapper is missing, install it once from the host account:
+If the wrapper is missing or has changed in this repo, install it once from
+the host account:
 
 ```bash
-sudo bash /home/vdrzd/doverabot-repair/admin-install-blagodarie-workflow.sh
+sudo bash /home/vdrzd/projects/blagodarie/deploy/install-blagodarie-admin-workflow.sh
+```
+
+Nginx site configs are tracked under `deploy/nginx/sites-available/`. After
+editing them, install only those site configs with:
+
+```bash
+sudo -n /usr/local/sbin/blagodarie-admin install-nginx-sites
 ```
 
 Useful checks:
@@ -30,6 +38,7 @@ Useful checks:
 ```bash
 sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run
 sudo -n /usr/local/sbin/blagodarie-admin check-django
+sudo -n /usr/local/sbin/blagodarie-admin nginx-test
 sudo -n /usr/local/sbin/blagodarie-admin is-active
 sudo -n /usr/local/sbin/blagodarie-admin logs-web 120
 sudo -n /usr/local/sbin/blagodarie-admin logs-bot 120

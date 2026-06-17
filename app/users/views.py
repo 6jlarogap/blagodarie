@@ -426,11 +426,92 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
             Некоторое исключение для фото: если фото не было задано в Profile, оно таки заносится.
     """
 
-    def check_input(self, request):
+    TELEGRAM_AUTH_FIELDS = (
+        'id',
+        'first_name',
+        'last_name',
+        'username',
+        'photo_url',
+        'auth_date',
+        'allows_write_to_pm',
+    )
+    AUTH_ENDPOINT_FIELDS = (
+        'redirect_path',
+        'keep_user_data',
+    )
+
+    def copy_request_data(self, request):
         if request.method == 'POST':
             rd = request.data
         elif request.method == 'GET':
             rd = request.GET
+        else:
+            rd = {}
+        try:
+            return rd.copy()
+        except AttributeError:
+            return copy.copy(rd)
+
+    def get_request_values(self, rd, key):
+        if hasattr(rd, 'getlist'):
+            return rd.getlist(key)
+        value = rd.get(key)
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple)):
+            return list(value)
+        return [value]
+
+    def set_request_value(self, rd, key, value):
+        if hasattr(rd, 'setlist'):
+            rd.setlist(key, [value])
+        else:
+            rd[key] = value
+
+    def pop_request_key(self, rd, key):
+        try:
+            rd.pop(key, None)
+        except TypeError:
+            try:
+                del rd[key]
+            except KeyError:
+                pass
+
+    def restore_redirect_path_query(self, rd):
+        redirect_path = rd.get('redirect_path')
+        if not redirect_path:
+            return
+
+        auth_endpoint_keys = (
+            set(self.TELEGRAM_AUTH_FIELDS) |
+            set(self.AUTH_ENDPOINT_FIELDS) |
+            {'hash'}
+        )
+        split_query_params = []
+        for key in list(rd.keys()):
+            if key in auth_endpoint_keys:
+                continue
+            for value in self.get_request_values(rd, key):
+                split_query_params.append((key, value))
+        if not split_query_params:
+            return
+
+        urlparse_result = urlparse(redirect_path)
+        extra_query = urllib.parse.urlencode(split_query_params, doseq=True)
+        query_new = '&'.join(
+            query_part
+            for query_part in (urlparse_result.query, extra_query)
+            if query_part
+        )
+        redirect_path = urlparse_result._replace(query=query_new).geturl()
+        self.set_request_value(rd, 'redirect_path', redirect_path)
+
+        for key, _value in split_query_params:
+            self.pop_request_key(rd, key)
+
+    def check_input(self, request):
+        rd = self.copy_request_data(request)
+        self.restore_redirect_path_query(rd)
         msg_invalid_request = 'Неверный запрос'
         try:
             if not rd or not rd.get('auth_date') or not rd.get('hash') or not rd.get('id'):
@@ -440,18 +521,17 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
         if not settings.TELEGRAM_BOT_TOKEN:
             raise ServiceException('В системе не определен TELEGRAM_BOT_TOKEN')
 
-        request_data = rd.copy()
         unix_time_now = int(time.time())
         unix_time_auth_date = int(rd['auth_date'])
         if unix_time_now - unix_time_auth_date > settings.TELEGRAM_AUTH_DATA_OUTDATED:
             raise ServiceException('Неверный запрос, данные авторизации устарели')
 
-        request_data.pop("hash", None)
-        for parm in ('redirect_path', 'keep_user_data',):
-            try:
-                request_data.pop(parm, None)
-            except KeyError:
-                pass
+        request_data = {}
+        for parm in self.TELEGRAM_AUTH_FIELDS:
+            if parm in rd:
+                value = rd.get(parm)
+                if value is not None:
+                    request_data[parm] = value
         request_data_alphabetical_order = sorted(request_data.items(), key=lambda x: x[0])
         data_check_string = []
         for data_pair in request_data_alphabetical_order:
@@ -464,12 +544,13 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
             msg=data_check_string.encode(),
             digestmod=hashlib.sha256,
         ).hexdigest()
-        if calculated_hash != rd['hash']:
+        if not hmac.compare_digest(calculated_hash, rd['hash']):
             raise ServiceException('Неверный запрос, данные не прошли проверку на hash')
         return rd
 
     def process_input(self, rd):
         photo_url = rd.get('photo_url', '')
+        keep_user_data = rd.get('keep_user_data')
         try:
             oauth = Oauth.objects.select_related('user', 'user__profile').get(
                 provider = Oauth.PROVIDER_TELEGRAM,
@@ -479,7 +560,6 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
             #
             user = oauth.user
             profile = user.profile
-            keep_user_data = rd.get('keep_user_data')
 
             oauth_tg_field_map = dict(
                 last_name='last_name',
@@ -507,7 +587,10 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
                 user.last_name = ''
                 changed = True
             if was_not_active or not keep_user_data:
-                first_name = Profile.make_first_name(rd['last_name'], rd['first_name'])
+                first_name = Profile.make_first_name(
+                    rd.get('last_name', ''),
+                    rd.get('first_name', ''),
+                )
                 if user.first_name != first_name:
                     user.first_name = first_name
                     changed = True
