@@ -15,7 +15,7 @@ server {
 
     location = /auth/telegram {
         proxy_pass http://127.0.0.1:8000/api/auth/telegram/;
-        proxy_set_header Host $host;
+        proxy_set_header Host api.doverabot.ru;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -25,7 +25,7 @@ server {
 
     location = /auth/telegram/ {
         proxy_pass http://127.0.0.1:8000/api/auth/telegram/;
-        proxy_set_header Host $host;
+        proxy_set_header Host api.doverabot.ru;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
