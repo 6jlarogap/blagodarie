@@ -1,7 +1,7 @@
 # Doverabot Rental Runtime Concierge Owner Consumer Agent Chain
 
 Date: 2026-06-18
-Status: implemented, pending deployment
+Status: implemented and deployed
 Parent chain: [doverabot-rental-offers-chain.md](doverabot-rental-offers-chain.md)
 Started `/new-go-slug`: `doverabot-rental-runtime-concierge-owner-consumer-agent`
 Suggested next `/new-go-slug`: `doverabot-rental-durable-fsm-hermes-map-marker-tests`
@@ -35,12 +35,26 @@ Passed:
 - `python3 -m compileall telegram-bot`
 - `/srv/blagodarie/venv-app/bin/python manage.py check`
 - `/srv/blagodarie/venv-app/bin/python manage.py makemigrations --check --dry-run`
+- `git commit -m "doverabot-rental-runtime-concierge-owner-consumer-agent"` -> `5ff91f0`
+- `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run`
+- `sudo -n /usr/local/sbin/blagodarie-admin sync`
+- `sudo -n /usr/local/sbin/blagodarie-admin migrate` -> applied `users.0059_rentalreservationevent`
+- `sudo -n /usr/local/sbin/blagodarie-admin deploy`
+- `sudo -n /usr/local/sbin/blagodarie-admin is-active` -> nginx, web, bot active
+- `curl -sS -w '\nHTTP_STATUS=%{http_code}\n' 'https://api.doverabot.ru/api/rental/search/?query=tent&number=1'` -> HTTP 200
+- `sudo -n /usr/local/sbin/blagodarie-admin logs-web 80`
+- `sudo -n /usr/local/sbin/blagodarie-admin logs-bot 80`
 
 Blocked:
 
 - `/srv/blagodarie/venv-app/bin/python manage.py test users`
 
 Reason: the sandboxed run cannot access the local PostgreSQL socket; the unsandboxed run reaches PostgreSQL but peer authentication rejects the current OS user for database user `postgres`. `sudo -n -u postgres ...` is unavailable because sudo requires interactive authentication.
+
+Deploy notes:
+
+- Django deploy check reports the pre-existing `security.W002` clickjacking middleware warning.
+- Recent web/bot logs after deploy show service restarts and no new traceback in the checked tail; older June 16 permission errors remain in the 80-line journal window.
 
 ## Follow-Up Basket
 
