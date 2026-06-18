@@ -1790,6 +1790,84 @@ class RentalReservationIntent(BaseModelInsertUpdateTimestamp):
         )
 
 
+class RentalReservationEvent(BaseModelInsertTimestamp):
+    """
+    Audited runtime event in the owner-consumer rental concierge flow.
+    """
+
+    ROLE_REQUESTER = 'requester'
+    ROLE_OWNER = 'owner'
+    ROLE_SYSTEM = 'system'
+
+    ACTOR_ROLES = (
+        (ROLE_REQUESTER, _("Запросивший")),
+        (ROLE_OWNER, _("Владелец")),
+        (ROLE_SYSTEM, _("Система")),
+    )
+
+    EVENT_CREATED = 'created'
+    EVENT_OWNER_ACCEPT = 'owner_accept'
+    EVENT_PAYMENT_REPORTED = 'payment_reported'
+    EVENT_OWNER_CONFIRM = 'owner_confirm'
+    EVENT_CANCEL = 'cancel'
+
+    EVENT_TYPES = (
+        (EVENT_CREATED, _("Создано")),
+        (EVENT_OWNER_ACCEPT, _("Принято владельцем")),
+        (EVENT_PAYMENT_REPORTED, _("Оплата сообщена")),
+        (EVENT_OWNER_CONFIRM, _("Подтверждено владельцем")),
+        (EVENT_CANCEL, _("Отменено")),
+    )
+
+    reservation = models.ForeignKey(
+        RentalReservationIntent,
+        verbose_name=_("Заявка на бронь"),
+        on_delete=models.CASCADE,
+        related_name='events',
+    )
+    actor = models.ForeignKey(
+        'auth.User',
+        verbose_name=_("Участник"),
+        on_delete=models.SET_NULL,
+        related_name='rental_reservation_events',
+        null=True,
+        blank=True,
+    )
+    actor_role = models.CharField(
+        _("Роль участника"),
+        max_length=16,
+        choices=ACTOR_ROLES,
+        db_index=True,
+    )
+    event_type = models.CharField(
+        _("Тип события"),
+        max_length=32,
+        choices=EVENT_TYPES,
+        db_index=True,
+    )
+    status_from = models.CharField(_("Статус до"), max_length=32, blank=True, default='')
+    status_to = models.CharField(_("Статус после"), max_length=32, blank=True, default='')
+    note = models.TextField(verbose_name=_("Комментарий"), blank=True, default='')
+    payload = models.JSONField(_("Данные события"), blank=True, default=dict)
+
+    class Meta:
+        ordering = ('-insert_timestamp', '-pk')
+
+    def data_dict(self):
+        return dict(
+            id=self.pk,
+            reservation_id=self.reservation_id,
+            actor_uuid=self.actor.profile.uuid if self.actor_id else '',
+            actor_role=self.actor_role,
+            event_type=self.event_type,
+            status_from=self.status_from,
+            status_to=self.status_to,
+            note=self.note,
+            payload=self.payload,
+            insert_timestamp=self.insert_timestamp,
+        )
+
+
 class RentalOfferContactRequest(BaseModelInsertTimestamp):
     """
     Запрос контакта по объявлению проката.

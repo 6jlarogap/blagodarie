@@ -3,6 +3,7 @@
 Status: active architecture chain
 Root reference: [2026-06-18-doverabot-rental-offers-architecture.md](2026-06-18-doverabot-rental-offers-architecture.md)
 Next baskets: [2026-06-18-doverabot-rental-next-work-baskets-chain.md](2026-06-18-doverabot-rental-next-work-baskets-chain.md)
+Runtime concierge chain: [2026-06-18-doverabot-rental-runtime-concierge-owner-consumer-agent-chain.md](2026-06-18-doverabot-rental-runtime-concierge-owner-consumer-agent-chain.md)
 
 ## Chain Purpose
 

@@ -10,17 +10,20 @@ Chain: [../references/doverabot-rental-offers-chain.md](../references/doverabot-
 
 Next-work baskets: [../references/2026-06-18-doverabot-rental-next-work-baskets-chain.md](../references/2026-06-18-doverabot-rental-next-work-baskets-chain.md)
 
+Runtime concierge chain: [../references/2026-06-18-doverabot-rental-runtime-concierge-owner-consumer-agent-chain.md](../references/2026-06-18-doverabot-rental-runtime-concierge-owner-consumer-agent-chain.md)
+
 Current decision:
 
 - Build travel-equipment rental as a new `/rent` surface.
 - Keep poll-style `/offer` and `/offer_multi` unchanged.
-- V1 is listing, search, map exposure, contact, and payment handoff only.
-- Do not add booking, escrow, reservation conflict tracking, geocoding, or vector search in V1.
+- V1 is listing, search, map exposure, contact, reservation intent, and payment handoff only.
+- Do not add escrow, reservation conflict tracking, geocoding, or vector search in V1.
 
 Current implementation:
 
 - Rental models, migration, API endpoints, map exposure, bot command wiring, media capture, and contact handoff were added on 2026-06-18.
 - The implementation keeps `/offer` and `/offer_multi` on the existing poll flow.
+- Rental reservation runtime now has owner/consumer bot callbacks for accept, payment reported, confirm, and cancel, with audited backend events.
 
 Primary implementation areas:
 
@@ -42,11 +45,11 @@ Primary implementation areas:
 
 ## Next Implementation Slice
 
-Harden the rental flow before broad rollout: replace `MemoryStorage`, wire the real Organizm/Hermes transcript handoff, broaden aiogram handler tests, and decide whether deployed map UI needs a frontend change for rental markers.
+Harden the rental flow before broad rollout: replace `MemoryStorage`, verify the real Organizm/Hermes transcript handoff, broaden aiogram handler tests, and decide whether deployed map UI needs a frontend change for rental markers.
 
-Suggested `/new-go-slug`: `doverabot-rental-deploy-forward-booking-voice-taxonomy-reservation`.
+Suggested `/new-go-slug`: `doverabot-rental-durable-fsm-hermes-map-marker-tests`.
 
-Accepted next-session decisions:
+Accepted prior-session decisions:
 
 - Deployment is part of the next goal.
 - Rental media should be sent by Telegram offer-message copy/forward, not local media storage.

@@ -397,6 +397,10 @@ class KeyboardType(object):
     #
     RENTAL_BOOK = 82
 
+    # Действие по заявке на бронь проката
+    #
+    RENTAL_RESERVATION_ACTION = 83
+
     # Разделитель данных в call back data
     #
     SEP = '~'

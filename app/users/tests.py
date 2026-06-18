@@ -7,7 +7,8 @@ from django.test import RequestFactory, SimpleTestCase, TestCase, override_setti
 from rest_framework.test import APIClient
 
 from contact.models import CurrentState, Key, KeyType
-from users.models import Profile, RentalEquipmentType, RentalOffer, RentalOfferMessage, RentalReservationIntent
+from users.models import Profile, RentalEquipmentType, RentalOffer, RentalOfferMessage, \
+    RentalReservationEvent, RentalReservationIntent
 from users.views import ApiAuthTelegram
 
 
@@ -215,3 +216,80 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(reservation.recipient_kind, RentalReservationIntent.RECIPIENT_SYSTEM)
         self.assertEqual(reservation.recipient_payment_info_snapshot, 'system bank')
         self.assertEqual(response.data['payment_recipient']['username'], 'author')
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    def test_reservation_runtime_owner_consumer_actions(self):
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Tent',
+            description_text='Палатка',
+        )
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        reservation_id = response.data['reservation']['id']
+        self.assertEqual(response.data['event']['event_type'], RentalReservationEvent.EVENT_CREATED)
+        self.assertEqual(response.data['requester']['username'], 'requester')
+        self.assertEqual(response.data['owner']['username'], 'owner')
+
+        response_forbidden = self.client.put('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'reservation_id': reservation_id,
+            'action': RentalReservationEvent.EVENT_OWNER_ACCEPT,
+        }, format='json')
+        self.assertEqual(response_forbidden.status_code, 403)
+
+        response = self.client.put('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.owner_profile.uuid),
+            'reservation_id': reservation_id,
+            'action': RentalReservationEvent.EVENT_OWNER_ACCEPT,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_OWNER_ACCEPTED)
+        self.assertEqual(response.data['event']['actor_role'], RentalReservationEvent.ROLE_OWNER)
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], False)
+        self.assertEqual(response.data['reservation']['id'], reservation_id)
+        self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_OWNER_ACCEPTED)
+
+        response = self.client.put('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'reservation_id': reservation_id,
+            'action': RentalReservationEvent.EVENT_PAYMENT_REPORTED,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_PAYMENT_REPORTED)
+        self.assertEqual(response.data['event']['actor_role'], RentalReservationEvent.ROLE_REQUESTER)
+
+        response = self.client.put('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.owner_profile.uuid),
+            'reservation_id': reservation_id,
+            'action': RentalReservationEvent.EVENT_OWNER_CONFIRM,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_CONFIRMED)
+        self.assertEqual(len(response.data['events']), 4)
+
+        response = self.client.put('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'reservation_id': reservation_id,
+            'action': RentalReservationEvent.EVENT_CANCEL,
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Заявка уже закрыта')

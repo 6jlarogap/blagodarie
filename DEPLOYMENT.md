@@ -43,3 +43,16 @@ sudo -n /usr/local/sbin/blagodarie-admin is-active
 sudo -n /usr/local/sbin/blagodarie-admin logs-web 120
 sudo -n /usr/local/sbin/blagodarie-admin logs-bot 120
 ```
+
+## Chain Success Handoff
+
+For a `/new go` chain or similarly scoped implementation slice, treat success
+as an operational handoff:
+
+1. Run relevant source checks.
+2. Commit the successful source state with the chain slug in the message.
+3. If migrations or runtime code changed, deploy from this workspace with the
+   `blagodarie-admin` wrapper.
+4. Run migration/deploy/status checks after the commit.
+5. Record the result in `log.md` or the chain reference, including exact
+   blockers and failed commands when any step cannot run.

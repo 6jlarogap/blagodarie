@@ -48,6 +48,19 @@ class Rental(object):
     PROMPT_SEARCH = 'Что ищем в прокат? Укажите предмет, место или даты одним сообщением.'
     PROMPT_SEARCH_CONTEXT = 'Где или на какие даты искать? Можно ответить голосом.'
 
+    ACTION_OWNER_ACCEPT = 'owner_accept'
+    ACTION_PAYMENT_REPORTED = 'payment_reported'
+    ACTION_OWNER_CONFIRM = 'owner_confirm'
+    ACTION_CANCEL = 'cancel'
+
+    STATUS_LABELS = {
+        'sent': 'заявка отправлена',
+        'owner_accepted': 'владелец принял заявку',
+        'payment_reported': 'оплата отмечена',
+        'confirmed': 'бронь подтверждена',
+        'cancelled': 'заявка отменена',
+    }
+
     @classmethod
     def message_text(cls, message):
         return (message.text or message.caption or '').strip()
@@ -304,6 +317,21 @@ class Rental(object):
         return status, response
 
     @classmethod
+    async def reservation_action(cls, reservation_id, profile_from, action):
+        payload = dict(
+            tg_token=settings.TOKEN,
+            user_uuid=profile_from['uuid'],
+            reservation_id=reservation_id,
+            action=action,
+        )
+        status, response = await Misc.api_request(
+            path='/api/rental/reservation',
+            method='put',
+            json=payload,
+        )
+        return status, response
+
+    @classmethod
     async def contact(cls, offer_uuid, profile_from, text):
         payload = dict(
             tg_token=settings.TOKEN,
@@ -376,6 +404,85 @@ class Rental(object):
                 )
             ],
         ])
+
+    @classmethod
+    def reservation_status_label(cls, reservation):
+        return cls.STATUS_LABELS.get(
+            reservation.get('status'),
+            reservation.get('status') or 'статус неизвестен',
+        )
+
+    @classmethod
+    def reservation_action_callback_data(cls, action, reservation_id):
+        return '%s%s%s%s%s' % (
+            KeyboardType.RENTAL_RESERVATION_ACTION,
+            KeyboardType.SEP,
+            action,
+            KeyboardType.SEP,
+            reservation_id,
+        )
+
+    @classmethod
+    def markup_reservation_consumer(cls, reservation):
+        status = reservation.get('status')
+        rows = []
+        if status in ('sent', 'owner_accepted'):
+            rows.append([
+                InlineKeyboardButton(
+                    text='Я оплатил',
+                    callback_data=cls.reservation_action_callback_data(
+                        cls.ACTION_PAYMENT_REPORTED,
+                        reservation['id'],
+                    ),
+                )
+            ])
+        if status in ('sent', 'owner_accepted', 'payment_reported'):
+            rows.append([
+                InlineKeyboardButton(
+                    text='Отменить бронь',
+                    callback_data=cls.reservation_action_callback_data(
+                        cls.ACTION_CANCEL,
+                        reservation['id'],
+                    ),
+                )
+            ])
+        return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
+
+    @classmethod
+    def markup_reservation_owner(cls, reservation):
+        status = reservation.get('status')
+        rows = []
+        if status == 'sent':
+            rows.append([
+                InlineKeyboardButton(
+                    text='Принять',
+                    callback_data=cls.reservation_action_callback_data(
+                        cls.ACTION_OWNER_ACCEPT,
+                        reservation['id'],
+                    ),
+                )
+            ])
+        if status == 'payment_reported':
+            rows.append([
+                InlineKeyboardButton(
+                    text='Подтвердить',
+                    callback_data=cls.reservation_action_callback_data(
+                        cls.ACTION_OWNER_CONFIRM,
+                        reservation['id'],
+                    ),
+                )
+            ])
+        if status in ('sent', 'owner_accepted', 'payment_reported'):
+            rows.append([
+                InlineKeyboardButton(
+                    text='Отменить',
+                    callback_data=cls.reservation_action_callback_data(
+                        cls.ACTION_CANCEL,
+                        reservation['id'],
+                    ),
+                )
+            ])
+        return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
     @classmethod
     def canonical_message(cls, offer):
@@ -546,6 +653,47 @@ class Rental(object):
             recipient,
         )
 
+    @classmethod
+    def text_reservation_status(cls, response):
+        reservation = response['reservation']
+        offer = response['offer']
+        return (
+            'Заявка на бронь №%s\n'
+            'Объявление: %s\n'
+            'Статус: %s'
+        ) % (
+            reservation.get('sequence_number') or reservation.get('id'),
+            html.quote(offer.get('title') or offer.get('item_text') or 'Прокат'),
+            cls.reservation_status_label(reservation),
+        )
+
+    @classmethod
+    def text_consumer_reservation_update(cls, response):
+        text = cls.text_reservation_status(response)
+        reservation = response['reservation']
+        if reservation.get('status') == 'owner_accepted':
+            text += '\n\nВладелец принял заявку. Если условия подходят, сообщите об оплате кнопкой ниже.'
+        elif reservation.get('status') == 'confirmed':
+            text += '\n\nВладелец подтвердил бронь.'
+        elif reservation.get('status') == 'cancelled':
+            text += '\n\nЗаявка закрыта.'
+        return text
+
+    @classmethod
+    def text_owner_reservation_update(cls, response, profile_from):
+        text = cls.text_reservation_status(response)
+        requester = response.get('requester') or {}
+        if requester:
+            text += '\nОт: %s' % Misc.get_deeplink_with_name(requester)
+        reservation = response['reservation']
+        if reservation.get('status') == 'payment_reported':
+            text += '\n\nКлиент отметил оплату. Подтвердите бронь после проверки.'
+        elif reservation.get('status') == 'cancelled':
+            text += '\n\nЗаявка закрыта.'
+        elif profile_from:
+            text += '\n\nДействие выполнил: %s' % Misc.get_deeplink_with_name(profile_from)
+        return text
+
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMRentalOffer.ask))
 async def process_rental_offer(message: Message, state: FSMContext):
@@ -661,7 +809,10 @@ async def cbq_rental_book(callback: CallbackQuery, state: FSMContext):
         )
         await callback.answer()
         return
-    sent = await callback.message.reply(Rental.text_reservation(response_reserve))
+    sent = await callback.message.reply(
+        Rental.text_reservation(response_reserve),
+        reply_markup=Rental.markup_reservation_consumer(response_reserve['reservation']),
+    )
     await Rental.register_message(
         offer_uuid,
         'booking_prompt',
@@ -674,12 +825,84 @@ async def cbq_rental_book(callback: CallbackQuery, state: FSMContext):
     delivered = 0
     for tg_account in owner.get('tg_data') or []:
         try:
-            await bot.send_message(tg_account['tg_uid'], text=owner_notice)
+            await bot.send_message(
+                tg_account['tg_uid'],
+                text=owner_notice,
+                reply_markup=Rental.markup_reservation_owner(response_reserve['reservation']),
+            )
             delivered += 1
         except (TelegramBadRequest, TelegramForbiddenError):
             pass
     if delivered == 0:
         await callback.message.reply('Заявка сохранена, но владельцу не удалось отправить уведомление в Telegram')
+    await callback.answer()
+
+
+@router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
+        KeyboardType.RENTAL_RESERVATION_ACTION,
+        KeyboardType.SEP,
+    )), StateFilter(None))
+async def cbq_rental_reservation_action(callback: CallbackQuery, state: FSMContext):
+    parts = (callback.data or '').split(KeyboardType.SEP)
+    if len(parts) != 3:
+        await callback.answer()
+        return
+    action = parts[1]
+    reservation_id = parts[2]
+    status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if status_from != 200:
+        await callback.answer()
+        return
+    status_action, response_action = await Rental.reservation_action(
+        reservation_id,
+        profile_from,
+        action,
+    )
+    if status_action != 200:
+        await callback.message.reply(
+            (response_action or {}).get('message') or 'Не удалось обновить заявку'
+        )
+        await callback.answer()
+        return
+
+    reservation = response_action['reservation']
+    event = response_action.get('event') or {}
+    owner = response_action.get('owner') or {}
+    requester = response_action.get('requester') or {}
+    actor_role = event.get('actor_role')
+
+    if actor_role == 'requester':
+        await callback.message.reply(
+            Rental.text_consumer_reservation_update(response_action),
+            reply_markup=Rental.markup_reservation_consumer(reservation),
+        )
+        owner_text = Rental.text_owner_reservation_update(response_action, profile_from)
+        for tg_account in owner.get('tg_data') or []:
+            try:
+                await bot.send_message(
+                    tg_account['tg_uid'],
+                    text=owner_text,
+                    reply_markup=Rental.markup_reservation_owner(reservation),
+                )
+            except (TelegramBadRequest, TelegramForbiddenError):
+                pass
+    elif actor_role == 'owner':
+        await callback.message.reply(
+            Rental.text_owner_reservation_update(response_action, profile_from),
+            reply_markup=Rental.markup_reservation_owner(reservation),
+        )
+        consumer_text = Rental.text_consumer_reservation_update(response_action)
+        for tg_account in requester.get('tg_data') or []:
+            try:
+                await bot.send_message(
+                    tg_account['tg_uid'],
+                    text=consumer_text,
+                    reply_markup=Rental.markup_reservation_consumer(reservation),
+                )
+            except (TelegramBadRequest, TelegramForbiddenError):
+                pass
+    else:
+        await callback.message.reply(Rental.text_reservation_status(response_action))
     await callback.answer()
 
 

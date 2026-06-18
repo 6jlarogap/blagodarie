@@ -36,7 +36,7 @@ from users.models import Oauth, CreateUserMixin, IncognitoUser, Profile, TgGroup
     TgPoll, TgPollAnswer, Offer, OfferAnswer, TgDesc, \
     OfferRefJournal, OfferRefState, ApiDonateUser, \
     RentalEquipmentType, RentalOffer, RentalOfferContactRequest, \
-    RentalOfferMessage, RentalReservationIntent
+    RentalOfferMessage, RentalReservationIntent, RentalReservationEvent
 from contact.models import Key, KeyType, CurrentState, OperationType, Wish, Ability, \
                            ApiAddOperationMixin, Journal, TgMessageJournal
 from wote.models import Video, Vote
@@ -4119,6 +4119,111 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
             offer.owner,
         )
 
+    def rental_user_payload(self, user):
+        return dict(
+            first_name=user.first_name,
+            uuid=user.profile.uuid,
+            user_id=user.pk,
+            username=user.username,
+            tg_data=user.profile.tg_data(),
+        )
+
+    def reservation_actor_role(self, reservation, actor):
+        if actor == reservation.offer.owner:
+            return RentalReservationEvent.ROLE_OWNER
+        if actor == reservation.requester:
+            return RentalReservationEvent.ROLE_REQUESTER
+        raise PermissionDenied()
+
+    def create_reservation_event(self, reservation, actor, actor_role, event_type,
+                                 status_from='', status_to='', note='', payload=None):
+        return RentalReservationEvent.objects.create(
+            reservation=reservation,
+            actor=actor,
+            actor_role=actor_role,
+            event_type=event_type,
+            status_from=status_from or '',
+            status_to=status_to or '',
+            note=note or '',
+            payload=payload or {},
+        )
+
+    def apply_reservation_action(self, reservation, actor, action, note=''):
+        action = str(action or '').strip()
+        actor_role = self.reservation_actor_role(reservation, actor)
+        status_from = reservation.status
+        terminal_statuses = (
+            RentalReservationIntent.STATUS_CONFIRMED,
+            RentalReservationIntent.STATUS_CANCELLED,
+        )
+        if status_from in terminal_statuses:
+            raise ServiceException('Заявка уже закрыта')
+
+        if action == RentalReservationEvent.EVENT_OWNER_ACCEPT:
+            if actor_role != RentalReservationEvent.ROLE_OWNER:
+                raise PermissionDenied()
+            if status_from != RentalReservationIntent.STATUS_SENT:
+                raise ServiceException('Заявку нельзя принять в текущем статусе')
+            status_to = RentalReservationIntent.STATUS_OWNER_ACCEPTED
+        elif action == RentalReservationEvent.EVENT_PAYMENT_REPORTED:
+            if actor_role != RentalReservationEvent.ROLE_REQUESTER:
+                raise PermissionDenied()
+            if status_from not in (
+                    RentalReservationIntent.STATUS_SENT,
+                    RentalReservationIntent.STATUS_OWNER_ACCEPTED,
+            ):
+                raise ServiceException('Оплату нельзя отметить в текущем статусе')
+            status_to = RentalReservationIntent.STATUS_PAYMENT_REPORTED
+        elif action == RentalReservationEvent.EVENT_OWNER_CONFIRM:
+            if actor_role != RentalReservationEvent.ROLE_OWNER:
+                raise PermissionDenied()
+            if status_from != RentalReservationIntent.STATUS_PAYMENT_REPORTED:
+                raise ServiceException('Подтвердить можно только после сообщения об оплате')
+            status_to = RentalReservationIntent.STATUS_CONFIRMED
+        elif action == RentalReservationEvent.EVENT_CANCEL:
+            status_to = RentalReservationIntent.STATUS_CANCELLED
+        else:
+            raise ServiceException('Неверное действие заявки')
+
+        reservation.status = status_to
+        reservation.save(update_fields=('status', 'update_timestamp'))
+        return self.create_reservation_event(
+            reservation=reservation,
+            actor=actor,
+            actor_role=actor_role,
+            event_type=action,
+            status_from=status_from,
+            status_to=status_to,
+            note=note,
+            payload=dict(action=action),
+        )
+
+    def rental_reservation_response(self, request, reservation, created=False, event=None):
+        payment_user = self.system_payment_user() if \
+            reservation.recipient_kind == RentalReservationIntent.RECIPIENT_SYSTEM else \
+            reservation.offer.owner
+        recipient_profile = payment_user.profile.data_dict(request) if payment_user else None
+        return dict(
+            reservation=reservation.data_dict(),
+            created=created,
+            event=event.data_dict() if event else None,
+            events=[
+                item.data_dict()
+                for item in reservation.events.select_related(
+                    'actor',
+                    'actor__profile',
+                ).order_by('insert_timestamp', 'pk')
+            ],
+            offer=reservation.offer.data_dict(
+                request=request,
+                viewer_user=reservation.requester,
+                include_payment=True,
+            ),
+            owner=self.rental_user_payload(reservation.offer.owner),
+            requester=self.rental_user_payload(reservation.requester),
+            payment_recipient=recipient_profile,
+        )
+
 
 class ApiRentalOffer(ApiRentalMixin, APIView):
 
@@ -4460,6 +4565,8 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                 status__in=(
                     RentalReservationIntent.STATUS_DRAFT,
                     RentalReservationIntent.STATUS_SENT,
+                    RentalReservationIntent.STATUS_OWNER_ACCEPTED,
+                    RentalReservationIntent.STATUS_PAYMENT_REPORTED,
                 ),
             ).order_by('-insert_timestamp', '-pk').first()
             created = reservation is None
@@ -4493,13 +4600,22 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                     'recipient_payment_info_snapshot',
                     'update_timestamp',
                 ))
+                event = self.create_reservation_event(
+                    reservation=reservation,
+                    actor=requester,
+                    actor_role=RentalReservationEvent.ROLE_REQUESTER,
+                    event_type=RentalReservationEvent.EVENT_CREATED,
+                    status_from='',
+                    status_to=reservation.status,
+                )
             else:
                 reservation.source_message = source_message or reservation.source_message
                 reservation.date_from = date_from or reservation.date_from
                 reservation.date_to = date_to or reservation.date_to
                 reservation.amount_suggested = amount_suggested or reservation.amount_suggested
                 reservation.currency = currency or reservation.currency
-                reservation.status = RentalReservationIntent.STATUS_SENT
+                if reservation.status == RentalReservationIntent.STATUS_DRAFT:
+                    reservation.status = RentalReservationIntent.STATUS_SENT
                 reservation.save(update_fields=(
                     'source_message',
                     'date_from',
@@ -4509,26 +4625,49 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                     'status',
                     'update_timestamp',
                 ))
-                payment_user = self.system_payment_user() if \
-                    reservation.recipient_kind == RentalReservationIntent.RECIPIENT_SYSTEM else offer.owner
+                event = None
 
-            recipient_profile = payment_user.profile.data_dict(request) if payment_user else None
-            data = dict(
-                reservation=reservation.data_dict(),
+            data = self.rental_reservation_response(
+                request=request,
+                reservation=reservation,
                 created=created,
-                offer=offer.data_dict(
-                    request=request,
-                    viewer_user=requester,
-                    include_payment=True,
-                ),
-                owner=dict(
-                    first_name=offer.owner.first_name,
-                    uuid=offer.owner.profile.uuid,
-                    user_id=offer.owner.pk,
-                    username=offer.owner.username,
-                    tg_data=offer.owner.profile.tg_data(),
-                ),
-                payment_recipient=recipient_profile,
+                event=event,
+            )
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            transaction.set_rollback(True)
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+    @transaction.atomic
+    def put(self, request):
+        try:
+            self.check_bot_token(request)
+            actor, profile = self.check_user_uuid(
+                uuid=request.data.get('user_uuid'),
+                related=('user',),
+            )
+            try:
+                reservation = RentalReservationIntent.objects.select_related(
+                    'offer',
+                    'offer__owner',
+                    'offer__owner__profile',
+                    'requester',
+                    'requester__profile',
+                ).get(pk=self.parse_int(request.data, 'reservation_id'))
+            except RentalReservationIntent.DoesNotExist:
+                raise ServiceException('Заявка на бронь не найдена')
+            event = self.apply_reservation_action(
+                reservation=reservation,
+                actor=actor,
+                action=self.clean_text(request.data, 'action'),
+                note=self.clean_text(request.data, 'note'),
+            )
+            data = self.rental_reservation_response(
+                request=request,
+                reservation=reservation,
+                event=event,
             )
             status_code = status.HTTP_200_OK
         except ServiceException as excpt:
