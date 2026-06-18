@@ -1,4 +1,5 @@
 import os, re, hmac, hashlib, json, time, datetime, copy, string, random
+from decimal import Decimal, InvalidOperation
 import redis, html
 from uuid import uuid4
 import urllib.request, urllib.error, urllib.parse
@@ -33,7 +34,9 @@ from django.contrib.auth.models import User
 from users.models import Oauth, CreateUserMixin, IncognitoUser, Profile, TgGroup, \
     TempToken, UuidMixin, TelegramApiMixin, \
     TgPoll, TgPollAnswer, Offer, OfferAnswer, TgDesc, \
-    OfferRefJournal, OfferRefState, ApiDonateUser
+    OfferRefJournal, OfferRefState, ApiDonateUser, \
+    RentalEquipmentType, RentalOffer, RentalOfferContactRequest, \
+    RentalOfferMessage, RentalReservationIntent
 from contact.models import Key, KeyType, CurrentState, OperationType, Wish, Ability, \
                            ApiAddOperationMixin, Journal, TgMessageJournal
 from wote.models import Video, Vote
@@ -2136,7 +2139,95 @@ class ApiBotGroupMember(ApiBotGroupMixin, APIView):
 
 api_bot_groupmember = ApiBotGroupMember.as_view()
 
-class ApiUserPoints(FromToCountMixin, FrontendMixin, TelegramApiMixin, UuidMixin, GenderMixin, APIView):
+class RentalVisibilityMixin(object):
+
+    def get_rental_viewer_user(self, request, data=None):
+        if request.user.is_authenticated:
+            return request.user
+        data = data or {}
+        user_uuid = data.get('user_uuid') or request.GET.get('user_uuid')
+        if user_uuid:
+            try:
+                return User.objects.select_related('profile').get(profile__uuid=user_uuid)
+            except (ValidationError, User.DoesNotExist,):
+                return None
+        return None
+
+    def rental_mistrust_owner_ids(self, viewer_user):
+        if not viewer_user:
+            return set()
+        ids = set(CurrentState.objects.filter(
+            user_from=viewer_user,
+            user_to__isnull=False,
+            is_reverse=False,
+            attitude=CurrentState.MISTRUST,
+        ).values_list('user_to_id', flat=True))
+        ids.update(CurrentState.objects.filter(
+            user_to=viewer_user,
+            is_reverse=False,
+            attitude=CurrentState.MISTRUST,
+        ).values_list('user_from_id', flat=True))
+        return ids
+
+    def rental_trusted_owner_ids(self, viewer_user):
+        if not viewer_user:
+            return set()
+        attitudes = (CurrentState.TRUST, CurrentState.ACQ)
+        ids = set(CurrentState.objects.filter(
+            user_from=viewer_user,
+            user_to__isnull=False,
+            is_reverse=False,
+            attitude__in=attitudes,
+        ).values_list('user_to_id', flat=True))
+        ids.update(CurrentState.objects.filter(
+            user_to=viewer_user,
+            is_reverse=False,
+            attitude__in=attitudes,
+        ).values_list('user_from_id', flat=True))
+        return ids
+
+    def filter_rental_visibility(self, qs, viewer_user=None, include_private_link=False):
+        if include_private_link:
+            if viewer_user:
+                qs = qs.exclude(owner_id__in=self.rental_mistrust_owner_ids(viewer_user))
+            return qs
+        if not viewer_user:
+            return qs.none()
+        trusted_owner_ids = self.rental_trusted_owner_ids(viewer_user)
+        q_visible = (
+            Q(owner=viewer_user) |
+            Q(visibility=RentalOffer.VISIBILITY_AUTHENTICATED)
+        )
+        if trusted_owner_ids:
+            q_visible |= Q(
+                visibility=RentalOffer.VISIBILITY_TRUSTED,
+                owner_id__in=trusted_owner_ids,
+            )
+        return qs.filter(q_visible).exclude(
+            owner_id__in=self.rental_mistrust_owner_ids(viewer_user)
+        )
+
+    def rental_offer_queryset(self, request, active_only=True, include_private_link=False, data=None):
+        viewer_user = self.get_rental_viewer_user(request, data=data)
+        qs = RentalOffer.objects.select_related(
+            'owner',
+            'owner__profile',
+        ).prefetch_related(
+            'tgdesc',
+            'equipment_types',
+            'telegram_messages_set',
+        )
+        if active_only:
+            qs = qs.filter(status=RentalOffer.STATUS_ACTIVE)
+        qs = self.filter_rental_visibility(
+            qs,
+            viewer_user=viewer_user,
+            include_private_link=include_private_link,
+        )
+        return qs, viewer_user
+
+
+class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, TelegramApiMixin, UuidMixin, GenderMixin, APIView):
     """
     Вернуть список координат пользователей
 
@@ -2354,6 +2445,71 @@ class ApiUserPoints(FromToCountMixin, FrontendMixin, TelegramApiMixin, UuidMixin
             link_on_map=link_on_map,
         )
 
+    def append_rental_points(self, request, points, q_rectangle=None):
+        qs, viewer_user = self.rental_offer_queryset(request)
+        qs = qs.filter(latitude__isnull=False, longitude__isnull=False)
+        if q_rectangle:
+            qs = qs.filter(q_rectangle)
+        lat_sum = lng_sum = 0
+        count = 0
+        for rental in qs.distinct():
+            owner_profile = rental.owner.profile
+            offerer = self.popup_data(
+                owner_profile,
+                color='darkgreen',
+                frame=2,
+                thumb_size_icon=28,
+            )
+            title = rental.title or rental.item_text or 'Прокат'
+            if self.bot_username:
+                rental_deeplink = (
+                    f'<a href="https://t.me/{self.bot_username}?start=rent-{rental.uuid}" '
+                    f'target="_blank">{html.escape(title)}</a>'
+                )
+            else:
+                rental_deeplink = html.escape(title)
+            popup_rental = (
+                '<table>'
+                '<tr>'
+                    '<td valign=top>'
+                        '<img src="%(url_photo_popup)s" width=%(thumb_size_popup)s height=%(thumb_size_popup)s>'
+                    '</td>'
+                    '<td valign=top>'
+                        ' %(full_name)s (%(trust_count)s)<br />'
+                        ' <a href="%(url_deeplink)s" target="_blank">Профиль</a><br />'
+                        '%(link_on_map)s'
+                        ' <a href="%(url_profile)s" target="_blank">Доверия</a>'
+                    '</td>'
+                '</tr>'
+                '<tr>'
+                    '<td valign=middle>Прокат:</td>'
+                    '<td valign=middle>%(rental_deeplink)s</td>'
+                '</tr>'
+                '<tr>'
+                    '<td valign=middle>Цена:</td>'
+                    '<td valign=middle>%(price)s</td>'
+                '</tr>'
+                '</table>'
+            )
+            offerer.update(
+                rental_deeplink=rental_deeplink,
+                price=html.escape(rental.price_text or ''),
+            )
+            points.append(dict(
+                latitude=rental.latitude,
+                longitude=rental.longitude,
+                title=title,
+                popup=popup_rental % offerer,
+                icon=offerer['url_photo_icon'],
+                is_of_found_user=False,
+                size_icon=offerer['thumb_size_icon'],
+                is_rental=True,
+            ))
+            lat_sum += rental.latitude
+            lng_sum += rental.longitude
+            count += 1
+        return lat_sum, lng_sum, count
+
     def get(self, request):
 
         bot_username = self.get_bot_username()
@@ -2371,6 +2527,7 @@ class ApiUserPoints(FromToCountMixin, FrontendMixin, TelegramApiMixin, UuidMixin
         graph =None
         meet = False
         offer_on = False
+        rental_on = False
         num_all = 0
         first_name = ''
         gender = ''
@@ -2420,6 +2577,8 @@ class ApiUserPoints(FromToCountMixin, FrontendMixin, TelegramApiMixin, UuidMixin
             meet = True
         elif request.GET.get('offer'):
             offer_on = True
+        elif request.GET.get('rental'):
+            rental_on = True
         elif request.GET.get('offer_id'):
             offer_id = request.GET['offer_id']
         elif request.GET.get('uuid_trustees'):
@@ -2484,6 +2643,15 @@ class ApiUserPoints(FromToCountMixin, FrontendMixin, TelegramApiMixin, UuidMixin
                 point.update(popup=offer_popup)
                 points.append(point)
             num_all = len(coords)
+
+        elif rental_on:
+            rental_lat_sum, rental_lng_sum, rental_count = self.append_rental_points(
+                request,
+                points,
+            )
+            lat_sum += rental_lat_sum
+            lng_sum += rental_lng_sum
+            num_all = rental_count
 
         elif meet:
             if not user_auth:
@@ -2813,6 +2981,16 @@ class ApiUserPoints(FromToCountMixin, FrontendMixin, TelegramApiMixin, UuidMixin
                         offer_popup += '</table>'
                         point.update(popup=offer_popup % offerer)
                         points.append(point)
+
+                if request.GET.get('with_rentals'):
+                    rental_lat_sum, rental_lng_sum, rental_count = self.append_rental_points(
+                        request,
+                        points,
+                        q_rectangle=q_rectangle if in_rectangle else None,
+                    )
+                    lat_sum += rental_lat_sum
+                    lng_sum += rental_lng_sum
+                    num_all += rental_count
 
         elif offer_id:
             try:
@@ -3369,6 +3547,15 @@ class ApiUserPoints(FromToCountMixin, FrontendMixin, TelegramApiMixin, UuidMixin
                         lat_sum += profile.latitude
                         lng_sum += profile.longitude
 
+        if request.GET.get('with_rentals') and not rental_on and not meet:
+            rental_lat_sum, rental_lng_sum, rental_count = self.append_rental_points(
+                request,
+                points,
+            )
+            lat_sum += rental_lat_sum
+            lng_sum += rental_lng_sum
+            num_all += rental_count
+
         if offer_question:
             legend = '<br><table style="border-spacing: 0;border-bottom: 2px solid black;">'
             frame = self.OFFER_PHOTO_FRAME * 2
@@ -3792,6 +3979,566 @@ class ApiBotPollResults(TelegramApiMixin, APIView):
         return self.do_it(request, request.data.get('tg_poll_id'))
 
 api_bot_poll_results = ApiBotPollResults.as_view()
+
+
+class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
+
+    RENTAL_TEXT_FIELDS = (
+        'title',
+        'item_text',
+        'description_text',
+        'price_text',
+        'price_currency',
+        'price_period',
+        'availability_text',
+        'address',
+    )
+
+    def check_bot_token(self, request):
+        if request.data.get('tg_token') != settings.TELEGRAM_BOT_TOKEN:
+            raise ServiceException('Неверный токен телеграм бота')
+
+    def clean_text(self, data, key, default=''):
+        value = data.get(key, default)
+        if value is None:
+            return ''
+        return str(value).strip()
+
+    def parse_date(self, value, field_name):
+        if value in (None, ''):
+            return None
+        if isinstance(value, datetime.date):
+            return value
+        value = str(value).strip()
+        for date_format in ('%Y-%m-%d', '%d.%m.%Y'):
+            try:
+                return datetime.datetime.strptime(value, date_format).date()
+            except ValueError:
+                pass
+        raise ServiceException('Неверная дата %s' % field_name)
+
+    def parse_decimal(self, value, field_name):
+        if value in (None, ''):
+            return None
+        try:
+            return Decimal(str(value).replace(',', '.'))
+        except (InvalidOperation, ValueError):
+            raise ServiceException('Неверное число %s' % field_name)
+
+    def location_values(self, data):
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        if latitude in (None, '') and longitude in (None, ''):
+            return None, None
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (TypeError, ValueError):
+            raise ServiceException('Неверные координаты')
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            raise ServiceException('Неверные координаты')
+        return latitude, longitude
+
+    def parse_int(self, data, key):
+        try:
+            return int(data[key])
+        except (KeyError, TypeError, ValueError):
+            raise ServiceException('Неверный параметр %s' % key)
+
+    def rental_field_values(self, data, partial=False):
+        values = {}
+        for field in self.RENTAL_TEXT_FIELDS:
+            if not partial or field in data:
+                values[field] = self.clean_text(data, field)
+        if not partial or 'status' in data:
+            status_value = self.clean_text(data, 'status', RentalOffer.STATUS_ACTIVE)
+            if status_value not in dict(RentalOffer.STATUSES):
+                raise ServiceException('Неверный статус объявления')
+            values['status'] = status_value
+        if not partial or 'visibility' in data:
+            visibility = self.clean_text(data, 'visibility', RentalOffer.VISIBILITY_AUTHENTICATED)
+            if visibility not in dict(RentalOffer.VISIBILITIES):
+                raise ServiceException('Неверная видимость объявления')
+            values['visibility'] = visibility
+        if not partial or 'available_from' in data:
+            values['available_from'] = self.parse_date(data.get('available_from'), 'available_from')
+        if not partial or 'available_to' in data:
+            values['available_to'] = self.parse_date(data.get('available_to'), 'available_to')
+        if not partial or 'price_amount' in data:
+            values['price_amount'] = self.parse_decimal(data.get('price_amount'), 'price_amount')
+        if not values.get('description_text') and data.get('transcript_text'):
+            values['description_text'] = self.clean_text(data, 'transcript_text')
+        if values.get('available_from') and values.get('available_to') and \
+           values['available_from'] > values['available_to']:
+            raise ServiceException('Дата начала доступности позже даты окончания')
+        return values
+
+    def save_tgdesc(self, offer, tgdesc_dict, is_first=False):
+        if not tgdesc_dict:
+            return
+        if is_first:
+            offer.tgdesc.filter(
+                ~Q(uuid_pack=tgdesc_dict['uuid_pack'])
+            ).delete()
+        tgdesc = TgDesc.objects.create(**tgdesc_dict)
+        offer.tgdesc.add(tgdesc)
+
+    def apply_equipment_tags(self, offer):
+        text = ' '.join([
+            offer.title or '',
+            offer.item_text or '',
+            offer.description_text or '',
+        ])
+        concrete_equipment, ambiguous_equipment = RentalEquipmentType.match_text(text)
+        offer.equipment_types.set(concrete_equipment)
+
+    def user_payment_info(self, user):
+        key = Key.objects.filter(
+            owner=user,
+            type__pk=KeyType.BANKING_DETAILS_ID,
+        ).order_by('pk').first()
+        return key.value if key else ''
+
+    def system_payment_user(self):
+        author_user_id = getattr(settings, 'AUTHOR_USER_ID', None)
+        if not author_user_id:
+            return None
+        return User.objects.select_related('profile').filter(pk=author_user_id).first()
+
+    def reservation_payment_snapshot(self, offer, sequence_number):
+        if sequence_number and sequence_number % 10 == 0:
+            system_user = self.system_payment_user()
+            return (
+                RentalReservationIntent.RECIPIENT_SYSTEM,
+                self.user_payment_info(system_user) if system_user else '',
+                system_user,
+            )
+        return (
+            RentalReservationIntent.RECIPIENT_OWNER,
+            offer.payment_details_text(),
+            offer.owner,
+        )
+
+
+class ApiRentalOffer(ApiRentalMixin, APIView):
+
+    @transaction.atomic
+    def post(self, request):
+        try:
+            self.check_bot_token(request)
+            owner, profile = self.check_user_uuid(
+                uuid=request.data.get('user_uuid'),
+                related=('user',),
+            )
+            values = self.rental_field_values(request.data)
+            if not values.get('title'):
+                values['title'] = values.get('item_text') or \
+                    values.get('description_text', '').split('\n')[0][:120]
+            if not values.get('title') and not values.get('description_text'):
+                raise ServiceException('Не задано описание объявления')
+            latitude, longitude = self.location_values(request.data)
+            values.update(
+                owner=owner,
+                latitude=latitude,
+                longitude=longitude,
+            )
+            offer = RentalOffer.objects.create(**values)
+            self.save_tgdesc(
+                offer,
+                request.data.get('tgdesc'),
+                is_first=True,
+            )
+            self.apply_equipment_tags(offer)
+            data = dict(offer=offer.data_dict(
+                request=request,
+                viewer_user=owner,
+                include_payment=True,
+            ))
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            transaction.set_rollback(True)
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+    def get(self, request):
+        try:
+            include_private_link = bool(request.GET.get('uuid'))
+            qs, viewer_user = self.rental_offer_queryset(
+                request,
+                active_only=False,
+                include_private_link=include_private_link,
+            )
+            if request.GET.get('uuid'):
+                qs = qs.filter(uuid=request.GET['uuid'])
+            elif request.GET.get('offer_id'):
+                qs = qs.filter(pk=request.GET['offer_id'])
+            else:
+                raise ValueError
+            offer = qs.get()
+            data = dict(offer=offer.data_dict(
+                request=request,
+                viewer_user=viewer_user,
+                include_payment=bool(request.GET.get('include_payment')),
+            ))
+            status_code = status.HTTP_200_OK
+        except (TypeError, ValueError, ValidationError, RentalOffer.DoesNotExist,):
+            data = {}
+            status_code = status.HTTP_404_NOT_FOUND
+        return Response(data=data, status=status_code)
+
+    @transaction.atomic
+    def put(self, request):
+        try:
+            self.check_bot_token(request)
+            try:
+                offer = RentalOffer.objects.select_related('owner', 'owner__profile').get(
+                    uuid=request.data.get('offer_uuid')
+                )
+            except (TypeError, ValueError, ValidationError, RentalOffer.DoesNotExist,):
+                raise ServiceException('Объявление проката не найдено')
+            owner, profile = self.check_user_uuid(
+                uuid=request.data.get('user_uuid'),
+                related=('user',),
+            )
+            if offer.owner != owner:
+                raise PermissionDenied()
+            values = self.rental_field_values(request.data, partial=True)
+            latitude, longitude = self.location_values(request.data)
+            if latitude is not None and longitude is not None:
+                values.update(latitude=latitude, longitude=longitude)
+            update_fields = []
+            for field, value in values.items():
+                setattr(offer, field, value)
+                update_fields.append(field)
+            if update_fields:
+                offer.save(update_fields=update_fields)
+            self.save_tgdesc(
+                offer,
+                request.data.get('tgdesc'),
+                is_first=bool(request.data.get('is_first')),
+            )
+            if any(field in request.data for field in self.RENTAL_TEXT_FIELDS):
+                self.apply_equipment_tags(offer)
+            data = dict(offer=offer.data_dict(
+                request=request,
+                viewer_user=owner,
+                include_payment=True,
+            ))
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            transaction.set_rollback(True)
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+api_rental_offer = ApiRentalOffer.as_view()
+
+
+class ApiRentalSearch(ApiRentalMixin, APIView):
+
+    def get(self, request):
+        try:
+            qs, viewer_user = self.rental_offer_queryset(request)
+            query_text = self.clean_text(request.GET, 'query') or self.clean_text(request.GET, 'q')
+            concrete_equipment = []
+            if query_text:
+                concrete_equipment, ambiguous_equipment = RentalEquipmentType.match_text(query_text)
+                if ambiguous_equipment and not concrete_equipment:
+                    data = dict(
+                        offers=[],
+                        clarification=RentalEquipmentType.clarification_data(ambiguous_equipment),
+                    )
+                    return Response(data=data, status=status.HTTP_200_OK)
+                q_text_fallback = (
+                    Q(title__icontains=query_text) |
+                    Q(item_text__icontains=query_text) |
+                    Q(description_text__icontains=query_text) |
+                    Q(address__icontains=query_text)
+                )
+                if concrete_equipment:
+                    q_text_fallback |= Q(equipment_types__in=concrete_equipment)
+                if connection.vendor == 'postgresql':
+                    try:
+                        query = SearchQuery(query_text, search_type='websearch')
+                        vector = SearchVector(
+                            'title',
+                            'item_text',
+                            'description_text',
+                            'address',
+                        )
+                        q_search = Q(search=query)
+                        if concrete_equipment:
+                            q_search |= Q(equipment_types__in=concrete_equipment)
+                        qs = qs.annotate(search=vector).filter(q_search)
+                    except ProgrammingError:
+                        qs = qs.filter(q_text_fallback)
+                else:
+                    qs = qs.filter(q_text_fallback)
+            date_from = self.parse_date(request.GET.get('date_from'), 'date_from')
+            date_to = self.parse_date(request.GET.get('date_to'), 'date_to')
+            if date_from:
+                qs = qs.filter(Q(available_to__isnull=True) | Q(available_to__gte=date_from))
+            if date_to:
+                qs = qs.filter(Q(available_from__isnull=True) | Q(available_from__lte=date_to))
+            for input_name, lookup in (
+                ('lat_south', 'latitude__gte'),
+                ('lat_north', 'latitude__lte'),
+                ('lng_west', 'longitude__gte'),
+                ('lng_east', 'longitude__lte'),
+            ):
+                if request.GET.get(input_name) not in (None, ''):
+                    try:
+                        qs = qs.filter(**{lookup: float(request.GET[input_name])})
+                    except (TypeError, ValueError):
+                        raise ServiceException('Неверные координаты')
+            try:
+                number = min(int(request.GET.get('number', 10)), 50)
+            except ValueError:
+                number = 10
+            data = dict(
+                offers=[
+                    offer.data_dict(request=request, viewer_user=viewer_user)
+                    for offer in qs.distinct()[:number]
+                ]
+            )
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+api_rental_search = ApiRentalSearch.as_view()
+
+
+class ApiRentalContact(ApiRentalMixin, APIView):
+
+    @transaction.atomic
+    def post(self, request):
+        try:
+            self.check_bot_token(request)
+            requester, profile = self.check_user_uuid(
+                uuid=request.data.get('user_uuid'),
+                related=('user',),
+            )
+            qs, viewer_user = self.rental_offer_queryset(
+                request,
+                include_private_link=True,
+                data=dict(user_uuid=profile.uuid),
+            )
+            try:
+                offer = qs.get(uuid=request.data.get('offer_uuid'))
+            except (TypeError, ValueError, ValidationError, RentalOffer.DoesNotExist,):
+                raise ServiceException('Объявление проката не найдено')
+            if offer.owner == requester:
+                raise ServiceException('Нельзя отправить запрос самому себе')
+            message = self.clean_text(request.data, 'message')
+            transcript = self.clean_text(request.data, 'transcript')
+            if not message and not transcript:
+                raise ServiceException('Не задано сообщение')
+            contact_request = RentalOfferContactRequest.objects.create(
+                requester=requester,
+                offer=offer,
+                message=message,
+                transcript=transcript,
+            )
+            data = dict(
+                contact=contact_request.data_dict(),
+                offer=offer.data_dict(
+                    request=request,
+                    viewer_user=requester,
+                    include_payment=True,
+                ),
+                owner=dict(
+                    first_name=offer.owner.first_name,
+                    uuid=offer.owner.profile.uuid,
+                    user_id=offer.owner.pk,
+                    username=offer.owner.username,
+                    tg_data=offer.owner.profile.tg_data(),
+                ),
+            )
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            transaction.set_rollback(True)
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+api_rental_contact = ApiRentalContact.as_view()
+
+
+class ApiRentalMessage(ApiRentalMixin, APIView):
+
+    @transaction.atomic
+    def post(self, request):
+        try:
+            self.check_bot_token(request)
+            try:
+                offer = RentalOffer.objects.get(uuid=request.data.get('offer_uuid'))
+            except (TypeError, ValueError, ValidationError, RentalOffer.DoesNotExist,):
+                raise ServiceException('Объявление проката не найдено')
+            message_kind = self.clean_text(request.data, 'message_kind')
+            if message_kind not in dict(RentalOfferMessage.MESSAGE_KINDS):
+                raise ServiceException('Неверный тип сообщения')
+            recipient = None
+            if request.data.get('recipient_uuid'):
+                recipient, profile = self.check_user_uuid(
+                    uuid=request.data.get('recipient_uuid'),
+                    related=('user',),
+                )
+            chat_id = self.parse_int(request.data, 'chat_id')
+            message_id = self.parse_int(request.data, 'message_id')
+            message, created = RentalOfferMessage.objects.update_or_create(
+                offer=offer,
+                chat_id=chat_id,
+                message_id=message_id,
+                message_kind=message_kind,
+                defaults=dict(recipient=recipient),
+            )
+            data = dict(message=message.data_dict())
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            transaction.set_rollback(True)
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+
+api_rental_message = ApiRentalMessage.as_view()
+
+
+class ApiRentalReservation(ApiRentalMixin, APIView):
+
+    def find_source_message(self, offer, data):
+        chat_id = data.get('source_chat_id')
+        message_id = data.get('source_message_id')
+        if chat_id in (None, '') or message_id in (None, ''):
+            return None
+        try:
+            return RentalOfferMessage.objects.filter(
+                offer=offer,
+                chat_id=int(chat_id),
+                message_id=int(message_id),
+            ).order_by('-insert_timestamp', '-pk').first()
+        except (TypeError, ValueError):
+            return None
+
+    @transaction.atomic
+    def post(self, request):
+        try:
+            self.check_bot_token(request)
+            requester, profile = self.check_user_uuid(
+                uuid=request.data.get('user_uuid'),
+                related=('user',),
+            )
+            qs, viewer_user = self.rental_offer_queryset(
+                request,
+                include_private_link=True,
+                data=dict(user_uuid=profile.uuid),
+            )
+            try:
+                offer = qs.get(uuid=request.data.get('offer_uuid'))
+            except (TypeError, ValueError, ValidationError, RentalOffer.DoesNotExist,):
+                raise ServiceException('Объявление проката не найдено')
+            if offer.owner == requester:
+                raise ServiceException('Нельзя бронировать собственное объявление')
+
+            date_from = self.parse_date(request.data.get('date_from'), 'date_from')
+            date_to = self.parse_date(request.data.get('date_to'), 'date_to')
+            if date_from and date_to and date_from > date_to:
+                raise ServiceException('Дата начала позже даты окончания')
+            amount_suggested = self.parse_decimal(
+                request.data.get('amount_suggested') or offer.price_amount,
+                'amount_suggested',
+            )
+            currency = self.clean_text(request.data, 'currency') or offer.price_currency
+            source_message = self.find_source_message(offer, request.data)
+
+            reservation = RentalReservationIntent.objects.filter(
+                offer=offer,
+                requester=requester,
+                status__in=(
+                    RentalReservationIntent.STATUS_DRAFT,
+                    RentalReservationIntent.STATUS_SENT,
+                ),
+            ).order_by('-insert_timestamp', '-pk').first()
+            created = reservation is None
+            if created:
+                reservation = RentalReservationIntent.objects.create(
+                    offer=offer,
+                    requester=requester,
+                    source_message=source_message,
+                    date_from=date_from,
+                    date_to=date_to,
+                    amount_suggested=amount_suggested,
+                    currency=currency,
+                    status=RentalReservationIntent.STATUS_SENT,
+                )
+                reservation.sequence_number = reservation.pk
+                recipient_kind, payment_info, payment_user = self.reservation_payment_snapshot(
+                    offer,
+                    reservation.sequence_number,
+                )
+                reservation.recipient_kind = recipient_kind
+                reservation.recipient_payment_info_snapshot = payment_info
+                reservation.save(update_fields=(
+                    'source_message',
+                    'date_from',
+                    'date_to',
+                    'amount_suggested',
+                    'currency',
+                    'status',
+                    'sequence_number',
+                    'recipient_kind',
+                    'recipient_payment_info_snapshot',
+                    'update_timestamp',
+                ))
+            else:
+                reservation.source_message = source_message or reservation.source_message
+                reservation.date_from = date_from or reservation.date_from
+                reservation.date_to = date_to or reservation.date_to
+                reservation.amount_suggested = amount_suggested or reservation.amount_suggested
+                reservation.currency = currency or reservation.currency
+                reservation.status = RentalReservationIntent.STATUS_SENT
+                reservation.save(update_fields=(
+                    'source_message',
+                    'date_from',
+                    'date_to',
+                    'amount_suggested',
+                    'currency',
+                    'status',
+                    'update_timestamp',
+                ))
+                payment_user = self.system_payment_user() if \
+                    reservation.recipient_kind == RentalReservationIntent.RECIPIENT_SYSTEM else offer.owner
+
+            recipient_profile = payment_user.profile.data_dict(request) if payment_user else None
+            data = dict(
+                reservation=reservation.data_dict(),
+                created=created,
+                offer=offer.data_dict(
+                    request=request,
+                    viewer_user=requester,
+                    include_payment=True,
+                ),
+                owner=dict(
+                    first_name=offer.owner.first_name,
+                    uuid=offer.owner.profile.uuid,
+                    user_id=offer.owner.pk,
+                    username=offer.owner.username,
+                    tg_data=offer.owner.profile.tg_data(),
+                ),
+                payment_recipient=recipient_profile,
+            )
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            transaction.set_rollback(True)
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+
+api_rental_reservation = ApiRentalReservation.as_view()
 
 
 class ApiOfferMixin(object):

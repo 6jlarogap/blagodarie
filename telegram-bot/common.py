@@ -109,6 +109,7 @@ class Rcache(object):
     SEND_MESSAGE_PREFIX = 'send_message'
     USER_DESC_PREFIX = 'user_desc'
     OFFER_DESC_PREFIX = 'offer_desc'
+    RENTAL_DESC_PREFIX = 'rental_desc'
     ASK_MONEY_PREFIX = 'ask_money'
     DONATE_OFFER_CHOICE = 'donate_offer'
     SET_NEXT_SYMPA_WAIT_PREFIX = 'set_next_sympa_wait'
@@ -387,6 +388,14 @@ class KeyboardType(object):
     # Отмена голоса вместо доната в офере
     #
     DONATE_OFFER_REVOKE_VOICE = 80
+
+    # Связаться с владельцем объявления проката
+    #
+    RENTAL_CONTACT = 81
+
+    # Забронировать объявление проката
+    #
+    RENTAL_BOOK = 82
 
     # Разделитель данных в call back data
     #
@@ -2998,7 +3007,7 @@ class TgDesc(object):
         Сформировать данные из -- возможно -- media group сообщения
         """
         file_id = ''; file_type = ''
-        for file_type in ('photo', 'audio', 'video', 'document'):
+        for file_type in ('photo', 'audio', 'video', 'document', 'voice'):
             # Типы, для которых возможна группировка
             content = getattr(message, file_type, None)
             if content:

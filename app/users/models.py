@@ -626,6 +626,10 @@ class Profile(PhotoModel, GeoPointAddressModel):
             Token.objects.filter(user=user_from).update(user=user)
 
         Offer.objects.filter(owner=user_from).update(owner=user)
+        RentalOffer.objects.filter(owner=user_from).update(owner=user)
+        RentalOfferContactRequest.objects.filter(requester=user_from).update(requester=user)
+        RentalOfferMessage.objects.filter(recipient=user_from).update(recipient=user)
+        RentalReservationIntent.objects.filter(requester=user_from).update(requester=user)
 
         do_save = False
         if not self.photo and profile_from.photo:
@@ -1351,6 +1355,480 @@ class OfferRefJournal(BaseModelInsertTimestamp):
     user_to = models.ForeignKey('auth.User',
                     verbose_name=_("Приглашенный (стал referrer"), on_delete=models.CASCADE,
                     related_name='offerrefjournal_user_to_set')
+
+
+class RentalEquipmentType(BaseModelInsertUpdateTimestamp):
+    """
+    Curated rental equipment taxonomy with multilingual labels/synonyms.
+    """
+
+    slug = models.SlugField(_("Slug"), max_length=64, unique=True)
+    parent = models.ForeignKey(
+        'self',
+        verbose_name=_("Родитель"),
+        on_delete=models.SET_NULL,
+        related_name='children',
+        null=True,
+        blank=True,
+    )
+    canonical_name = models.CharField(_("Каноническое название"), max_length=255)
+    labels = models.JSONField(_("Названия"), blank=True, default=dict)
+    synonyms = models.JSONField(_("Синонимы"), blank=True, default=dict)
+    is_ambiguous = models.BooleanField(_("Требует уточнения"), default=False, db_index=True)
+
+    class Meta:
+        ordering = ('slug',)
+
+    def __str__(self):
+        return self.canonical_name or self.slug
+
+    def terms(self):
+        result = set()
+        for values in (self.labels or {}).values():
+            if isinstance(values, str):
+                result.add(values)
+            else:
+                result.update(values or [])
+        for values in (self.synonyms or {}).values():
+            if isinstance(values, str):
+                result.add(values)
+            else:
+                result.update(values or [])
+        result.add(self.slug.replace('-', ' '))
+        result.add(self.canonical_name)
+        return [term.strip() for term in result if term and term.strip()]
+
+    def data_dict(self):
+        return dict(
+            slug=self.slug,
+            parent=self.parent.slug if self.parent_id else '',
+            canonical_name=self.canonical_name,
+            labels=self.labels,
+            synonyms=self.synonyms,
+            is_ambiguous=self.is_ambiguous,
+        )
+
+    @classmethod
+    def match_text(cls, text):
+        text = (text or '').lower()
+        if not text:
+            return [], []
+        concrete = []
+        ambiguous = []
+        for equipment_type in cls.objects.select_related('parent').all():
+            for term in equipment_type.terms():
+                pattern = r'(?<![\w])%s(?![\w])' % re.escape(term.lower())
+                if re.search(pattern, text, flags=re.I):
+                    if equipment_type.is_ambiguous:
+                        ambiguous.append(equipment_type)
+                    else:
+                        concrete.append(equipment_type)
+                    break
+        return concrete, ambiguous
+
+    @classmethod
+    def clarification_data(cls, ambiguous_types):
+        choices = []
+        ambiguous_ids = [equipment_type.pk for equipment_type in ambiguous_types]
+        qs = cls.objects.filter(is_ambiguous=False)
+        if ambiguous_ids:
+            qs = qs.filter(parent_id__in=ambiguous_ids)
+        for equipment_type in qs.order_by('canonical_name', 'slug')[:8]:
+            choices.append(equipment_type.data_dict())
+        return dict(
+            message='Уточните тип снаряжения',
+            ambiguous=[equipment_type.data_dict() for equipment_type in ambiguous_types],
+            choices=choices,
+        )
+
+
+class RentalOffer(BaseModelInsertUpdateTimestamp, GeoPointAddressModel):
+    """
+    Объявление о прокате снаряжения.
+
+    Это не опрос и не использует ответы OfferAnswer.
+    """
+
+    STATUS_DRAFT = 'draft'
+    STATUS_ACTIVE = 'active'
+    STATUS_PAUSED = 'paused'
+    STATUS_ARCHIVED = 'archived'
+
+    STATUSES = (
+        (STATUS_DRAFT, _("Черновик")),
+        (STATUS_ACTIVE, _("Активно")),
+        (STATUS_PAUSED, _("Приостановлено")),
+        (STATUS_ARCHIVED, _("Архив")),
+    )
+
+    VISIBILITY_AUTHENTICATED = 'authenticated'
+    VISIBILITY_TRUSTED = 'trusted'
+    VISIBILITY_PRIVATE = 'private'
+
+    VISIBILITIES = (
+        (VISIBILITY_AUTHENTICATED, _("Пользователи Doverabot")),
+        (VISIBILITY_TRUSTED, _("Доверенное окружение")),
+        (VISIBILITY_PRIVATE, _("Только по приватной ссылке")),
+    )
+
+    owner = models.ForeignKey(
+        'auth.User',
+        verbose_name=_("Владелец"),
+        on_delete=models.CASCADE,
+        related_name='rental_offers',
+    )
+    uuid = models.UUIDField(default=uuid4, editable=False, db_index=True)
+    status = models.CharField(
+        _("Статус"),
+        max_length=16,
+        choices=STATUSES,
+        default=STATUS_ACTIVE,
+        db_index=True,
+    )
+    title = models.CharField(_("Название"), max_length=255, blank=True, default='', db_index=True)
+    item_text = models.CharField(_("Предмет"), max_length=255, blank=True, default='', db_index=True)
+    description_text = models.TextField(verbose_name=_("Описание"), blank=True, default='')
+    price_text = models.TextField(verbose_name=_("Цена и платежи"), blank=True, default='')
+    price_amount = models.DecimalField(
+        _("Цена"),
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    price_currency = models.CharField(_("Валюта"), max_length=8, blank=True, default='')
+    price_period = models.CharField(_("Период цены"), max_length=32, blank=True, default='')
+    availability_text = models.TextField(verbose_name=_("Доступность"), blank=True, default='')
+    available_from = models.DateField(_("Доступно с"), null=True, blank=True, db_index=True)
+    available_to = models.DateField(_("Доступно до"), null=True, blank=True, db_index=True)
+    visibility = models.CharField(
+        _("Видимость"),
+        max_length=20,
+        choices=VISIBILITIES,
+        default=VISIBILITY_AUTHENTICATED,
+        db_index=True,
+    )
+    tgdesc = models.ManyToManyField(
+        'users.TgDesc',
+        verbose_name=_("Сообщения с описаниями"),
+        blank=True,
+    )
+    equipment_types = models.ManyToManyField(
+        RentalEquipmentType,
+        verbose_name=_("Типы снаряжения"),
+        blank=True,
+        related_name='rental_offers',
+    )
+
+    class Meta:
+        ordering = ('-insert_timestamp', '-pk')
+
+    def __str__(self):
+        return self.title or self.item_text or str(self.uuid)
+
+    def desc(self):
+        return [
+            m.message_dict() for m in self.tgdesc.all().order_by('message_id')
+        ]
+
+    def telegram_messages(self):
+        return [
+            m.data_dict() for m in self.telegram_messages_set.all().order_by('insert_timestamp', 'pk')
+        ]
+
+    def canonical_message(self):
+        message = self.telegram_messages_set.filter(
+            message_kind=RentalOfferMessage.KIND_OWNER_OFFER,
+        ).order_by('insert_timestamp', 'pk').first()
+        return message.data_dict() if message else None
+
+    def payment_details_text(self):
+        if self.price_text:
+            return self.price_text
+        Key = get_model('contact', 'Key')
+        KeyType = get_model('contact', 'KeyType')
+        key = Key.objects.filter(
+            owner=self.owner,
+            type__pk=KeyType.BANKING_DETAILS_ID,
+        ).order_by('pk').first()
+        return key.value if key else ''
+
+    def trust_badges(self, viewer_user=None):
+        result = dict(
+            owner_trust_count=self.owner.profile.trust_count,
+            owner_acq_count=self.owner.profile.acq_count,
+            owner_fame=self.owner.profile.fame,
+            viewer_attitude='',
+            owner_attitude='',
+        )
+        if viewer_user and viewer_user.is_authenticated and viewer_user != self.owner:
+            CurrentState = get_model('contact', 'CurrentState')
+            viewer_state = CurrentState.objects.filter(
+                user_from=viewer_user,
+                user_to=self.owner,
+                is_reverse=False,
+                attitude__isnull=False,
+            ).first()
+            owner_state = CurrentState.objects.filter(
+                user_from=self.owner,
+                user_to=viewer_user,
+                is_reverse=False,
+                attitude__isnull=False,
+            ).first()
+            result.update(
+                viewer_attitude=viewer_state.attitude if viewer_state else '',
+                owner_attitude=owner_state.attitude if owner_state else '',
+            )
+        return result
+
+    def data_dict(self, request=None, viewer_user=None, include_payment=False):
+        result = dict(
+            uuid=self.uuid,
+            rental_offer_id=self.pk,
+            status=self.status,
+            title=self.title,
+            item_text=self.item_text,
+            description_text=self.description_text,
+            price_text=self.price_text,
+            price_amount=str(self.price_amount) if self.price_amount is not None else '',
+            price_currency=self.price_currency,
+            price_period=self.price_period,
+            availability_text=self.availability_text,
+            available_from=self.available_from.isoformat() if self.available_from else '',
+            available_to=self.available_to.isoformat() if self.available_to else '',
+            visibility=self.visibility,
+            latitude=self.latitude,
+            longitude=self.longitude,
+            address=self.address,
+            insert_timestamp=self.insert_timestamp,
+            update_timestamp=self.update_timestamp,
+            owner=dict(
+                first_name=self.owner.first_name,
+                uuid=self.owner.profile.uuid,
+                user_id=self.owner.pk,
+                username=self.owner.username,
+            ),
+            desc=self.desc(),
+            equipment_types=[
+                equipment_type.data_dict()
+                for equipment_type in self.equipment_types.all().order_by('slug')
+            ],
+            telegram_messages=self.telegram_messages(),
+            canonical_message=self.canonical_message(),
+            trust_badges=self.trust_badges(viewer_user=viewer_user),
+        )
+        if include_payment:
+            result.update(payment_details=self.payment_details_text())
+        return result
+
+
+class RentalOfferMessage(BaseModelInsertTimestamp):
+    """
+    Telegram message identity for copied/forwarded rental listings and prompts.
+    """
+
+    KIND_OWNER_OFFER = 'owner_offer'
+    KIND_SEARCH_RESULT = 'search_result'
+    KIND_BOOKING_PROMPT = 'booking_prompt'
+    KIND_CONTACT_HANDOFF = 'contact_handoff'
+
+    MESSAGE_KINDS = (
+        (KIND_OWNER_OFFER, _("Сообщение владельца")),
+        (KIND_SEARCH_RESULT, _("Результат поиска")),
+        (KIND_BOOKING_PROMPT, _("Подсказка бронирования")),
+        (KIND_CONTACT_HANDOFF, _("Передача контакта")),
+    )
+
+    offer = models.ForeignKey(
+        RentalOffer,
+        verbose_name=_("Объявление проката"),
+        on_delete=models.CASCADE,
+        related_name='telegram_messages_set',
+    )
+    chat_id = models.BigIntegerField(_("Chat Id"), db_index=True)
+    message_id = models.BigIntegerField(_("Message Id"), db_index=True)
+    message_kind = models.CharField(
+        _("Тип сообщения"),
+        max_length=32,
+        choices=MESSAGE_KINDS,
+        db_index=True,
+    )
+    recipient = models.ForeignKey(
+        'auth.User',
+        verbose_name=_("Получатель"),
+        on_delete=models.SET_NULL,
+        related_name='rental_offer_messages',
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ('-insert_timestamp', '-pk')
+        unique_together = ('offer', 'chat_id', 'message_id', 'message_kind')
+
+    def data_dict(self):
+        return dict(
+            id=self.pk,
+            offer_uuid=self.offer.uuid,
+            chat_id=self.chat_id,
+            message_id=self.message_id,
+            message_kind=self.message_kind,
+            recipient_uuid=self.recipient.profile.uuid if self.recipient_id else '',
+            insert_timestamp=self.insert_timestamp,
+        )
+
+
+class RentalReservationIntent(BaseModelInsertUpdateTimestamp):
+    """
+    Non-escrow reservation/payment handoff intent for a rental offer.
+    """
+
+    STATUS_DRAFT = 'draft'
+    STATUS_SENT = 'sent'
+    STATUS_OWNER_ACCEPTED = 'owner_accepted'
+    STATUS_PAYMENT_REPORTED = 'payment_reported'
+    STATUS_CONFIRMED = 'confirmed'
+    STATUS_CANCELLED = 'cancelled'
+
+    STATUSES = (
+        (STATUS_DRAFT, _("Черновик")),
+        (STATUS_SENT, _("Отправлено")),
+        (STATUS_OWNER_ACCEPTED, _("Принято владельцем")),
+        (STATUS_PAYMENT_REPORTED, _("Оплата сообщена")),
+        (STATUS_CONFIRMED, _("Подтверждено")),
+        (STATUS_CANCELLED, _("Отменено")),
+    )
+
+    RECIPIENT_OWNER = 'owner'
+    RECIPIENT_SYSTEM = 'system'
+
+    RECIPIENT_KINDS = (
+        (RECIPIENT_OWNER, _("Владелец")),
+        (RECIPIENT_SYSTEM, _("Система")),
+    )
+
+    offer = models.ForeignKey(
+        RentalOffer,
+        verbose_name=_("Объявление проката"),
+        on_delete=models.CASCADE,
+        related_name='reservation_intents',
+    )
+    requester = models.ForeignKey(
+        'auth.User',
+        verbose_name=_("Запросивший"),
+        on_delete=models.CASCADE,
+        related_name='rental_reservation_intents',
+    )
+    source_message = models.ForeignKey(
+        RentalOfferMessage,
+        verbose_name=_("Сообщение-источник"),
+        on_delete=models.SET_NULL,
+        related_name='reservation_intents',
+        null=True,
+        blank=True,
+    )
+    date_from = models.DateField(_("Дата с"), null=True, blank=True)
+    date_to = models.DateField(_("Дата до"), null=True, blank=True)
+    amount_suggested = models.DecimalField(
+        _("Предложенная сумма"),
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    currency = models.CharField(_("Валюта"), max_length=8, blank=True, default='')
+    recipient_kind = models.CharField(
+        _("Получатель"),
+        max_length=16,
+        choices=RECIPIENT_KINDS,
+        default=RECIPIENT_OWNER,
+        db_index=True,
+    )
+    recipient_payment_info_snapshot = models.TextField(
+        verbose_name=_("Снимок реквизитов получателя"),
+        blank=True,
+        default='',
+    )
+    sequence_number = models.PositiveIntegerField(
+        _("Глобальный номер"),
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+    )
+    status = models.CharField(
+        _("Статус"),
+        max_length=32,
+        choices=STATUSES,
+        default=STATUS_SENT,
+        db_index=True,
+    )
+
+    class Meta:
+        ordering = ('-insert_timestamp', '-pk')
+
+    def data_dict(self):
+        return dict(
+            id=self.pk,
+            offer_uuid=self.offer.uuid,
+            requester=dict(
+                first_name=self.requester.first_name,
+                uuid=self.requester.profile.uuid,
+                user_id=self.requester.pk,
+                username=self.requester.username,
+            ),
+            date_from=self.date_from.isoformat() if self.date_from else '',
+            date_to=self.date_to.isoformat() if self.date_to else '',
+            amount_suggested=str(self.amount_suggested) if self.amount_suggested is not None else '',
+            currency=self.currency,
+            recipient_kind=self.recipient_kind,
+            recipient_payment_info_snapshot=self.recipient_payment_info_snapshot,
+            sequence_number=self.sequence_number,
+            status=self.status,
+            insert_timestamp=self.insert_timestamp,
+            update_timestamp=self.update_timestamp,
+        )
+
+
+class RentalOfferContactRequest(BaseModelInsertTimestamp):
+    """
+    Запрос контакта по объявлению проката.
+
+    V1 хранит только факт и текст обращения, без брони и резервирования.
+    """
+
+    requester = models.ForeignKey(
+        'auth.User',
+        verbose_name=_("Запросивший"),
+        on_delete=models.CASCADE,
+        related_name='rental_contact_requests',
+    )
+    offer = models.ForeignKey(
+        RentalOffer,
+        verbose_name=_("Объявление проката"),
+        on_delete=models.CASCADE,
+        related_name='contact_requests',
+    )
+    message = models.TextField(verbose_name=_("Сообщение"), blank=True, default='')
+    transcript = models.TextField(verbose_name=_("Распознанный текст"), blank=True, default='')
+
+    class Meta:
+        ordering = ('-insert_timestamp', '-pk')
+
+    def data_dict(self):
+        return dict(
+            id=self.pk,
+            offer_uuid=self.offer.uuid,
+            requester=dict(
+                first_name=self.requester.first_name,
+                uuid=self.requester.profile.uuid,
+                user_id=self.requester.pk,
+                username=self.requester.username,
+            ),
+            message=self.message,
+            transcript=self.transcript,
+            insert_timestamp=self.insert_timestamp,
+        )
 
 
 class TgDesc(BaseModelInsertTimestamp):

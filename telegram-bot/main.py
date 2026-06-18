@@ -40,6 +40,7 @@ async def main_():
     from handler_callbacks import router as router_callbacks
     from handler_group import router as router_group
     from handler_offer import router as router_offer
+    from handler_rental import router as router_rental
     from handler_sympas import router as router_sympas
     from handler_relatives import router as router_relatives
 
@@ -62,6 +63,7 @@ async def main_():
         router_callbacks,
         router_group,
         router_offer,
+        router_rental,
         router_sympas,
         router_relatives,
     )

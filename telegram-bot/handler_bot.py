@@ -363,6 +363,17 @@ async def cmd_start(message: Message, state: FSMContext):
                 await message.reply('Опрос-предложение не найдено')
 
     elif m := re.search(
+            r'^rent\-([0-9a-f]{8}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{12})$',
+            arg, flags=re.I
+        ):
+        from handler_rental import Rental
+        status_rental, response_rental = await Rental.get_offer(m.group(1), response_sender['uuid'])
+        if status_rental == 200:
+            await Rental.show_offer(message, response_sender, response_rental['offer'])
+        else:
+            await message.reply('Объявление проката не найдено')
+
+    elif m := re.search(
             r'^([0-9a-f]{8}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{12})$',
             arg, flags=re.I
         ):
@@ -492,6 +503,41 @@ async def cmd_offer(message: Message, state: FSMContext):
     logging.debug(f"Executing cmd_offer command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
     from handler_offer import Offer
     await Offer.cmd_offer(message, state)
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
+    Command(re.compile('^rent$', flags=re.I)),
+)
+async def cmd_rent(message: Message, state: FSMContext):
+    logging.debug(f"Executing cmd_rent command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
+    from handler_rental import Rental
+    await Rental.cmd_rent(message, state)
+
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
+    Command(re.compile('^rent_offer$', flags=re.I)),
+)
+async def cmd_rent_offer(message: Message, state: FSMContext):
+    logging.debug(f"Executing cmd_rent_offer command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
+    from handler_rental import Rental
+    await Rental.cmd_rent_offer(message, state)
+
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
+    Command(re.compile('^rent_search$', flags=re.I)),
+)
+async def cmd_rent_search(message: Message, state: FSMContext):
+    logging.debug(f"Executing cmd_rent_search command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
+    from handler_rental import Rental
+    await Rental.cmd_rent_search(message, state)
 
 
 @router.message(

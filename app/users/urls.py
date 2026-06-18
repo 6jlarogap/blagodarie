@@ -45,6 +45,12 @@ urlpatterns = [
     re_path(r'^api/offer/voted/tg_users?$', views.api_offer_voted_tg_users),
     re_path(r'^api/offer/ref/?$', views.api_offer_ref),
 
+    re_path(r'^api/rental/offer/?$', views.api_rental_offer),
+    re_path(r'^api/rental/search/?$', views.api_rental_search),
+    re_path(r'^api/rental/contact/?$', views.api_rental_contact),
+    re_path(r'^api/rental/message/?$', views.api_rental_message),
+    re_path(r'^api/rental/reservation/?$', views.api_rental_reservation),
+
     re_path(r'^api/token/url/?$', views.api_token_url),
     re_path(r'^api/token/authdata/?$', views.api_token_authdata),
     re_path(r'^api/token/invite/?$', views.api_token_invite),

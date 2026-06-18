@@ -56,6 +56,12 @@ MULTI_MESSAGE_TIMEOUT = 2
 #
 API_HOST = 'https://api.doverabot.ru'
 
+# Optional external STT adapter for rental voice search.
+# settings_local.py can set RENTAL_STT_URL plus mode 'file_id' or 'download'.
+RENTAL_STT_URL = ''
+RENTAL_STT_TOKEN = ''
+RENTAL_STT_MODE = 'file_id'
+
 # - домен, прописанный в боте
 #
 FRONTEND_HOST = 'https://doverabot.ru'
@@ -189,4 +195,3 @@ except ModuleNotFoundError:
     pass
 
 logging.basicConfig(**LOG_CONFIG)
-

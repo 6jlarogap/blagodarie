@@ -1,0 +1,11 @@
+# Log
+
+## 2026-06-18
+
+- Added the Doverabot rental-offers architecture reference for the new `/rent` surface.
+- Added `doverabot-rental-offers-chain` with child tracks for data model/API, bot voice UX, search/map, trust/privacy, and tests.
+- Created the Doverabot revival project note and captured the rental-offers implementation backlog.
+- Implemented the initial rental V1 code slice: models/migration, API endpoints, search/map exposure, bot commands, media preservation, contact handoff, and focused backend tests.
+- Added next-work baskets for deployment, Telegram message identity, voice-only managed search, multilingual equipment matching, reservation donation policy, and `/new-go-slug`.
+- Accepted the one-session-shot next goal: deployment, copied/forwarded offer messages with booking keyboard, English/Russian taxonomy, voice search, and global 10th reservation system-owner payment substitution.
+- Implemented and deployed `doverabot-rental-deploy-forward-booking-voice-taxonomy-reservation`: rental message identity, copied search results with booking keyboard, reservation payment handoff, English/Russian taxonomy seed, configurable rental STT adapter, migration apply, deploy, and API smoke checks.
