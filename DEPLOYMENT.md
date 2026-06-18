@@ -56,3 +56,17 @@ as an operational handoff:
 4. Run migration/deploy/status checks after the commit.
 5. Record the result in `log.md` or the chain reference, including exact
    blockers and failed commands when any step cannot run.
+
+Maintainer helper:
+
+```bash
+scripts/chain-handoff.sh CHAIN_SLUG
+scripts/chain-handoff.sh CHAIN_SLUG --runtime --logs
+```
+
+The helper runs source checks, commits only already-staged changes with the
+chain slug, and refuses unstaged tracked changes or untracked non-ignored files.
+Use `--runtime` when migrations or runtime code changed; it then runs
+`deploy-dry-run`, `sync`, `migrate`, `deploy`, and `is-active` through the
+`blagodarie-admin` wrapper. Record the result in `log.md` or the chain
+reference after the run.
