@@ -1,5 +1,9 @@
 # Log
 
+## 2026-06-20
+
+- Added `doverabot-equipment-rental-trust-flow-plan`: documented the one-public-Doverabot topology, rental roles, trust-aware rental flow, cross-feature boundaries, split-bot criteria, and docs-only scope.
+
 ## 2026-06-18
 
 - Added the Doverabot rental-offers architecture reference for the new `/rent` surface.

@@ -12,18 +12,23 @@ Next-work baskets: [../references/2026-06-18-doverabot-rental-next-work-baskets-
 
 Runtime concierge chain: [../references/2026-06-18-doverabot-rental-runtime-concierge-owner-consumer-agent-chain.md](../references/2026-06-18-doverabot-rental-runtime-concierge-owner-consumer-agent-chain.md)
 
+Business process and topology plan: [../references/2026-06-20-doverabot-equipment-rental-trust-flow-plan.md](../references/2026-06-20-doverabot-equipment-rental-trust-flow-plan.md)
+
 Current decision:
 
+- Keep one public Doverabot identity with modular feature flows: `/rent`, `/offer`, `/meet`, `rod`, `/trust`, and `/thank`.
 - Build travel-equipment rental as a new `/rent` surface.
 - Keep poll-style `/offer` and `/offer_multi` unchanged.
 - V1 is listing, search, map exposure, contact, reservation intent, and payment handoff only.
 - Do not add escrow, reservation conflict tracking, geocoding, or vector search in V1.
+- Treat dedicated public service bots as a future exception only for separate branding, moderation/compliance boundaries, traffic isolation, or a materially different user journey.
 
 Current implementation:
 
 - Rental models, migration, API endpoints, map exposure, bot command wiring, media capture, and contact handoff were added on 2026-06-18.
 - The implementation keeps `/offer` and `/offer_multi` on the existing poll flow.
 - Rental reservation runtime now has owner/consumer bot callbacks for accept, payment reported, confirm, and cancel, with audited backend events.
+- The rental trust-flow business process is documented as a docs-only reference on 2026-06-20.
 
 Primary implementation areas:
 
