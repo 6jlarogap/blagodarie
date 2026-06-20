@@ -2,6 +2,7 @@
 
 ## 2026-06-20
 
+- Added `doverabot-rental-go-rent-baskets-chain`: saved the `/new go rent` one-session-shot chain for timed rental holds, payment-proof reuse, trust-based exclusions, 10th/system trust-first booking, voice-only listing/search, map UX improvements, and operational handoff.
 - Added `doverabot-equipment-rental-trust-flow-plan`: documented the one-public-Doverabot topology, rental roles, trust-aware rental flow, cross-feature boundaries, split-bot criteria, and docs-only scope.
 
 ## 2026-06-18
