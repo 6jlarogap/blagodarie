@@ -234,6 +234,33 @@ Operational handoff:
 - Run deploy/status/log checks.
 - Record successful verification or exact blockers in `log.md` or this chain reference.
 
+## Handoff Result, 2026-06-20
+
+Implemented and committed:
+
+- `2a6d030 go-rent`: timed rental holds, payment-proof API/storage, trust and overlap enforcement, bot proof capture/forwarding, map rental filters/marker metadata, focused tests, and docs alignment.
+- `b40c750 go-rent deploy excludes`: source update to keep local agent/graph artifacts out of wrapper rsync deploys.
+
+Checks run:
+
+- `python3 -m py_compile app/users/models.py app/users/views.py app/users/tests.py app/users/migrations/0060_rentalreservation_hold_paymentproof.py telegram-bot/handler_rental.py telegram-bot/common.py` -> OK.
+- `/srv/blagodarie/venv-app/bin/python manage.py check` from `app/` -> OK.
+- `/srv/blagodarie/venv-app/bin/python manage.py makemigrations --check --dry-run` from `app/` -> "No changes detected"; sandbox emitted PostgreSQL socket warning: `Operation not permitted`.
+- `python3 -m compileall telegram-bot` -> OK.
+- `uv tool run --from graphifyy graphify update .` -> OK, graph rebuilt.
+- `sudo -n /usr/local/sbin/blagodarie-admin check-django` -> completed with existing deploy warning `security.W002`.
+- `sudo -n /usr/local/sbin/blagodarie-admin is-active` -> nginx, web, and bot all `active`.
+
+Blocked checks/deploy:
+
+- Focused Django tests are blocked by local PostgreSQL peer auth. Command: `/srv/blagodarie/venv-app/bin/python manage.py test users.tests.ApiRentalOfferTests`. Result, both sandboxed and unsandboxed: `FATAL: Peer authentication failed for user "postgres"`.
+- Live deploy was not run. `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run` showed the installed wrapper would sync local non-runtime artifacts including `.codex/`, `graphify-out/`, dirty `log.md`, and `scripts/graphify-code.sh`.
+- The source wrapper now excludes those artifacts, but installing it is blocked by sudo authentication. Commands tried:
+  - `sudo bash deploy/install-blagodarie-admin-workflow.sh` -> `sudo: A terminal is required to authenticate`
+  - `sudo -n bash deploy/install-blagodarie-admin-workflow.sh` -> `sudo: interactive authentication is required`
+
+Next operator step: install the updated wrapper or otherwise deploy from a clean workspace, then run `sudo -n /usr/local/sbin/blagodarie-admin migrate`, `deploy`, `is-active`, and rental API smoke checks.
+
 ## Out Of Scope
 
 - Escrow or in-bot payment processing.
