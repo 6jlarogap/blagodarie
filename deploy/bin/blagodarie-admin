@@ -19,9 +19,15 @@ NGINX_SITE_FILES=(
 
 RSYNC_EXCLUDES=(
   --exclude '/.git/'
+  --exclude '/.agents/'
+  --exclude '/.codex/'
+  --exclude '/graphify-out/'
+  --exclude '/AGENTS.md'
+  --exclude '/log.md'
   --exclude '/app/app/local_settings.py'
   --exclude '/app/app/__pycache__/'
   --exclude '/app/media/'
+  --exclude '/scripts/graphify-code.sh'
   --exclude '/audit/'
   --exclude '/telegram-bot/settings_local.py'
   --exclude '/telegram-bot/ENV/'
