@@ -36,7 +36,8 @@ from users.models import Oauth, CreateUserMixin, IncognitoUser, Profile, TgGroup
     TgPoll, TgPollAnswer, Offer, OfferAnswer, TgDesc, \
     OfferRefJournal, OfferRefState, ApiDonateUser, \
     RentalEquipmentType, RentalOffer, RentalOfferContactRequest, \
-    RentalOfferMessage, RentalReservationIntent, RentalReservationEvent
+    RentalOfferMessage, RentalReservationIntent, RentalReservationEvent, \
+    RentalReservationPaymentProof
 from contact.models import Key, KeyType, CurrentState, OperationType, Wish, Ability, \
                            ApiAddOperationMixin, Journal, TgMessageJournal
 from wote.models import Video, Vote
@@ -2226,6 +2227,66 @@ class RentalVisibilityMixin(object):
         )
         return qs, viewer_user
 
+    def parse_rental_filter_date(self, value, field_name):
+        if value in (None, ''):
+            return None
+        value = str(value).strip()
+        for date_format in ('%Y-%m-%d', '%d.%m.%Y'):
+            try:
+                return datetime.datetime.strptime(value, date_format).date()
+            except ValueError:
+                pass
+        return None
+
+    def apply_rental_map_filters(self, request, qs, viewer_user=None):
+        query_text = (
+            request.GET.get('rental_query') or
+            request.GET.get('rental_q') or
+            (request.GET.get('query') if request.GET.get('rental') else '')
+        )
+        query_text = (query_text or '').strip()
+        if query_text:
+            concrete_equipment, ambiguous_equipment = RentalEquipmentType.match_text(query_text)
+            q_text = (
+                Q(title__icontains=query_text) |
+                Q(item_text__icontains=query_text) |
+                Q(description_text__icontains=query_text) |
+                Q(address__icontains=query_text)
+            )
+            if concrete_equipment:
+                q_text |= Q(equipment_types__in=concrete_equipment)
+            qs = qs.filter(q_text)
+        equipment_slug = (
+            request.GET.get('rental_equipment_type') or
+            request.GET.get('equipment_type') or
+            ''
+        ).strip()
+        if equipment_slug:
+            qs = qs.filter(equipment_types__slug=equipment_slug)
+        date_from = self.parse_rental_filter_date(
+            request.GET.get('rental_date_from') or request.GET.get('date_from'),
+            'date_from',
+        )
+        date_to = self.parse_rental_filter_date(
+            request.GET.get('rental_date_to') or request.GET.get('date_to'),
+            'date_to',
+        )
+        if date_from:
+            qs = qs.filter(Q(available_to__isnull=True) | Q(available_to__gte=date_from))
+        if date_to:
+            qs = qs.filter(Q(available_from__isnull=True) | Q(available_from__lte=date_to))
+        price_max = request.GET.get('rental_price_max') or request.GET.get('price_max')
+        if price_max not in (None, ''):
+            try:
+                qs = qs.filter(price_amount__isnull=False, price_amount__lte=Decimal(str(price_max).replace(',', '.')))
+            except (InvalidOperation, ValueError):
+                pass
+        trusted_only = request.GET.get('rental_trusted_only') or request.GET.get('trusted_only')
+        if trusted_only and viewer_user:
+            trusted_owner_ids = self.rental_trusted_owner_ids(viewer_user)
+            qs = qs.filter(Q(owner=viewer_user) | Q(owner_id__in=trusted_owner_ids))
+        return qs
+
 
 class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, TelegramApiMixin, UuidMixin, GenderMixin, APIView):
     """
@@ -2450,6 +2511,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
         qs = qs.filter(latitude__isnull=False, longitude__isnull=False)
         if q_rectangle:
             qs = qs.filter(q_rectangle)
+        qs = self.apply_rental_map_filters(request, qs, viewer_user=viewer_user)
         lat_sum = lng_sum = 0
         count = 0
         for rental in qs.distinct():
@@ -2462,12 +2524,20 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
             )
             title = rental.title or rental.item_text or 'Прокат'
             if self.bot_username:
+                rental_url = f'https://t.me/{self.bot_username}?start=rent-{rental.uuid}'
                 rental_deeplink = (
-                    f'<a href="https://t.me/{self.bot_username}?start=rent-{rental.uuid}" '
-                    f'target="_blank">{html.escape(title)}</a>'
+                    f'<a href="{rental_url}" target="_blank">{html.escape(title)}</a>'
                 )
             else:
+                rental_url = ''
                 rental_deeplink = html.escape(title)
+            availability = rental.availability_text or ''
+            if rental.available_from or rental.available_to:
+                availability = '%s %s - %s' % (
+                    availability,
+                    rental.available_from.isoformat() if rental.available_from else '?',
+                    rental.available_to.isoformat() if rental.available_to else '?',
+                )
             popup_rental = (
                 '<table>'
                 '<tr>'
@@ -2489,11 +2559,16 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                     '<td valign=middle>Цена:</td>'
                     '<td valign=middle>%(price)s</td>'
                 '</tr>'
+                '<tr>'
+                    '<td valign=middle>Доступность:</td>'
+                    '<td valign=middle>%(availability)s</td>'
+                '</tr>'
                 '</table>'
             )
             offerer.update(
                 rental_deeplink=rental_deeplink,
                 price=html.escape(rental.price_text or ''),
+                availability=html.escape(availability.strip()),
             )
             points.append(dict(
                 latitude=rental.latitude,
@@ -2504,6 +2579,20 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                 is_of_found_user=False,
                 size_icon=offerer['thumb_size_icon'],
                 is_rental=True,
+                marker_kind='rental',
+                marker_color='darkgreen',
+                rental_offer_id=rental.pk,
+                rental_uuid=str(rental.uuid),
+                rental_url=rental_url,
+                price_text=rental.price_text,
+                price_amount=str(rental.price_amount) if rental.price_amount is not None else '',
+                price_currency=rental.price_currency,
+                available_from=rental.available_from.isoformat() if rental.available_from else '',
+                available_to=rental.available_to.isoformat() if rental.available_to else '',
+                equipment_types=[
+                    equipment_type.data_dict()
+                    for equipment_type in rental.equipment_types.all().order_by('slug')
+                ],
             ))
             lat_sum += rental.latitude
             lng_sum += rental.longitude
@@ -3983,6 +4072,8 @@ api_bot_poll_results = ApiBotPollResults.as_view()
 
 class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
 
+    RESERVATION_HOLD_SECONDS = 10 * 60
+
     RENTAL_TEXT_FIELDS = (
         'title',
         'item_text',
@@ -4119,6 +4210,94 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
             offer.owner,
         )
 
+    def now_timestamp(self):
+        return int(time.time())
+
+    def normalize_reservation_dates(self, offer, date_from, date_to):
+        date_from = date_from or offer.available_from
+        date_to = date_to or offer.available_to
+        if date_from and not date_to:
+            date_to = date_from
+        if date_to and not date_from:
+            date_from = date_to
+        if not date_from or not date_to:
+            raise ServiceException('Для бронирования укажите даты начала и окончания')
+        if date_from > date_to:
+            raise ServiceException('Дата начала позже даты окончания')
+        if offer.available_from and date_to < offer.available_from:
+            raise ServiceException('На эти даты объявление недоступно')
+        if offer.available_to and date_from > offer.available_to:
+            raise ServiceException('На эти даты объявление недоступно')
+        return date_from, date_to
+
+    def ensure_rental_booking_allowed(self, requester, offer):
+        if offer.owner == requester:
+            raise ServiceException('Нельзя бронировать собственное объявление')
+        if offer.owner_id in self.rental_mistrust_owner_ids(requester):
+            raise ServiceException('Бронирование недоступно из-за недоверия')
+
+    def expire_reservation_holds(self, offer=None, now=None):
+        now = now or self.now_timestamp()
+        qs = RentalReservationIntent.objects.select_for_update().filter(
+            status=RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+            hold_expires_at__gt=0,
+            hold_expires_at__lte=now,
+        )
+        if offer:
+            qs = qs.filter(offer=offer)
+        for reservation in qs:
+            status_from = reservation.status
+            reservation.status = RentalReservationIntent.STATUS_EXPIRED
+            reservation.save(update_fields=('status', 'update_timestamp'))
+            self.create_reservation_event(
+                reservation=reservation,
+                actor=reservation.requester,
+                actor_role=RentalReservationEvent.ROLE_SYSTEM,
+                event_type=RentalReservationEvent.EVENT_EXPIRE,
+                status_from=status_from,
+                status_to=reservation.status,
+                payload=dict(hold_expires_at=reservation.hold_expires_at),
+            )
+
+    def active_reservation_overlap_queryset(self, offer, date_from, date_to,
+                                            exclude_reservation=None, now=None):
+        now = now or self.now_timestamp()
+        blocking_q = (
+            Q(status__in=(
+                RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED,
+                RentalReservationIntent.STATUS_PAYMENT_REPORTED,
+                RentalReservationIntent.STATUS_CONFIRMED,
+            )) |
+            Q(
+                status__in=(
+                    RentalReservationIntent.STATUS_SENT,
+                    RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+                    RentalReservationIntent.STATUS_OWNER_ACCEPTED,
+                ),
+                hold_expires_at__gt=now,
+            )
+        )
+        qs = RentalReservationIntent.objects.select_for_update().filter(
+            blocking_q,
+            offer=offer,
+            date_from__lte=date_to,
+            date_to__gte=date_from,
+        )
+        if exclude_reservation:
+            qs = qs.exclude(pk=exclude_reservation.pk)
+        return qs
+
+    def ensure_no_reservation_overlap(self, offer, date_from, date_to,
+                                      exclude_reservation=None, now=None):
+        if self.active_reservation_overlap_queryset(
+                offer,
+                date_from,
+                date_to,
+                exclude_reservation=exclude_reservation,
+                now=now,
+        ).exists():
+            raise ServiceException('На эти даты уже есть активная бронь')
+
     def rental_user_payload(self, user):
         return dict(
             first_name=user.first_name,
@@ -4151,10 +4330,13 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
     def apply_reservation_action(self, reservation, actor, action, note=''):
         action = str(action or '').strip()
         actor_role = self.reservation_actor_role(reservation, actor)
+        self.expire_reservation_holds(offer=reservation.offer)
+        reservation.refresh_from_db()
         status_from = reservation.status
         terminal_statuses = (
             RentalReservationIntent.STATUS_CONFIRMED,
             RentalReservationIntent.STATUS_CANCELLED,
+            RentalReservationIntent.STATUS_EXPIRED,
         )
         if status_from in terminal_statuses:
             raise ServiceException('Заявка уже закрыта')
@@ -4162,22 +4344,23 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
         if action == RentalReservationEvent.EVENT_OWNER_ACCEPT:
             if actor_role != RentalReservationEvent.ROLE_OWNER:
                 raise PermissionDenied()
-            if status_from != RentalReservationIntent.STATUS_SENT:
+            if status_from not in (
+                    RentalReservationIntent.STATUS_SENT,
+                    RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+            ):
                 raise ServiceException('Заявку нельзя принять в текущем статусе')
             status_to = RentalReservationIntent.STATUS_OWNER_ACCEPTED
         elif action == RentalReservationEvent.EVENT_PAYMENT_REPORTED:
             if actor_role != RentalReservationEvent.ROLE_REQUESTER:
                 raise PermissionDenied()
-            if status_from not in (
-                    RentalReservationIntent.STATUS_SENT,
-                    RentalReservationIntent.STATUS_OWNER_ACCEPTED,
-            ):
-                raise ServiceException('Оплату нельзя отметить в текущем статусе')
-            status_to = RentalReservationIntent.STATUS_PAYMENT_REPORTED
+            raise ServiceException('Пришлите подтверждение оплаты сообщением')
         elif action == RentalReservationEvent.EVENT_OWNER_CONFIRM:
             if actor_role != RentalReservationEvent.ROLE_OWNER:
                 raise PermissionDenied()
-            if status_from != RentalReservationIntent.STATUS_PAYMENT_REPORTED:
+            if status_from not in (
+                    RentalReservationIntent.STATUS_PAYMENT_REPORTED,
+                    RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED,
+            ):
                 raise ServiceException('Подтвердить можно только после сообщения об оплате')
             status_to = RentalReservationIntent.STATUS_CONFIRMED
         elif action == RentalReservationEvent.EVENT_CANCEL:
@@ -4198,11 +4381,83 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
             payload=dict(action=action),
         )
 
+    def save_reservation_payment_proof(self, request, reservation, sender):
+        if sender != reservation.requester:
+            raise PermissionDenied()
+        self.ensure_rental_booking_allowed(sender, reservation.offer)
+        now = self.now_timestamp()
+        self.expire_reservation_holds(offer=reservation.offer, now=now)
+        reservation.refresh_from_db()
+        if reservation.status == RentalReservationIntent.STATUS_EXPIRED:
+            raise ServiceException('Время удержания брони истекло')
+        if reservation.status not in (
+                RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+                RentalReservationIntent.STATUS_OWNER_ACCEPTED,
+                RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED,
+        ):
+            raise ServiceException('Подтверждение оплаты нельзя принять в текущем статусе')
+        if reservation.hold_expires_at and reservation.hold_expires_at <= now:
+            status_from = reservation.status
+            reservation.status = RentalReservationIntent.STATUS_EXPIRED
+            reservation.save(update_fields=('status', 'update_timestamp'))
+            self.create_reservation_event(
+                reservation=reservation,
+                actor=sender,
+                actor_role=RentalReservationEvent.ROLE_SYSTEM,
+                event_type=RentalReservationEvent.EVENT_EXPIRE,
+                status_from=status_from,
+                status_to=reservation.status,
+                payload=dict(hold_expires_at=reservation.hold_expires_at),
+            )
+            raise ServiceException('Время удержания брони истекло')
+        self.ensure_no_reservation_overlap(
+            reservation.offer,
+            reservation.date_from,
+            reservation.date_to,
+            exclude_reservation=reservation,
+            now=now,
+        )
+        tgdesc_dict = request.data.get('tgdesc') or {}
+        uuid_pack = self.clean_text(tgdesc_dict, 'uuid_pack') or \
+            self.clean_text(request.data, 'uuid_pack')
+        if not uuid_pack:
+            raise ServiceException('Не указан uuid_pack подтверждения')
+        proof, created = RentalReservationPaymentProof.objects.get_or_create(
+            reservation=reservation,
+            uuid_pack=uuid_pack,
+            defaults=dict(
+                sender=sender,
+                recipient_kind=reservation.recipient_kind,
+            ),
+        )
+        if tgdesc_dict:
+            tgdesc = TgDesc.objects.create(**tgdesc_dict)
+            proof.tgdesc.add(tgdesc)
+        event = None
+        if reservation.status != RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED:
+            status_from = reservation.status
+            reservation.status = RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED
+            reservation.save(update_fields=('status', 'update_timestamp'))
+            event = self.create_reservation_event(
+                reservation=reservation,
+                actor=sender,
+                actor_role=RentalReservationEvent.ROLE_REQUESTER,
+                event_type=RentalReservationEvent.EVENT_PAYMENT_PROOF_SUBMITTED,
+                status_from=status_from,
+                status_to=reservation.status,
+                payload=dict(
+                    uuid_pack=uuid_pack,
+                    proof_id=proof.pk,
+                    recipient_kind=reservation.recipient_kind,
+                ),
+            )
+        return proof, event
+
     def rental_reservation_response(self, request, reservation, created=False, event=None):
         payment_user = self.system_payment_user() if \
             reservation.recipient_kind == RentalReservationIntent.RECIPIENT_SYSTEM else \
             reservation.offer.owner
-        recipient_profile = payment_user.profile.data_dict(request) if payment_user else None
+        recipient_profile = self.rental_user_payload(payment_user) if payment_user else None
         return dict(
             reservation=reservation.data_dict(),
             created=created,
@@ -4213,6 +4468,13 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
                     'actor',
                     'actor__profile',
                 ).order_by('insert_timestamp', 'pk')
+            ],
+            payment_proofs=[
+                item.data_dict()
+                for item in reservation.payment_proofs.prefetch_related('tgdesc').order_by(
+                    'insert_timestamp',
+                    'pk',
+                )
             ],
             offer=reservation.offer.data_dict(
                 request=request,
@@ -4542,16 +4804,28 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                 data=dict(user_uuid=profile.uuid),
             )
             try:
-                offer = qs.get(uuid=request.data.get('offer_uuid'))
+                visible_offer = qs.get(uuid=request.data.get('offer_uuid'))
             except (TypeError, ValueError, ValidationError, RentalOffer.DoesNotExist,):
                 raise ServiceException('Объявление проката не найдено')
-            if offer.owner == requester:
-                raise ServiceException('Нельзя бронировать собственное объявление')
+            offer = RentalOffer.objects.select_for_update().select_related(
+                'owner',
+                'owner__profile',
+            ).prefetch_related(
+                'tgdesc',
+                'equipment_types',
+                'telegram_messages_set',
+            ).get(pk=visible_offer.pk)
+            self.ensure_rental_booking_allowed(requester, offer)
+            now = self.now_timestamp()
+            self.expire_reservation_holds(offer=offer, now=now)
 
             date_from = self.parse_date(request.data.get('date_from'), 'date_from')
             date_to = self.parse_date(request.data.get('date_to'), 'date_to')
-            if date_from and date_to and date_from > date_to:
-                raise ServiceException('Дата начала позже даты окончания')
+            date_from, date_to = self.normalize_reservation_dates(
+                offer,
+                date_from,
+                date_to,
+            )
             amount_suggested = self.parse_decimal(
                 request.data.get('amount_suggested') or offer.price_amount,
                 'amount_suggested',
@@ -4559,18 +4833,18 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
             currency = self.clean_text(request.data, 'currency') or offer.price_currency
             source_message = self.find_source_message(offer, request.data)
 
-            reservation = RentalReservationIntent.objects.filter(
+            reservation = self.active_reservation_overlap_queryset(
+                offer,
+                date_from,
+                date_to,
+                now=now,
+            ).filter(
                 offer=offer,
                 requester=requester,
-                status__in=(
-                    RentalReservationIntent.STATUS_DRAFT,
-                    RentalReservationIntent.STATUS_SENT,
-                    RentalReservationIntent.STATUS_OWNER_ACCEPTED,
-                    RentalReservationIntent.STATUS_PAYMENT_REPORTED,
-                ),
             ).order_by('-insert_timestamp', '-pk').first()
             created = reservation is None
             if created:
+                self.ensure_no_reservation_overlap(offer, date_from, date_to, now=now)
                 reservation = RentalReservationIntent.objects.create(
                     offer=offer,
                     requester=requester,
@@ -4579,7 +4853,8 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                     date_to=date_to,
                     amount_suggested=amount_suggested,
                     currency=currency,
-                    status=RentalReservationIntent.STATUS_SENT,
+                    hold_expires_at=now + self.RESERVATION_HOLD_SECONDS,
+                    status=RentalReservationIntent.STATUS_AWAITING_PAYMENT,
                 )
                 reservation.sequence_number = reservation.pk
                 recipient_kind, payment_info, payment_user = self.reservation_payment_snapshot(
@@ -4594,6 +4869,7 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                     'date_to',
                     'amount_suggested',
                     'currency',
+                    'hold_expires_at',
                     'status',
                     'sequence_number',
                     'recipient_kind',
@@ -4607,19 +4883,19 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                     event_type=RentalReservationEvent.EVENT_CREATED,
                     status_from='',
                     status_to=reservation.status,
+                    payload=dict(
+                        hold_expires_at=reservation.hold_expires_at,
+                        hold_seconds=self.RESERVATION_HOLD_SECONDS,
+                    ),
                 )
             else:
                 reservation.source_message = source_message or reservation.source_message
-                reservation.date_from = date_from or reservation.date_from
-                reservation.date_to = date_to or reservation.date_to
                 reservation.amount_suggested = amount_suggested or reservation.amount_suggested
                 reservation.currency = currency or reservation.currency
                 if reservation.status == RentalReservationIntent.STATUS_DRAFT:
-                    reservation.status = RentalReservationIntent.STATUS_SENT
+                    reservation.status = RentalReservationIntent.STATUS_AWAITING_PAYMENT
                 reservation.save(update_fields=(
                     'source_message',
-                    'date_from',
-                    'date_to',
                     'amount_suggested',
                     'currency',
                     'status',
@@ -4655,7 +4931,7 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                     'offer__owner__profile',
                     'requester',
                     'requester__profile',
-                ).get(pk=self.parse_int(request.data, 'reservation_id'))
+                ).select_for_update().get(pk=self.parse_int(request.data, 'reservation_id'))
             except RentalReservationIntent.DoesNotExist:
                 raise ServiceException('Заявка на бронь не найдена')
             event = self.apply_reservation_action(
@@ -4678,6 +4954,48 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
 
 
 api_rental_reservation = ApiRentalReservation.as_view()
+
+
+class ApiRentalReservationPaymentProof(ApiRentalMixin, APIView):
+
+    @transaction.atomic
+    def post(self, request):
+        try:
+            self.check_bot_token(request)
+            sender, profile = self.check_user_uuid(
+                uuid=request.data.get('user_uuid'),
+                related=('user',),
+            )
+            try:
+                reservation = RentalReservationIntent.objects.select_related(
+                    'offer',
+                    'offer__owner',
+                    'offer__owner__profile',
+                    'requester',
+                    'requester__profile',
+                ).select_for_update().get(pk=self.parse_int(request.data, 'reservation_id'))
+            except RentalReservationIntent.DoesNotExist:
+                raise ServiceException('Заявка на бронь не найдена')
+            proof, event = self.save_reservation_payment_proof(
+                request=request,
+                reservation=reservation,
+                sender=sender,
+            )
+            data = self.rental_reservation_response(
+                request=request,
+                reservation=reservation,
+                event=event,
+            )
+            data.update(proof=proof.data_dict())
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            transaction.set_rollback(True)
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+
+api_rental_reservation_payment_proof = ApiRentalReservationPaymentProof.as_view()
 
 
 class ApiOfferMixin(object):

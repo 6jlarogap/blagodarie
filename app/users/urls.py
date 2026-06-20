@@ -50,6 +50,7 @@ urlpatterns = [
     re_path(r'^api/rental/contact/?$', views.api_rental_contact),
     re_path(r'^api/rental/message/?$', views.api_rental_message),
     re_path(r'^api/rental/reservation/?$', views.api_rental_reservation),
+    re_path(r'^api/rental/reservation/payment_proof/?$', views.api_rental_reservation_payment_proof),
 
     re_path(r'^api/token/url/?$', views.api_token_url),
     re_path(r'^api/token/authdata/?$', views.api_token_authdata),

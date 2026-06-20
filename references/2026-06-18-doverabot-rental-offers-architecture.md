@@ -10,6 +10,12 @@ Travel-equipment rental must be a new rental surface, not a reuse of the existin
 
 V1 is listing, search, map exposure, contact, and payment handoff only. It must not implement booking, escrow, reservations, or conflict tracking.
 
+Superseding note, 2026-06-20: reservation runtime behavior is now governed by
+`2026-06-18-doverabot-rental-runtime-concierge-owner-consumer-agent-chain.md`
+and `2026-06-20-doverabot-rental-go-rent-baskets-chain.md`. `/offer` and
+`/offer_multi` remain poll surfaces; `/rent` is the equipment rental surface.
+Escrow and in-bot payment processing remain out of scope.
+
 ## Command Surface
 
 Add rental-specific bot commands:

@@ -110,6 +110,7 @@ class Rcache(object):
     USER_DESC_PREFIX = 'user_desc'
     OFFER_DESC_PREFIX = 'offer_desc'
     RENTAL_DESC_PREFIX = 'rental_desc'
+    RENTAL_PAYMENT_PROOF_PREFIX = 'rental_payment_proof'
     ASK_MONEY_PREFIX = 'ask_money'
     DONATE_OFFER_CHOICE = 'donate_offer'
     SET_NEXT_SYMPA_WAIT_PREFIX = 'set_next_sympa_wait'

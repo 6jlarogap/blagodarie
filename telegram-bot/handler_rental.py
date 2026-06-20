@@ -39,6 +39,10 @@ class FSMRentalContact(StatesGroup):
     ask = State()
 
 
+class FSMRentalPaymentProof(StatesGroup):
+    ask = State()
+
+
 class Rental(object):
 
     PROMPT_OFFER = (
@@ -55,10 +59,13 @@ class Rental(object):
 
     STATUS_LABELS = {
         'sent': 'заявка отправлена',
+        'awaiting_payment': 'ожидает подтверждения оплаты',
         'owner_accepted': 'владелец принял заявку',
         'payment_reported': 'оплата отмечена',
+        'payment_proof_submitted': 'подтверждение оплаты отправлено',
         'confirmed': 'бронь подтверждена',
         'cancelled': 'заявка отменена',
+        'expired': 'время удержания истекло',
     }
 
     @classmethod
@@ -332,6 +339,21 @@ class Rental(object):
         return status, response
 
     @classmethod
+    async def payment_proof(cls, reservation_id, profile_from, message, uuid_pack):
+        payload = dict(
+            tg_token=settings.TOKEN,
+            user_uuid=profile_from['uuid'],
+            reservation_id=reservation_id,
+            tgdesc=TgDesc.from_message(message, uuid_pack),
+        )
+        status, response = await Misc.api_request(
+            path='/api/rental/reservation/payment_proof',
+            method='post',
+            json=payload,
+        )
+        return status, response
+
+    @classmethod
     async def contact(cls, offer_uuid, profile_from, text):
         payload = dict(
             tg_token=settings.TOKEN,
@@ -426,17 +448,17 @@ class Rental(object):
     def markup_reservation_consumer(cls, reservation):
         status = reservation.get('status')
         rows = []
-        if status in ('sent', 'owner_accepted'):
+        if status in ('awaiting_payment', 'owner_accepted'):
             rows.append([
                 InlineKeyboardButton(
-                    text='Я оплатил',
+                    text='Отправить чек',
                     callback_data=cls.reservation_action_callback_data(
                         cls.ACTION_PAYMENT_REPORTED,
                         reservation['id'],
                     ),
                 )
             ])
-        if status in ('sent', 'owner_accepted', 'payment_reported'):
+        if status in ('sent', 'awaiting_payment', 'owner_accepted', 'payment_proof_submitted'):
             rows.append([
                 InlineKeyboardButton(
                     text='Отменить бронь',
@@ -462,7 +484,7 @@ class Rental(object):
                     ),
                 )
             ])
-        if status == 'payment_reported':
+        if status in ('payment_reported', 'payment_proof_submitted'):
             rows.append([
                 InlineKeyboardButton(
                     text='Подтвердить',
@@ -472,7 +494,7 @@ class Rental(object):
                     ),
                 )
             ])
-        if status in ('sent', 'owner_accepted', 'payment_reported'):
+        if status in ('sent', 'awaiting_payment', 'owner_accepted', 'payment_reported', 'payment_proof_submitted'):
             rows.append([
                 InlineKeyboardButton(
                     text='Отменить',
@@ -604,6 +626,7 @@ class Rental(object):
         reservation = response['reservation']
         offer = response['offer']
         payment = reservation.get('recipient_payment_info_snapshot') or ''
+        hold_seconds = reservation.get('hold_seconds_remaining') or 0
         if reservation.get('recipient_kind') == 'system':
             recipient_text = (
                 'Получатель платежа: команда проекта. Это каждая 10-я бронь; '
@@ -620,6 +643,9 @@ class Rental(object):
             html.quote(offer.get('title') or offer.get('item_text') or 'Прокат'),
             recipient_text,
         )
+        if hold_seconds:
+            minutes = max(1, int((hold_seconds + 59) / 60))
+            text += '\n\nИнтервал удерживается %s мин. Пришлите подтверждение оплаты до истечения времени.' % minutes
         if payment:
             text += '\n\nРеквизиты/условия оплаты:\n%s' % html.quote(payment)
         else:
@@ -673,10 +699,17 @@ class Rental(object):
         reservation = response['reservation']
         if reservation.get('status') == 'owner_accepted':
             text += '\n\nВладелец принял заявку. Если условия подходят, сообщите об оплате кнопкой ниже.'
+        elif reservation.get('status') == 'payment_proof_submitted':
+            if reservation.get('recipient_kind') == 'system':
+                text += '\n\nПодтверждение получено; бронь держится под доверие. Не называйте это проверенной оплатой до аудита.'
+            else:
+                text += '\n\nПодтверждение получено и передано владельцу.'
         elif reservation.get('status') == 'confirmed':
             text += '\n\nВладелец подтвердил бронь.'
         elif reservation.get('status') == 'cancelled':
             text += '\n\nЗаявка закрыта.'
+        elif reservation.get('status') == 'expired':
+            text += '\n\nВремя удержания истекло. Создайте новую бронь, если даты еще свободны.'
         return text
 
     @classmethod
@@ -686,13 +719,92 @@ class Rental(object):
         if requester:
             text += '\nОт: %s' % Misc.get_deeplink_with_name(requester)
         reservation = response['reservation']
-        if reservation.get('status') == 'payment_reported':
-            text += '\n\nКлиент отметил оплату. Подтвердите бронь после проверки.'
+        if reservation.get('status') in ('payment_reported', 'payment_proof_submitted'):
+            if reservation.get('recipient_kind') == 'system':
+                text += '\n\nКлиент прислал подтверждение системного платежа. Бронь создана под доверие; подтверждайте выдачу снаряжения, а не проверку платежа.'
+            else:
+                text += '\n\nКлиент прислал подтверждение оплаты. Подтвердите бронь после проверки.'
         elif reservation.get('status') == 'cancelled':
             text += '\n\nЗаявка закрыта.'
         elif profile_from:
             text += '\n\nДействие выполнил: %s' % Misc.get_deeplink_with_name(profile_from)
         return text
+
+    @classmethod
+    def text_payment_proof_notice(cls, response, profile_from):
+        reservation = response['reservation']
+        offer = response['offer']
+        text = (
+            'Получено подтверждение оплаты по брони №%s\n'
+            'Объявление: %s\n'
+            'От: %s'
+        ) % (
+            reservation.get('sequence_number') or reservation.get('id'),
+            html.quote(offer.get('title') or offer.get('item_text') or 'Прокат'),
+            Misc.get_deeplink_with_name(profile_from),
+        )
+        if reservation.get('recipient_kind') == 'system':
+            text += '\nПлатеж направлен системе; бронь держится под доверие.'
+        return text
+
+    @classmethod
+    async def send_payment_proof_notice(cls, response, profile_from):
+        recipients = []
+        owner = response.get('owner') or {}
+        if owner:
+            recipients.append(owner)
+        reservation = response.get('reservation') or {}
+        payment_recipient = response.get('payment_recipient') or {}
+        if reservation.get('recipient_kind') == 'system' and payment_recipient:
+            recipients.append(payment_recipient)
+        seen_tg_uids = set()
+        for recipient in recipients:
+            for tg_account in recipient.get('tg_data') or []:
+                tg_uid = tg_account.get('tg_uid')
+                if not tg_uid or tg_uid in seen_tg_uids:
+                    continue
+                seen_tg_uids.add(tg_uid)
+                try:
+                    await bot.send_message(
+                        tg_uid,
+                        text=cls.text_payment_proof_notice(response, profile_from),
+                        reply_markup=cls.markup_reservation_owner(reservation)
+                            if recipient == owner else None,
+                    )
+                except (TelegramBadRequest, TelegramForbiddenError):
+                    pass
+
+    @classmethod
+    async def forward_payment_proof_pack(cls, response, uuid_pack):
+        recipients = []
+        owner = response.get('owner') or {}
+        if owner:
+            recipients.append(owner)
+        reservation = response.get('reservation') or {}
+        payment_recipient = response.get('payment_recipient') or {}
+        if reservation.get('recipient_kind') == 'system' and payment_recipient:
+            recipients.append(payment_recipient)
+        sent_to = set()
+        success = False
+        for recipient in recipients:
+            username = recipient.get('username')
+            if not username or username in sent_to:
+                continue
+            sent_to.add(username)
+            payload_send_pack = dict(
+                tg_token=settings.TOKEN,
+                uuid_pack=uuid_pack,
+                username=username,
+                what='tgdesc',
+            )
+            status_send_pack, response_send_pack = await Misc.api_request(
+                path='/api/show_tgmsg_pack',
+                method='post',
+                json=payload_send_pack,
+            )
+            if status_send_pack == 200:
+                success = True
+        return success
 
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMRentalOffer.ask))
@@ -853,6 +965,19 @@ async def cbq_rental_reservation_action(callback: CallbackQuery, state: FSMConte
     if status_from != 200:
         await callback.answer()
         return
+    if action == Rental.ACTION_PAYMENT_REPORTED:
+        await state.set_state(FSMRentalPaymentProof.ask)
+        await state.update_data(
+            user_uuid=profile_from['uuid'],
+            reservation_id=reservation_id,
+            uuid_pack=str(uuid4()),
+        )
+        await callback.message.reply(
+            'Пришлите подтверждение оплаты: фото, скриншот, документ, видео, голосовое или текстовый комментарий.',
+            reply_markup=Misc.reply_markup_cancel_row(),
+        )
+        await callback.answer()
+        return
     status_action, response_action = await Rental.reservation_action(
         reservation_id,
         profile_from,
@@ -904,6 +1029,45 @@ async def cbq_rental_reservation_action(callback: CallbackQuery, state: FSMConte
     else:
         await callback.message.reply(Rental.text_reservation_status(response_action))
     await callback.answer()
+
+
+@router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMRentalPaymentProof.ask))
+async def process_rental_payment_proof(message: Message, state: FSMContext):
+    if await is_it_command(message, state):
+        return
+    data = await state.get_data()
+    status_from, profile_from = await Misc.post_tg_user(message.from_user)
+    if status_from != 200 or profile_from['uuid'] != data.get('user_uuid'):
+        await state.clear()
+        return
+    key = f'{Rcache.RENTAL_PAYMENT_PROOF_PREFIX}{Rcache.KEY_SEP}{data["uuid_pack"]}'
+    if not await Misc.check_none_n_clear(is_first := Misc.redis_is_key_first_up(key), state):
+        return
+    status, response = await Rental.payment_proof(
+        data['reservation_id'],
+        profile_from,
+        message,
+        data['uuid_pack'],
+    )
+    if status != 200:
+        await message.reply((response or {}).get('message') or 'Не удалось сохранить подтверждение')
+        await state.clear()
+        return
+    if not is_first:
+        return
+    if message.media_group_id:
+        wait_last = await Misc.redis_wait_last_in_pack(key)
+        if not await Misc.check_none_n_clear(wait_last, state):
+            return
+    await Rental.send_payment_proof_notice(response, profile_from)
+    forwarded = await Rental.forward_payment_proof_pack(response, data['uuid_pack'])
+    await message.reply(
+        Rental.text_consumer_reservation_update(response)
+        if forwarded else
+        Rental.text_consumer_reservation_update(response) + '\n\nПодтверждение сохранено, но переслать его получателю сейчас не удалось.',
+        reply_markup=Rental.markup_reservation_consumer(response['reservation']),
+    )
+    await state.clear()
 
 
 @router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (

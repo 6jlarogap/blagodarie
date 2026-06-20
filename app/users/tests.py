@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import time
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -8,7 +9,7 @@ from rest_framework.test import APIClient
 
 from contact.models import CurrentState, Key, KeyType
 from users.models import Profile, RentalEquipmentType, RentalOffer, RentalOfferMessage, \
-    RentalReservationEvent, RentalReservationIntent
+    RentalReservationEvent, RentalReservationIntent, RentalReservationPaymentProof, TgDesc
 from users.views import ApiAuthTelegram
 
 
@@ -206,6 +207,8 @@ class ApiRentalOfferTests(TestCase):
                 'tg_token': self.bot_token,
                 'user_uuid': str(self.requester_profile.uuid),
                 'offer_uuid': str(offer.uuid),
+                'date_from': '2026-07-01',
+                'date_to': '2026-07-03',
                 'source_chat_id': 100,
                 'source_message_id': 200,
             }, format='json')
@@ -213,9 +216,104 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(response.status_code, 200)
         reservation = RentalReservationIntent.objects.order_by('-pk').first()
         self.assertEqual(reservation.sequence_number, 10)
+        self.assertEqual(reservation.status, RentalReservationIntent.STATUS_AWAITING_PAYMENT)
+        self.assertGreater(reservation.hold_expires_at, int(time.time()))
         self.assertEqual(reservation.recipient_kind, RentalReservationIntent.RECIPIENT_SYSTEM)
         self.assertEqual(reservation.recipient_payment_info_snapshot, 'system bank')
         self.assertEqual(response.data['payment_recipient']['username'], 'author')
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    def test_timed_hold_requires_dates_and_rejects_overlap_until_expired(self):
+        other = User.objects.create_user(username='other', first_name='Other')
+        other_profile = Profile.objects.create(user=other)
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Tent',
+            description_text='Палатка',
+        )
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Для бронирования укажите даты начала и окончания')
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-01',
+            'date_to': '2026-07-03',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        first_reservation = RentalReservationIntent.objects.get()
+        self.assertEqual(first_reservation.status, RentalReservationIntent.STATUS_AWAITING_PAYMENT)
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(other_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-02',
+            'date_to': '2026-07-04',
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'На эти даты уже есть активная бронь')
+
+        first_reservation.hold_expires_at = int(time.time()) - 1
+        first_reservation.save(update_fields=('hold_expires_at',))
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(other_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-02',
+            'date_to': '2026-07-04',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        first_reservation.refresh_from_db()
+        self.assertEqual(first_reservation.status, RentalReservationIntent.STATUS_EXPIRED)
+        self.assertEqual(RentalReservationIntent.objects.count(), 2)
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    def test_payment_proof_rechecks_mistrust(self):
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Tent',
+            description_text='Палатка',
+        )
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-01',
+            'date_to': '2026-07-03',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        reservation_id = response.data['reservation']['id']
+        CurrentState.objects.create(
+            user_from=self.owner,
+            user_to=self.requester,
+            attitude=CurrentState.MISTRUST,
+        )
+
+        response = self.client.post('/api/rental/reservation/payment_proof/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'reservation_id': reservation_id,
+            'tgdesc': {
+                'message_id': 300,
+                'chat_id': 400,
+                'media_group_id': '',
+                'caption': 'paid',
+                'file_id': 'proof-file',
+                'file_type': 'photo',
+                'uuid_pack': 'proof-pack-blocked',
+            },
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Бронирование недоступно из-за недоверия')
+        self.assertEqual(RentalReservationPaymentProof.objects.count(), 0)
 
     @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
     def test_reservation_runtime_owner_consumer_actions(self):
@@ -229,6 +327,8 @@ class ApiRentalOfferTests(TestCase):
             'tg_token': self.bot_token,
             'user_uuid': str(self.requester_profile.uuid),
             'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-01',
+            'date_to': '2026-07-03',
         }, format='json')
 
         self.assertEqual(response.status_code, 200)
@@ -236,6 +336,7 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(response.data['event']['event_type'], RentalReservationEvent.EVENT_CREATED)
         self.assertEqual(response.data['requester']['username'], 'requester')
         self.assertEqual(response.data['owner']['username'], 'owner')
+        self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_AWAITING_PAYMENT)
 
         response_forbidden = self.client.put('/api/rental/reservation/', data={
             'tg_token': self.bot_token,
@@ -259,21 +360,35 @@ class ApiRentalOfferTests(TestCase):
             'tg_token': self.bot_token,
             'user_uuid': str(self.requester_profile.uuid),
             'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-01',
+            'date_to': '2026-07-03',
         }, format='json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['created'], False)
         self.assertEqual(response.data['reservation']['id'], reservation_id)
         self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_OWNER_ACCEPTED)
 
-        response = self.client.put('/api/rental/reservation/', data={
+        response = self.client.post('/api/rental/reservation/payment_proof/', data={
             'tg_token': self.bot_token,
             'user_uuid': str(self.requester_profile.uuid),
             'reservation_id': reservation_id,
-            'action': RentalReservationEvent.EVENT_PAYMENT_REPORTED,
+            'tgdesc': {
+                'message_id': 301,
+                'chat_id': 401,
+                'media_group_id': '',
+                'caption': 'paid',
+                'file_id': 'proof-file',
+                'file_type': 'photo',
+                'uuid_pack': 'proof-pack-ok',
+            },
         }, format='json')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_PAYMENT_REPORTED)
+        self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED)
         self.assertEqual(response.data['event']['actor_role'], RentalReservationEvent.ROLE_REQUESTER)
+        self.assertEqual(response.data['event']['event_type'], RentalReservationEvent.EVENT_PAYMENT_PROOF_SUBMITTED)
+        self.assertEqual(response.data['proof']['uuid_pack'], 'proof-pack-ok')
+        self.assertEqual(RentalReservationPaymentProof.objects.count(), 1)
+        self.assertEqual(TgDesc.objects.get().file_id, 'proof-file')
 
         response = self.client.put('/api/rental/reservation/', data={
             'tg_token': self.bot_token,

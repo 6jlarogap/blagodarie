@@ -1685,18 +1685,24 @@ class RentalReservationIntent(BaseModelInsertUpdateTimestamp):
 
     STATUS_DRAFT = 'draft'
     STATUS_SENT = 'sent'
+    STATUS_AWAITING_PAYMENT = 'awaiting_payment'
     STATUS_OWNER_ACCEPTED = 'owner_accepted'
     STATUS_PAYMENT_REPORTED = 'payment_reported'
+    STATUS_PAYMENT_PROOF_SUBMITTED = 'payment_proof_submitted'
     STATUS_CONFIRMED = 'confirmed'
     STATUS_CANCELLED = 'cancelled'
+    STATUS_EXPIRED = 'expired'
 
     STATUSES = (
         (STATUS_DRAFT, _("Черновик")),
         (STATUS_SENT, _("Отправлено")),
+        (STATUS_AWAITING_PAYMENT, _("Ожидает подтверждения оплаты")),
         (STATUS_OWNER_ACCEPTED, _("Принято владельцем")),
         (STATUS_PAYMENT_REPORTED, _("Оплата сообщена")),
+        (STATUS_PAYMENT_PROOF_SUBMITTED, _("Подтверждение оплаты отправлено")),
         (STATUS_CONFIRMED, _("Подтверждено")),
         (STATUS_CANCELLED, _("Отменено")),
+        (STATUS_EXPIRED, _("Истекло")),
     )
 
     RECIPIENT_OWNER = 'owner'
@@ -1756,6 +1762,11 @@ class RentalReservationIntent(BaseModelInsertUpdateTimestamp):
         unique=True,
         db_index=True,
     )
+    hold_expires_at = models.BigIntegerField(
+        _("До какого времени держится бронь"),
+        default=0,
+        db_index=True,
+    )
     status = models.CharField(
         _("Статус"),
         max_length=32,
@@ -1784,9 +1795,13 @@ class RentalReservationIntent(BaseModelInsertUpdateTimestamp):
             recipient_kind=self.recipient_kind,
             recipient_payment_info_snapshot=self.recipient_payment_info_snapshot,
             sequence_number=self.sequence_number,
+            hold_expires_at=self.hold_expires_at,
+            hold_seconds_remaining=max(0, self.hold_expires_at - int(time.time()))
+                if self.hold_expires_at else 0,
             status=self.status,
             insert_timestamp=self.insert_timestamp,
             update_timestamp=self.update_timestamp,
+            payment_proof_count=self.payment_proofs.count() if self.pk else 0,
         )
 
 
@@ -1808,15 +1823,19 @@ class RentalReservationEvent(BaseModelInsertTimestamp):
     EVENT_CREATED = 'created'
     EVENT_OWNER_ACCEPT = 'owner_accept'
     EVENT_PAYMENT_REPORTED = 'payment_reported'
+    EVENT_PAYMENT_PROOF_SUBMITTED = 'payment_proof_submitted'
     EVENT_OWNER_CONFIRM = 'owner_confirm'
     EVENT_CANCEL = 'cancel'
+    EVENT_EXPIRE = 'expire'
 
     EVENT_TYPES = (
         (EVENT_CREATED, _("Создано")),
         (EVENT_OWNER_ACCEPT, _("Принято владельцем")),
         (EVENT_PAYMENT_REPORTED, _("Оплата сообщена")),
+        (EVENT_PAYMENT_PROOF_SUBMITTED, _("Подтверждение оплаты отправлено")),
         (EVENT_OWNER_CONFIRM, _("Подтверждено владельцем")),
         (EVENT_CANCEL, _("Отменено")),
+        (EVENT_EXPIRE, _("Истекло")),
     )
 
     reservation = models.ForeignKey(
@@ -1864,6 +1883,57 @@ class RentalReservationEvent(BaseModelInsertTimestamp):
             status_to=self.status_to,
             note=self.note,
             payload=self.payload,
+            insert_timestamp=self.insert_timestamp,
+        )
+
+
+class RentalReservationPaymentProof(BaseModelInsertTimestamp):
+    """
+    Saved Telegram media/text pack submitted as reservation payment proof.
+    """
+
+    reservation = models.ForeignKey(
+        RentalReservationIntent,
+        verbose_name=_("Заявка на бронь"),
+        on_delete=models.CASCADE,
+        related_name='payment_proofs',
+    )
+    sender = models.ForeignKey(
+        'auth.User',
+        verbose_name=_("Отправитель"),
+        on_delete=models.SET_NULL,
+        related_name='rental_payment_proofs',
+        null=True,
+        blank=True,
+    )
+    uuid_pack = models.CharField(_("UUID пачки"), max_length=64, db_index=True)
+    recipient_kind = models.CharField(
+        _("Получатель"),
+        max_length=16,
+        choices=RentalReservationIntent.RECIPIENT_KINDS,
+        default=RentalReservationIntent.RECIPIENT_OWNER,
+        db_index=True,
+    )
+    tgdesc = models.ManyToManyField(
+        'users.TgDesc',
+        verbose_name=_("Сообщения подтверждения"),
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ('-insert_timestamp', '-pk')
+        unique_together = ('reservation', 'uuid_pack')
+
+    def data_dict(self):
+        return dict(
+            id=self.pk,
+            reservation_id=self.reservation_id,
+            sender_uuid=self.sender.profile.uuid if self.sender_id else '',
+            uuid_pack=self.uuid_pack,
+            recipient_kind=self.recipient_kind,
+            messages=[
+                m.message_dict() for m in self.tgdesc.all().order_by('message_id')
+            ],
             insert_timestamp=self.insert_timestamp,
         )
 
