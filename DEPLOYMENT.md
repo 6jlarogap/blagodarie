@@ -60,13 +60,13 @@ as an operational handoff:
 Maintainer helper:
 
 ```bash
-scripts/chain-handoff.sh CHAIN_SLUG
-scripts/chain-handoff.sh CHAIN_SLUG --runtime --logs
+scripts/chain-handoff.sh --new-go-slug CHAIN_SLUG
+scripts/chain-handoff.sh --new-go-slug CHAIN_SLUG --runtime --logs
 ```
 
 The helper runs source checks, commits only already-staged changes with the
-chain slug, and refuses unstaged tracked changes or untracked non-ignored files.
-Use `--runtime` when migrations or runtime code changed; it then runs
-`deploy-dry-run`, `sync`, `migrate`, `deploy`, and `is-active` through the
-`blagodarie-admin` wrapper. Record the result in `log.md` or the chain
-reference after the run.
+mandatory `/new go` slug, and refuses unstaged tracked changes or untracked
+non-ignored files. Positional slug arguments are rejected. Use `--runtime` when
+migrations or runtime code changed; it then runs `deploy-dry-run`, `sync`,
+`migrate`, `deploy`, and `is-active` through the `blagodarie-admin` wrapper.
+Record the result in `log.md` or the chain reference after the run.

@@ -13,3 +13,4 @@
 - Added the chain-success operational rule: successful chains should be checked, committed, migrated/deployed when runtime code or migrations changed, and logged with exact blockers when any step cannot run.
 - Committed and deployed `doverabot-rental-runtime-concierge-owner-consumer-agent`: synced source, applied `users.0059_rentalreservationevent`, restarted web/bot, verified services active, and smoked `/api/rental/search`.
 - Implemented and deployed `blagodarie-chain-wrapper-commit-migrate-deploy-handoff`: added a maintainer-side chain handoff helper, committed it as `66b8c08`, ran wrapper-backed dry-run/sync/migrate/deploy/status/log checks, and confirmed nginx, web, and bot active.
+- Tightened the chain handoff helper so `/new go` slug is mandatory via `--new-go-slug SLUG`; positional slug arguments are rejected.

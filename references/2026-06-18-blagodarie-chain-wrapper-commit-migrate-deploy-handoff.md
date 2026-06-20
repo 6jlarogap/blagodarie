@@ -12,6 +12,8 @@ operations into the root-owned deployment wrapper.
 Implemented:
 
 - Added `scripts/chain-handoff.sh` as a maintainer-side helper.
+- Made `/new go` slug explicit and mandatory through `--new-go-slug SLUG`.
+- Rejected positional slug arguments so handoffs cannot omit the chain field.
 - Kept commit behavior conservative: only already-staged changes are committed.
 - Added explicit runtime mode for the deploy wrapper sequence:
   `deploy-dry-run`, `sync`, `migrate`, `deploy`, and `is-active`.
@@ -31,6 +33,12 @@ Passed:
 - `scripts/chain-handoff.sh blagodarie-chain-wrapper-commit-migrate-deploy-handoff --runtime --logs --no-commit`
   -> ran `deploy-dry-run`, `sync`, `migrate`, `deploy`, `is-active`,
   `logs-web 80`, and `logs-bot 80`
+- `scripts/chain-handoff.sh --new-go-slug blagodarie-chain-wrapper-require-new-go-slug --no-commit`
+  -> passed with explicit mandatory slug
+- `scripts/chain-handoff.sh blagodarie-chain-wrapper-require-new-go-slug --no-commit`
+  -> rejected the old positional slug form with exit code 2
+- `scripts/chain-handoff.sh --no-commit`
+  -> rejected a missing slug with exit code 2
 
 Runtime results:
 
