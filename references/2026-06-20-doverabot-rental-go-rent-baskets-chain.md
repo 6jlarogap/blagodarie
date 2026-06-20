@@ -270,9 +270,22 @@ Deployment resumed after the operator installed the updated wrapper:
 - `curl -sS -w '\nHTTP_STATUS=%{http_code}\n' 'https://api.doverabot.ru/api/user/points/?rental=on'` -> HTTP 200, empty points payload.
 - `curl -sS -w '\nHTTP_STATUS=%{http_code}\n' 'https://api.doverabot.ru/api/rental/offer/'` -> expected HTTP 404 without `uuid`/`offer_id`.
 
-Remaining blocked check:
+Follow-up local test unblock, 2026-06-20:
 
-- Focused Django tests are blocked by local PostgreSQL peer auth. Command: `/srv/blagodarie/venv-app/bin/python manage.py test users.tests.ApiRentalOfferTests`. Result, both sandboxed and unsandboxed: `FATAL: Peer authentication failed for user "postgres"`.
+- Operator created a peer-authenticated PostgreSQL role for the workspace user:
+  `sudo -u postgres createuser --createdb vdrzd`.
+- Added `app.test_settings` for local tests using the current OS user by default, with `BLAGODARIE_TEST_DB_*` overrides.
+- Fixed fresh test database blockers exposed after peer auth was resolved:
+  historical `contact` checksum migrations now use historical models,
+  temp-table rebuild migrations drop stale temp names,
+  `users` data migrations declare the `contact.CurrentState` dependencies they read,
+  reservation row locks use `select_for_update(of=('self',))`,
+  and payment-proof pack ids are validated before creating `TgDesc`.
+- `python3 -m py_compile app/app/test_settings.py app/users/views.py app/users/tests.py app/contact/migrations/0023_fill_symptoms_checksum.py app/contact/migrations/0026_auto_20200508_1132.py app/contact/migrations/0063_data_template_tmp_parent_mother_father.py app/contact/migrations/0078_data_order_in_pgsql_funcs.py app/users/migrations/0013_data_recount_profile_counters.py app/users/migrations/0044_data_fill_profile_acq_count.py app/users/migrations/0049_data_fill_meet_invite_count.py` -> OK.
+- `/srv/blagodarie/venv-app/bin/python manage.py check --settings=app.test_settings` -> OK.
+- `/srv/blagodarie/venv-app/bin/python manage.py check` -> OK.
+- `/srv/blagodarie/venv-app/bin/python manage.py test users.tests.ApiRentalOfferTests --settings=app.test_settings --noinput` -> 7 tests OK.
+- `uv tool run --from graphifyy graphify update .` -> OK, graph rebuilt.
 
 ## Out Of Scope
 

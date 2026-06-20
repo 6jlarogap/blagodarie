@@ -1,7 +1,7 @@
 import os, re, hmac, hashlib, json, time, datetime, copy, string, random
 from decimal import Decimal, InvalidOperation
 import redis, html
-from uuid import uuid4
+from uuid import uuid4, UUID
 import urllib.request, urllib.error, urllib.parse
 from urllib.parse import urlparse
 
@@ -4422,6 +4422,13 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
             self.clean_text(request.data, 'uuid_pack')
         if not uuid_pack:
             raise ServiceException('Не указан uuid_pack подтверждения')
+        try:
+            uuid_pack = str(UUID(uuid_pack))
+        except ValueError:
+            raise ServiceException('Неверный uuid_pack подтверждения')
+        if tgdesc_dict:
+            tgdesc_dict = dict(tgdesc_dict)
+            tgdesc_dict['uuid_pack'] = uuid_pack
         proof, created = RentalReservationPaymentProof.objects.get_or_create(
             reservation=reservation,
             uuid_pack=uuid_pack,
@@ -4807,7 +4814,7 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                 visible_offer = qs.get(uuid=request.data.get('offer_uuid'))
             except (TypeError, ValueError, ValidationError, RentalOffer.DoesNotExist,):
                 raise ServiceException('Объявление проката не найдено')
-            offer = RentalOffer.objects.select_for_update().select_related(
+            offer = RentalOffer.objects.select_for_update(of=('self',)).select_related(
                 'owner',
                 'owner__profile',
             ).prefetch_related(
@@ -4931,7 +4938,7 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                     'offer__owner__profile',
                     'requester',
                     'requester__profile',
-                ).select_for_update().get(pk=self.parse_int(request.data, 'reservation_id'))
+                ).select_for_update(of=('self',)).get(pk=self.parse_int(request.data, 'reservation_id'))
             except RentalReservationIntent.DoesNotExist:
                 raise ServiceException('Заявка на бронь не найдена')
             event = self.apply_reservation_action(
@@ -4973,7 +4980,7 @@ class ApiRentalReservationPaymentProof(ApiRentalMixin, APIView):
                     'offer__owner__profile',
                     'requester',
                     'requester__profile',
-                ).select_for_update().get(pk=self.parse_int(request.data, 'reservation_id'))
+                ).select_for_update(of=('self',)).get(pk=self.parse_int(request.data, 'reservation_id'))
             except RentalReservationIntent.DoesNotExist:
                 raise ServiceException('Заявка на бронь не найдена')
             proof, event = self.save_reservation_payment_proof(

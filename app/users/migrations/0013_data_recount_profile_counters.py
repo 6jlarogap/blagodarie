@@ -41,6 +41,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('users', '0012_auto_20201110_1300'),
+        ('contact', '0039_currentstate_is_reverse'),
     ]
 
     operations = [

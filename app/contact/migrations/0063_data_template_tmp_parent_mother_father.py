@@ -10,6 +10,8 @@ def operation(apps, schema_editor):
     ops = """
         drop function if exists find_rel_parent_child;
 
+        drop table if exists tmp_parent;
+
         drop table if exists template_tmp_parent;
 
         create temp table tmp_parent(

@@ -22,6 +22,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('users', '0048_profile_invite_meet_count'),
+        ('contact', '0089_data_fill_meet_invite'),
     ]
 
     operations = [

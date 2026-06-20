@@ -21,11 +21,21 @@ drop function find_trust_relation_path(int, int, int)
 \f
 drop function find_rel_trust(int, int)
 \f
-drop table template_tmp_links
+drop table if exists tmp_links
 \f
-drop table template_tmp_trust
+drop table if exists tmp_links_paths
 \f
-drop table template_tmp_parent
+drop table if exists tmp_trust
+\f
+drop table if exists tmp_parent
+\f
+drop table if exists template_tmp_links
+\f
+drop table if exists template_tmp_links_paths
+\f
+drop table if exists template_tmp_trust
+\f
+drop table if exists template_tmp_parent
 \f
 create temp table tmp_links(
     level int,

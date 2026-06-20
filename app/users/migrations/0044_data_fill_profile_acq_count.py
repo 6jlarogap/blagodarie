@@ -38,6 +38,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('users', '0043_profile_acq_count_profile_did_meet'),
+        ('contact', '0084_data_fill_attitude'),
     ]
 
     operations = [

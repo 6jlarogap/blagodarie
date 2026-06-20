@@ -308,7 +308,7 @@ class ApiRentalOfferTests(TestCase):
                 'caption': 'paid',
                 'file_id': 'proof-file',
                 'file_type': 'photo',
-                'uuid_pack': 'proof-pack-blocked',
+                'uuid_pack': '00000000-0000-0000-0000-000000000001',
             },
         }, format='json')
         self.assertEqual(response.status_code, 400)
@@ -379,14 +379,14 @@ class ApiRentalOfferTests(TestCase):
                 'caption': 'paid',
                 'file_id': 'proof-file',
                 'file_type': 'photo',
-                'uuid_pack': 'proof-pack-ok',
+                'uuid_pack': '00000000-0000-0000-0000-000000000002',
             },
         }, format='json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED)
         self.assertEqual(response.data['event']['actor_role'], RentalReservationEvent.ROLE_REQUESTER)
         self.assertEqual(response.data['event']['event_type'], RentalReservationEvent.EVENT_PAYMENT_PROOF_SUBMITTED)
-        self.assertEqual(response.data['proof']['uuid_pack'], 'proof-pack-ok')
+        self.assertEqual(response.data['proof']['uuid_pack'], '00000000-0000-0000-0000-000000000002')
         self.assertEqual(RentalReservationPaymentProof.objects.count(), 1)
         self.assertEqual(TgDesc.objects.get().file_id, 'proof-file')
 
