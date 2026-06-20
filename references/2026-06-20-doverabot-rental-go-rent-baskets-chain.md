@@ -251,15 +251,28 @@ Checks run:
 - `sudo -n /usr/local/sbin/blagodarie-admin check-django` -> completed with existing deploy warning `security.W002`.
 - `sudo -n /usr/local/sbin/blagodarie-admin is-active` -> nginx, web, and bot all `active`.
 
-Blocked checks/deploy:
+Initial blocker:
 
-- Focused Django tests are blocked by local PostgreSQL peer auth. Command: `/srv/blagodarie/venv-app/bin/python manage.py test users.tests.ApiRentalOfferTests`. Result, both sandboxed and unsandboxed: `FATAL: Peer authentication failed for user "postgres"`.
 - Live deploy was not run. `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run` showed the installed wrapper would sync local non-runtime artifacts including `.codex/`, `graphify-out/`, dirty `log.md`, and `scripts/graphify-code.sh`.
 - The source wrapper now excludes those artifacts, but installing it is blocked by sudo authentication. Commands tried:
   - `sudo bash deploy/install-blagodarie-admin-workflow.sh` -> `sudo: A terminal is required to authenticate`
   - `sudo -n bash deploy/install-blagodarie-admin-workflow.sh` -> `sudo: interactive authentication is required`
 
-Next operator step: install the updated wrapper or otherwise deploy from a clean workspace, then run `sudo -n /usr/local/sbin/blagodarie-admin migrate`, `deploy`, `is-active`, and rental API smoke checks.
+Deployment resumed after the operator installed the updated wrapper:
+
+- `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run` -> OK; local `.codex/`, `graphify-out/`, dirty `log.md`, and `scripts/graphify-code.sh` were no longer listed.
+- `sudo -n /usr/local/sbin/blagodarie-admin sync` -> OK.
+- `sudo -n /usr/local/sbin/blagodarie-admin migrate` -> applied `users.0060_rentalreservation_hold_paymentproof`.
+- `sudo -n /usr/local/sbin/blagodarie-admin deploy` -> OK; nginx config test successful; web and bot restarted.
+- `sudo -n /usr/local/sbin/blagodarie-admin is-active` -> nginx, web, and bot all `active`.
+- `sudo -n /usr/local/sbin/blagodarie-admin logs-web 80` and `logs-bot 80` -> recent restart entries only; older June 16 permission errors remain in the log window.
+- `curl -sS -w '\nHTTP_STATUS=%{http_code}\n' 'https://api.doverabot.ru/api/rental/search/?query=tent&number=1'` -> HTTP 200, `{"offers":[]}`.
+- `curl -sS -w '\nHTTP_STATUS=%{http_code}\n' 'https://api.doverabot.ru/api/user/points/?rental=on'` -> HTTP 200, empty points payload.
+- `curl -sS -w '\nHTTP_STATUS=%{http_code}\n' 'https://api.doverabot.ru/api/rental/offer/'` -> expected HTTP 404 without `uuid`/`offer_id`.
+
+Remaining blocked check:
+
+- Focused Django tests are blocked by local PostgreSQL peer auth. Command: `/srv/blagodarie/venv-app/bin/python manage.py test users.tests.ApiRentalOfferTests`. Result, both sandboxed and unsandboxed: `FATAL: Peer authentication failed for user "postgres"`.
 
 ## Out Of Scope
 
