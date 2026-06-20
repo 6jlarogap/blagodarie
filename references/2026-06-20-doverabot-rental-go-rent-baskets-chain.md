@@ -286,6 +286,18 @@ Follow-up local test unblock, 2026-06-20:
 - `/srv/blagodarie/venv-app/bin/python manage.py check` -> OK.
 - `/srv/blagodarie/venv-app/bin/python manage.py test users.tests.ApiRentalOfferTests --settings=app.test_settings --noinput` -> 7 tests OK.
 - `uv tool run --from graphifyy graphify update .` -> OK, graph rebuilt.
+- Commit `2dd1f31 go-rent test unblock` created for this follow-up.
+- Runtime deploy after commit:
+  `deploy-dry-run` -> OK,
+  `check-django` -> existing `security.W002` warning only,
+  `sync` -> OK,
+  `migrate` -> no migrations to apply,
+  `deploy` -> OK, nginx config test successful,
+  `is-active` -> nginx, web, and bot all active.
+- Recent web/bot logs showed the new June 20 restarts and older June 16 permission errors still present in the 80-line window.
+- Smoke checks:
+  `https://api.doverabot.ru/api/rental/search/?query=tent&number=1` -> HTTP 200, `{"offers":[]}`;
+  `https://api.doverabot.ru/api/user/points/?rental=on` -> HTTP 200, empty points payload.
 
 ## Out Of Scope
 
