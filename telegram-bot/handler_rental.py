@@ -128,16 +128,33 @@ class Rental(object):
         return Misc.get_start_deeplink(f'rent-{offer_uuid}', https=True)
 
     @classmethod
-    def get_map_url(cls, offer):
+    def get_map_url(cls, offer, map_params=None):
         if offer.get('latitude') is None or offer.get('longitude') is None:
             return ''
+        map_params = map_params or {}
         params = dict(
             rental='on',
             rental_uuid=offer['uuid'],
         )
-        title = offer.get('title') or offer.get('item_text') or ''
-        if title:
-            params.update(rental_query=title)
+        query = map_params.get('query') or offer.get('title') or offer.get('item_text') or ''
+        if query:
+            params.update(rental_query=query)
+        equipment_types = offer.get('equipment_types') or []
+        if equipment_types:
+            equipment_slug = equipment_types[0].get('slug')
+            if equipment_slug:
+                params.update(rental_equipment_type=equipment_slug)
+        date_from = map_params.get('date_from') or offer.get('available_from') or ''
+        date_to = map_params.get('date_to') or offer.get('available_to') or ''
+        if date_from:
+            params.update(rental_date_from=date_from)
+        if date_to:
+            params.update(rental_date_to=date_to)
+        price_max = map_params.get('price_max') or offer.get('price_amount') or ''
+        if price_max:
+            params.update(rental_price_max=price_max)
+        if map_params.get('trusted_only'):
+            params.update(rental_trusted_only='on')
         return '%s/?%s' % (settings.MAP_HOST.rstrip('/'), urlencode(params))
 
     @classmethod
@@ -621,9 +638,10 @@ class Rental(object):
         return result
 
     @classmethod
-    def markup_offer(cls, profile_from, offer):
+    def markup_offer(cls, profile_from, offer, map_params=None):
         if profile_from and profile_from.get('uuid') == offer.get('owner', {}).get('uuid'):
             return None
+        map_url = cls.get_map_url(offer, map_params=map_params)
         return InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(
@@ -648,9 +666,9 @@ class Rental(object):
             *([[
                 InlineKeyboardButton(
                     text='На карте',
-                    url=cls.get_map_url(offer),
+                    url=map_url,
                 )
-            ]] if cls.get_map_url(offer) else []),
+            ]] if map_url else []),
         ])
 
     @classmethod
@@ -749,11 +767,12 @@ class Rental(object):
                 url=cls.get_deeplink(offer['uuid']),
             )
         ])
-        if cls.get_map_url(offer):
+        map_url = cls.get_map_url(offer)
+        if map_url:
             rows.append([
                 InlineKeyboardButton(
                     text='На карте',
-                    url=cls.get_map_url(offer),
+                    url=map_url,
                 )
             ])
         return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -777,9 +796,24 @@ class Rental(object):
     @classmethod
     def reservation_history_markup(cls, response):
         reservation = response.get('reservation') or {}
+        offer = response.get('offer') or {}
         if response.get('viewer_role') == 'owner':
-            return cls.markup_reservation_owner(reservation)
-        return cls.markup_reservation_consumer(reservation)
+            markup = cls.markup_reservation_owner(reservation)
+        else:
+            markup = cls.markup_reservation_consumer(reservation)
+        rows = list(markup.inline_keyboard) if markup else []
+        map_url = cls.get_map_url(offer, map_params=dict(
+            date_from=reservation.get('date_from') or '',
+            date_to=reservation.get('date_to') or '',
+        ))
+        if map_url:
+            rows.append([
+                InlineKeyboardButton(
+                    text='На карте',
+                    url=map_url,
+                )
+            ])
+        return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
     @classmethod
     def text_reservation_audit(cls, response):
@@ -1007,8 +1041,8 @@ class Rental(object):
         return desc[0] if desc else None
 
     @classmethod
-    async def show_offer(cls, message, profile_from, offer, message_kind='search_result'):
-        reply_markup = cls.markup_offer(profile_from, offer)
+    async def show_offer(cls, message, profile_from, offer, message_kind='search_result', map_params=None):
+        reply_markup = cls.markup_offer(profile_from, offer, map_params=map_params)
         canonical_message = cls.canonical_message(offer)
         if canonical_message and reply_markup:
             try:
@@ -1079,8 +1113,15 @@ class Rental(object):
         if not offers:
             await message.reply('Ничего не найдено')
             return
+        result_map_params = dict(
+            query=query,
+            date_from=date_from,
+            date_to=date_to,
+            price_max=price_max,
+            trusted_only=trusted_only,
+        )
         for offer in offers:
-            await cls.show_offer(message, response_sender, offer)
+            await cls.show_offer(message, response_sender, offer, map_params=result_map_params)
 
     @classmethod
     async def handle_search_text(cls, message, state, text):

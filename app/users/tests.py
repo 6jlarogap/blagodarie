@@ -334,6 +334,51 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['points'], [])
 
+    def test_rental_map_with_rentals_honors_filters_and_mistrust(self):
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Travel tent',
+            description_text='Легкая палатка рядом с метро',
+            price_amount=Decimal('500.00'),
+            price_currency='RUB',
+            latitude=55.75,
+            longitude=37.61,
+        )
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Private tent',
+            visibility=RentalOffer.VISIBILITY_PRIVATE,
+            price_amount=Decimal('400.00'),
+            latitude=55.76,
+            longitude=37.62,
+        )
+
+        response = self.client.get('/api/user/points/', data={
+            'with_rentals': 'on',
+            'user_uuid': str(self.requester_profile.uuid),
+            'rental_query': 'tent',
+            'rental_price_max': '600',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        rental_points = [point for point in response.data['points'] if point.get('is_rental')]
+        self.assertEqual(len(rental_points), 1)
+        self.assertEqual(rental_points[0]['title'], 'Travel tent')
+
+        CurrentState.objects.create(
+            user_from=self.requester,
+            user_to=self.owner,
+            attitude=CurrentState.MISTRUST,
+        )
+        response = self.client.get('/api/user/points/', data={
+            'rental': 'on',
+            'user_uuid': str(self.requester_profile.uuid),
+            'rental_query': 'tent',
+            'rental_price_max': '600',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['points'], [])
+
     @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
     def test_taxonomy_tags_offer_and_asks_for_ambiguous_board(self):
         response = self.client.post('/api/rental/offer/', data={

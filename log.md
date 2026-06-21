@@ -2,6 +2,13 @@
 
 ## 2026-06-21
 
+- Source-implemented `doverabot-rental-map-query-link-polish`: bot map links
+  now carry rental UUID/query/equipment/date/price/trusted-only params from
+  search, owner listing, and reservation-history contexts; `with_rentals=on`
+  and `rental=on` were covered on the shared map-points filter path, including
+  private and mistrusted listing hiding. Public read-only rental search and map
+  points smokes returned HTTP 200. Generated frontend bundles were not edited;
+  runtime deploy remains blocked by the active wrapper/untracked-helper issue.
 - Source-implemented `doverabot-rental-voice-search-refinement`: rental search
   parsing now carries date, price ceiling, trusted-only, and map-intent slots
   through the bot FSM/API call; `/api/rental/search` now honors `price_max` and

@@ -1,5 +1,6 @@
 import types
 import unittest
+from urllib.parse import parse_qs, urlparse
 from unittest import mock
 
 from bot_test_harness import (
@@ -129,15 +130,32 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
                 'title': 'Travel tent',
                 'latitude': 55.75,
                 'longitude': 37.61,
+                'available_from': '2026-07-01',
+                'available_to': '2026-07-10',
+                'price_amount': '500.00',
+                'equipment_types': [{'slug': 'tent'}],
                 'owner': {'uuid': 'owner-uuid'},
+            },
+            map_params={
+                'query': 'tent moscow',
+                'date_from': '2026-07-02',
+                'price_max': '600',
+                'trusted_only': True,
             },
         )
 
         buttons = [button for row in markup.inline_keyboard for button in row]
         map_buttons = [button for button in buttons if button.text == 'На карте']
         self.assertEqual(len(map_buttons), 1)
-        self.assertIn('rental=on', map_buttons[0].url)
-        self.assertIn('rental_uuid=offer-uuid', map_buttons[0].url)
+        params = parse_qs(urlparse(map_buttons[0].url).query)
+        self.assertEqual(params['rental'], ['on'])
+        self.assertEqual(params['rental_uuid'], ['offer-uuid'])
+        self.assertEqual(params['rental_query'], ['tent moscow'])
+        self.assertEqual(params['rental_equipment_type'], ['tent'])
+        self.assertEqual(params['rental_date_from'], ['2026-07-02'])
+        self.assertEqual(params['rental_date_to'], ['2026-07-10'])
+        self.assertEqual(params['rental_price_max'], ['600'])
+        self.assertEqual(params['rental_trusted_only'], ['on'])
 
     async def test_rent_hub_mentions_owner_listing_command(self):
         message = FakeMessage(text='/rent')
@@ -157,8 +175,12 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
                 'title': 'Travel tent',
                 'status': 'active',
                 'price_text': '500 руб/день',
+                'price_amount': '500.00',
+                'available_from': '2026-07-01',
+                'available_to': '2026-07-10',
                 'latitude': 55.75,
                 'longitude': 37.61,
+                'equipment_types': [{'slug': 'tent'}],
                 'owner': {'uuid': 'requester-uuid'},
             }],
         }
@@ -183,6 +205,11 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Пауза', [button.text for button in buttons])
         self.assertIn('В архив', [button.text for button in buttons])
         self.assertIn('На карте', [button.text for button in buttons])
+        map_url = [button.url for button in buttons if button.text == 'На карте'][0]
+        params = parse_qs(urlparse(map_url).query)
+        self.assertEqual(params['rental_equipment_type'], ['tent'])
+        self.assertEqual(params['rental_date_from'], ['2026-07-01'])
+        self.assertEqual(params['rental_price_max'], ['500.00'])
 
     async def test_cmd_rent_history_lists_open_and_closed_reservations_with_audit(self):
         message = FakeMessage(text='/rent_history')
@@ -274,6 +301,36 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             for button in row
         ]
         self.assertIn('Принять', [button.text for button in buttons])
+
+    async def test_history_card_map_link_carries_reservation_dates(self):
+        markup = self.handler_rental.Rental.reservation_history_markup({
+            'viewer_role': 'requester',
+            'reservation': {
+                'id': 44,
+                'status': 'confirmed',
+                'date_from': '2026-08-01',
+                'date_to': '2026-08-02',
+            },
+            'offer': {
+                'uuid': 'offer-uuid',
+                'title': 'Snowboard',
+                'latitude': 55.75,
+                'longitude': 37.61,
+                'equipment_types': [{'slug': 'snowboard'}],
+            },
+        })
+
+        buttons = [
+            button
+            for row in markup.inline_keyboard
+            for button in row
+        ]
+        map_url = [button.url for button in buttons if button.text == 'На карте'][0]
+        params = parse_qs(urlparse(map_url).query)
+        self.assertEqual(params['rental_uuid'], ['offer-uuid'])
+        self.assertEqual(params['rental_equipment_type'], ['snowboard'])
+        self.assertEqual(params['rental_date_from'], ['2026-08-01'])
+        self.assertEqual(params['rental_date_to'], ['2026-08-02'])
 
     async def test_owner_markup_includes_reject_payment_proof_button(self):
         markup = self.handler_rental.Rental.markup_reservation_owner({

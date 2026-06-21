@@ -1,12 +1,12 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-13 source-implemented; runtime deploy blocked since slice 10; slices 14-17 planned; rental map query link polish active
+Status: slices 1-14 source-implemented; runtime deploy blocked since slice 10; slices 15-17 planned; rental inventory quantity groundwork active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-rental-voice-search-refinement-chain.md](2026-06-21-doverabot-rental-voice-search-refinement-chain.md)
+Current completed chain: [2026-06-21-doverabot-rental-map-query-link-polish-chain.md](2026-06-21-doverabot-rental-map-query-link-polish-chain.md)
 
-Active next slice: Rental Map Query Link Polish
-Active next `/new-go-slug`: `doverabot-rental-map-query-link-polish`
+Active next slice: Rental Inventory Quantity Groundwork
+Active next `/new-go-slug`: `doverabot-rental-inventory-quantity-groundwork`
 After active slice, advance to the next planned slice and print its
 `/new-go-slug`; do not run another decision refresh until this saved sequence is
 exhausted or new production facts invalidate it.
@@ -387,7 +387,8 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-map-query-link-polish`
 
-Status: planned
+Status: source implemented; runtime deploy blocked in
+[2026-06-21-doverabot-rental-map-query-link-polish-chain.md](2026-06-21-doverabot-rental-map-query-link-polish-chain.md).
 
 Scope:
 
