@@ -1,9 +1,9 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: planned
+Status: slice 1 implemented; remaining slices planned
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-profile-edit-state-feedback-finish-chain.md](2026-06-21-doverabot-profile-edit-state-feedback-finish-chain.md)
+Current completed chain: [2026-06-21-doverabot-offer-sympa-feedback-coverage-chain.md](2026-06-21-doverabot-offer-sympa-feedback-coverage-chain.md)
 
 ## Chain Purpose
 
@@ -15,6 +15,9 @@ changes, and an operational handoff.
 ## Slice 1: Offer And Sympathy Feedback Coverage
 
 Suggested `/new-go-slug`: `doverabot-offer-sympa-feedback-coverage`
+
+Status: implemented and deployed in
+[2026-06-21-doverabot-offer-sympa-feedback-coverage-chain.md](2026-06-21-doverabot-offer-sympa-feedback-coverage-chain.md).
 
 Scope:
 
