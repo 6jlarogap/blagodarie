@@ -2,6 +2,14 @@
 
 ## 2026-06-21
 
+- Attempted `doverabot-rental-runtime-deploy-unblock`: confirmed
+  `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run` still includes the
+  unrelated untracked `scripts/unblock-django-test-db.sh` helper, while the
+  tracked wrapper source already excludes it. Wrapper reinstall is blocked:
+  `sudo bash deploy/install-blagodarie-admin-workflow.sh` and the escalated
+  rerun both failed with `sudo: A terminal is required to authenticate`.
+  Sync/migrate/deploy and live rental smokes were not run; the untracked helper
+  was not removed, staged, or deployed.
 - Implemented `doverabot-next-decision-refresh` after the saved rental future
   slices: re-read the project note, go-next chain, completed geocoding and
   semantic-ranking references, and source/test state; selected

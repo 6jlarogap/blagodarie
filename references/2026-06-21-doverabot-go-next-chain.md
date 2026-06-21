@@ -1,9 +1,10 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-17 source-implemented; runtime deploy blocked since slice 10; decision refresh selected runtime deploy unblock
+Status: slices 1-17 source-implemented; slice 18 blocked by sudo authentication before wrapper reinstall
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 Current completed chain: [2026-06-21-doverabot-next-decision-refresh-after-rental-future-slices-chain.md](2026-06-21-doverabot-next-decision-refresh-after-rental-future-slices-chain.md)
+Current blocked chain: [2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md](2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md)
 
 Active next slice: Rental Runtime Deploy Unblock
 Active next `/new-go-slug`: `doverabot-rental-runtime-deploy-unblock`
@@ -501,7 +502,8 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-runtime-deploy-unblock`
 
-Status: planned
+Status: blocked by sudo authentication before wrapper reinstall in
+[2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md](2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md).
 
 Scope:
 
