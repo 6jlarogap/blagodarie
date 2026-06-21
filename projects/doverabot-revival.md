@@ -16,6 +16,8 @@ Business process and topology plan: [../references/2026-06-20-doverabot-equipmen
 
 Callback hardening chain: [../references/2026-06-21-doverabot-rental-callback-payload-feedback-chain.md](../references/2026-06-21-doverabot-rental-callback-payload-feedback-chain.md)
 
+Runtime bot link cleanup chain: [../references/2026-06-21-doverabot-runtime-bot-link-cleanup-chain.md](../references/2026-06-21-doverabot-runtime-bot-link-cleanup-chain.md)
+
 Current decision:
 
 - Keep one public Doverabot identity with modular feature flows: `/rent`, `/offer`, `/meet`, `rod`, `/trust`, and `/thank`.
@@ -33,6 +35,7 @@ Current implementation:
 - The rental trust-flow business process is documented as a docs-only reference on 2026-06-20.
 - Durable Redis-backed FSM storage, explicit Organizm/Hermes STT handoff helpers, and deployed rental map marker forwarding were completed on 2026-06-21.
 - Rental booking/contact/reservation callbacks now have centralized payload parsing and user-visible stale/auth failure feedback.
+- The remaining runtime hard-coded Doverabot deep link in the sympathy contact handoff now uses the live bot username helper.
 
 Primary implementation areas:
 
@@ -48,14 +51,14 @@ Primary implementation areas:
 - Centralize remaining non-rental callback payload parsing.
 - Add handler tests around offers, callbacks, media packs, and command interruption.
 - Fix duplicate callback function names and known bug backlog from the interaction map.
-- Replace hard-coded bot links with `bot_data.username`.
+- Keep hard-coded bot/deep-link cleanup enforced in newly touched bot flows.
 - Improve user feedback on unauthorized or expired callbacks.
 
 ## Next Implementation Slice
 
-Continue bot hardening outside the rental callback path: clean up duplicate legacy callback handler names, centralize the older mixed callback payload parsing helpers, and expand user-visible feedback for unauthorized or expired non-rental callbacks.
+Continue bot hardening outside the rental callback path: clean up remaining profile-edit direct callback splits in `handler_callbacks.py`, especially non-media edit flows that were left out of the relatives/profile-photo pass.
 
-Suggested `/new-go-slug`: `doverabot-legacy-callback-cleanup-feedback`.
+Suggested `/new-go-slug`: `doverabot-profile-edit-callback-split-cleanup`.
 
 Accepted prior-session decisions:
 
