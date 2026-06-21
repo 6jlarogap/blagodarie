@@ -2,6 +2,16 @@
 
 ## 2026-06-21
 
+- Source-implemented `doverabot-rental-proof-dispute-controls`: added owner-only
+  payment-proof rejection as a distinct audited event that terminally cancels
+  the reservation without writing trust/mistrust state, added owner/requester
+  bot text and reject-proof markup, and covered backend plus mocked bot paths;
+  committed source as `0a65c6d`. Runtime deploy is blocked: active
+  `blagodarie-admin deploy-dry-run` would sync the unrelated untracked
+  `scripts/unblock-django-test-db.sh`, the repo wrapper was patched to exclude
+  it, but `sudo bash deploy/install-blagodarie-admin-workflow.sh` failed with
+  `sudo: A terminal is required to authenticate`; sync/migrate/deploy were not
+  run to avoid deploying unrelated local state.
 - Extended the Doverabot go-next chain beyond the active proof-dispute slice:
   saved ordered follow-up slugs for hold-duration config, voice listing
   clarifications, voice search refinement, map query/link polish, inventory

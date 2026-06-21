@@ -1,12 +1,12 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-9 implemented; slices 10-17 planned; rental proof dispute controls active
+Status: slices 1-10 source-implemented; slice 10 runtime deploy blocked; slices 11-17 planned; rental hold duration config active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md](2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md)
+Current completed chain: [2026-06-21-doverabot-rental-proof-dispute-controls-chain.md](2026-06-21-doverabot-rental-proof-dispute-controls-chain.md)
 
-Active next slice: Rental Proof Dispute Controls
-Active next `/new-go-slug`: `doverabot-rental-proof-dispute-controls`
+Active next slice: Rental Hold Duration Config
+Active next `/new-go-slug`: `doverabot-rental-hold-duration-config`
 After active slice, advance to the next planned slice and print its
 `/new-go-slug`; do not run another decision refresh until this saved sequence is
 exhausted or new production facts invalidate it.
@@ -276,7 +276,8 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-proof-dispute-controls`
 
-Status: active
+Status: source implemented; runtime deploy blocked in
+[2026-06-21-doverabot-rental-proof-dispute-controls-chain.md](2026-06-21-doverabot-rental-proof-dispute-controls-chain.md).
 
 Scope:
 
