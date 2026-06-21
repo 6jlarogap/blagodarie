@@ -17,6 +17,8 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.enums import ChatType
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
+from handler_bot import is_it_command
+
 import logging
 import settings
 
@@ -26,6 +28,14 @@ import me
 dp, bot, bot_data = me.dp, me.bot, me.bot_data
 
 router = Router()
+
+MSG_STATE_STALE = 'Ввод больше не актуален. Повторите команду и попробуйте снова.'
+
+
+async def reply_and_clear_state(message: Message, state: FSMContext, text=MSG_STATE_STALE):
+    await message.reply(text)
+    await state.clear()
+
 
 class FSMdonateSympa(StatesGroup):
     ask = State()
@@ -340,14 +350,16 @@ async def cbq_sympa_hide(callback: CallbackQuery, state: FSMContext):
     )
     logging.debug('post operation hide from sympa, status: %s' % status)
     logging.debug('post operation hide from sympa: %s' % response)
-    if status == 200:
-        text, reply_markup = await Common.make_sympa_hide(profile_from, profile_to, journal_id)
-        await Misc.remove_n_send_message(
-            chat_id=callback.from_user.id,
-            message_id=callback.message.message_id,
-            text=text,
-            reply_markup=reply_markup,
-        )
+    if status != 200:
+        await Misc.answer_callback_notice(callback, Misc.MSG_ERROR_API)
+        return
+    text, reply_markup = await Common.make_sympa_hide(profile_from, profile_to, journal_id)
+    await Misc.remove_n_send_message(
+        chat_id=callback.from_user.id,
+        message_id=callback.message.message_id,
+        text=text,
+        reply_markup=reply_markup,
+    )
     await callback.answer()
 
 
@@ -480,6 +492,10 @@ async def cbq_sympa_set(callback: CallbackQuery, state: FSMContext):
                     )
                     r.close()
 
+    else:
+        await Misc.answer_callback_notice(callback, Misc.MSG_ERROR_API)
+        return
+
     if text_from:
         await Misc.remove_n_send_message(
             chat_id=callback.from_user.id,
@@ -528,37 +544,40 @@ async def cbq_sympa_revoke(callback: CallbackQuery, state: FSMContext):
     logging.debug('post operation, revoke sympa only, response: %s' % response)
     message_pre = ''
     text = reply_markup = None
-    if status == 200:
-        journal_id = response['journal_id']
-        if response.get('previousstate'):
-            if response['previousstate']['is_sympa_confirmed']:
-                message_pre = f'Симпатия к {html.quote(profile_to["first_name"])} отменена'
-                if response['previousstate'].get('is_sympa_reciprocal'):
-                    text_to = (
-                        f'Взаимная симпатия отменена {html.quote(profile_from["first_name"])}. '
-                        f'Ваш профиль снова доступен для других участников Игры знакомств!'
-                    )
-                else:
-                    text_to = (
-                        f'Симпатия к Вам отменена. Приглашайте новых игроков '
-                        f'и ставьте больше интересов на карте - '
-                        f'чтобы скорее найти совпадения!'
-                    )
-                reply_markup_to = InlineKeyboardMarkup(inline_keyboard=[ [Common.inline_btn_map()] ])
-                for tgd in profile_to['tg_data']:
-                    try:
-                        await bot.send_message(
-                            tgd['tg_uid'],
-                            text=text_to,
-                            reply_markup=reply_markup_to
-                        )
-                    except (TelegramBadRequest, TelegramForbiddenError):
-                        pass
+    if status != 200:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_ERROR_API)
+        return
+    journal_id = response['journal_id']
+    if response.get('previousstate'):
+        if response['previousstate']['is_sympa_confirmed']:
+            message_pre = f'Симпатия к {html.quote(profile_to["first_name"])} отменена'
+            if response['previousstate'].get('is_sympa_reciprocal'):
+                text_to = (
+                    f'Взаимная симпатия отменена {html.quote(profile_from["first_name"])}. '
+                    f'Ваш профиль снова доступен для других участников Игры знакомств!'
+                )
             else:
-                message_pre = f'Симпатия к {html.quote(profile_to["first_name"])} уже отменена'
-            text, reply_markup = Common.make_sympa_do(
-                profile_from, profile_to, journal_id, message_pre
-            )
+                text_to = (
+                    f'Симпатия к Вам отменена. Приглашайте новых игроков '
+                    f'и ставьте больше интересов на карте - '
+                    f'чтобы скорее найти совпадения!'
+                )
+            reply_markup_to = InlineKeyboardMarkup(inline_keyboard=[ [Common.inline_btn_map()] ])
+            for tgd in profile_to['tg_data']:
+                try:
+                    await bot.send_message(
+                        tgd['tg_uid'],
+                        text=text_to,
+                        reply_markup=reply_markup_to
+                    )
+                except (TelegramBadRequest, TelegramForbiddenError):
+                    pass
+        else:
+            message_pre = f'Симпатия к {html.quote(profile_to["first_name"])} уже отменена'
+        text, reply_markup = Common.make_sympa_do(
+            profile_from, profile_to, journal_id, message_pre
+        )
     if text:
         await Misc.remove_n_send_message(
             chat_id=callback.from_user.id,
@@ -591,35 +610,46 @@ async def cbq_get_sympa_donate(callback: CallbackQuery, state: FSMContext):
     text, reply_markup, response_get_donate = await Common.make2_donate(
         profile_from, profile_to, journal_id, message_pre=''
     )
-    if text:
-        await state.set_state(FSMdonateSympa.ask)
-        message = await Misc.remove_n_send_message(
-            chat_id=callback.from_user.id,
-            message_id=callback.message.message_id,
-            text=text,
-            reply_markup=reply_markup,
-        )
-        await state.update_data(
-            journal_id=journal_id,
-            response_get_donate=response_get_donate,
-            # Это для того, если щелкнет Отказ от симпатии или Отказ от доната
-            callback=callback,
-            # Это для отравки доната
-            message=message,
-            uuid_pack=str(uuid4())
-        )
+    if not text:
+        await Misc.answer_callback_notice(callback, Misc.MSG_ERROR_API)
+        return
+    await state.set_state(FSMdonateSympa.ask)
+    message = await Misc.remove_n_send_message(
+        chat_id=callback.from_user.id,
+        message_id=callback.message.message_id,
+        text=text,
+        reply_markup=reply_markup,
+    )
+    await state.update_data(
+        journal_id=journal_id,
+        response_get_donate=response_get_donate,
+        # Это для того, если щелкнет Отказ от симпатии или Отказ от доната
+        callback=callback,
+        # Это для отравки доната
+        message=message,
+        uuid_pack=str(uuid4())
+    )
     await callback.answer()
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMdonateSympa.ask))
 async def process_message_donate_after_sympa(message: Message, state: FSMContext):
+    if await is_it_command(message, state):
+        return
     data = await state.get_data()
+    response_get_donate = data.get('response_get_donate') or {}
+    if not data.get('journal_id') or not data.get('uuid_pack') or \
+       not response_get_donate.get('user_m') or \
+       not response_get_donate.get('user_f') or \
+       not response_get_donate.get('donate'):
+        await reply_and_clear_state(message, state)
+        return
     status_from, profile_from = await Misc.post_tg_user(message.from_user)
     if status_from != 200 or \
-       profile_from['uuid'] != data.get('response_get_donate', {}).get('user_m', {}).get('uuid') or \
-       not data.get('journal_id'):
-        await state.clear(); return
+       profile_from['uuid'] != response_get_donate.get('user_m', {}).get('uuid'):
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
     user_m = profile_from
-    user_f = data['response_get_donate']['user_f']
+    user_f = response_get_donate['user_f']
     key = (
         f'{Rcache.ASK_MONEY_PREFIX}{Rcache.KEY_SEP}'
         f'{data["uuid_pack"]}'
@@ -640,73 +670,77 @@ async def process_message_donate_after_sympa(message: Message, state: FSMContext
     )
     logging.debug('post donate_reciprocal_sympathy, status: %s' % status)
     logging.debug('post donate_reciprocal_sympathy, response: %s' % response)
-    if status == 200:
-        if not is_first:
-            return
-        if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
-            return
-        success = False
-        for tgd in data['response_get_donate']['donate']['tg_data']:
+    if status != 200:
+        if is_first:
+            await message.reply(Misc.MSG_ERROR_API)
+        await state.clear()
+        return
+    if not is_first:
+        return
+    if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
+        return
+    success = False
+    for tgd in response_get_donate['donate']['tg_data']:
+        try:
+            await bot.send_message(
+                tgd['tg_uid'],
+                text=(
+                    f'Получена благодарность за приглашение '
+                    f'{html.quote(user_f["first_name"])} '
+                    f'в игру знакомств'
+            ))
+            success = True
+        except (TelegramBadRequest, TelegramForbiddenError):
+            pass
+
+    payload_send_pack = dict(
+        tg_token=settings.TOKEN,
+        uuid_pack=data['uuid_pack'],
+        username=response_get_donate['donate']['profile']['username'],
+        what='tgdesc',
+    )
+    # Api пошлёт всем
+    status_send_pack, response_send_pack = await Misc.api_request(
+        path='/api/show_tgmsg_pack',
+        method='post',
+        json=payload_send_pack,
+    )
+    payload_send_pack.update(username=user_f['username'])
+    status_send_pack, response_send_pack = await Misc.api_request(
+        path='/api/show_tgmsg_pack',
+        method='post',
+        json=payload_send_pack,
+    )
+    if success:
+        if data.get('message'):
+            text, reply_markup = Common.after_donate_or_not_donate(
+                user_m, user_f, data['journal_id'],
+                message_pre=(
+                    f'Добровольный дар отправлен.\n'
+                    f'Контакты запрошены. Ожидайте решения {html.quote(user_f["first_name"])} о передаче контактов.'
+            ))
+            await Misc.remove_n_send_message(
+                chat_id=message.from_user.id,
+                message_id=data['message'].message_id,
+                text=text,
+                reply_markup=reply_markup,
+            )
+
+        text, reply_markup = Common.after_donate_or_not_donate(
+            user_f, user_m, data['journal_id'],
+            message_pre=(
+                f'Получен запрос от {html.quote(user_m["first_name"])} на Ваши контакты'
+        ))
+        for tgd in user_f['tg_data']:
             try:
                 await bot.send_message(
                     tgd['tg_uid'],
-                    text=(
-                        f'Получена благодарность за приглашение '
-                        f'{html.quote(user_f["first_name"])} '
-                        f'в игру знакомств'
-                ))
-                success = True
-            except (TelegramBadRequest, TelegramForbiddenError):
-                pass
-
-        payload_send_pack = dict(
-            tg_token=settings.TOKEN,
-            uuid_pack=data['uuid_pack'],
-            username=data['response_get_donate']['donate']['profile']['username'],
-            what='tgdesc',
-        )
-        # Api пошлёт всем
-        status_send_pack, response_send_pack = await Misc.api_request(
-            path='/api/show_tgmsg_pack',
-            method='post',
-            json=payload_send_pack,
-        )
-        payload_send_pack.update(username=user_f['username'])
-        status_send_pack, response_send_pack = await Misc.api_request(
-            path='/api/show_tgmsg_pack',
-            method='post',
-            json=payload_send_pack,
-        )
-        if success:
-            if data.get('message'):
-                text, reply_markup = Common.after_donate_or_not_donate(
-                    user_m, user_f, data['journal_id'],
-                    message_pre=(
-                        f'Добровольный дар отправлен.\n'
-                        f'Контакты запрошены. Ожидайте решения {html.quote(user_f["first_name"])} о передаче контактов.'
-                ))
-                await Misc.remove_n_send_message(
-                    chat_id=message.from_user.id,
-                    message_id=data['message'].message_id,
                     text=text,
                     reply_markup=reply_markup,
                 )
-
-            text, reply_markup = Common.after_donate_or_not_donate(
-                user_f, user_m, data['journal_id'],
-                message_pre=(
-                    f'Получен запрос от {html.quote(user_m["first_name"])} на Ваши контакты'
-            ))
-            for tgd in user_f['tg_data']:
-                try:
-                    await bot.send_message(
-                        tgd['tg_uid'],
-                        text=text,
-                        reply_markup=reply_markup,
-                    )
-                except (TelegramBadRequest, TelegramForbiddenError):
-                    pass
-        await asyncio.sleep(settings.MULTI_MESSAGE_TIMEOUT)
+            except (TelegramBadRequest, TelegramForbiddenError):
+                pass
+    await asyncio.sleep(settings.MULTI_MESSAGE_TIMEOUT)
     await state.clear()
 
 
@@ -829,7 +863,10 @@ async def cbq_get_sympa_send_profile(callback: CallbackQuery, state: FSMContext)
     )), StateFilter(FSMdonateSympa))
 async def cbq_sympa_donate_refuse(callback: CallbackQuery, state: FSMContext):
     user_m, user_f, journal_id = await Common.check_common_callback(callback)
-    if not user_f or user_f['gender'] != 'f':
+    if not user_f:
+        return
+    if user_f['gender'] != 'f':
+        await Misc.answer_callback_notice(callback)
         return
     if await Common.is_any_not_active(callback, user_m, user_f):
         return
@@ -922,6 +959,9 @@ async def cbq_get_sympa_mistrust(callback: CallbackQuery, state: FSMContext):
                 )
             except (TelegramBadRequest, TelegramForbiddenError):
                 pass
+    elif not (status == 400 and response.get('code', '') == 'already'):
+        await Misc.answer_callback_notice(callback, Misc.MSG_ERROR_API)
+        return
     await callback.answer()
 
 
@@ -949,14 +989,16 @@ async def cbq_get_sympa_show(callback: CallbackQuery, state: FSMContext):
     )
     logging.debug('post operation show from sympa, status: %s' % status)
     logging.debug('post operation show from sympa: %s' % response)
-    if status == 200:
-        text, reply_markup = Common.make_sympa_do(
-            profile_from, profile_to, journal_id, message_pre='',
-        )
-        await Misc.remove_n_send_message(
-            chat_id=callback.from_user.id,
-            message_id=callback.message.message_id,
-            text=text,
-            reply_markup=reply_markup,
-        )
+    if status != 200:
+        await Misc.answer_callback_notice(callback, Misc.MSG_ERROR_API)
+        return
+    text, reply_markup = Common.make_sympa_do(
+        profile_from, profile_to, journal_id, message_pre='',
+    )
+    await Misc.remove_n_send_message(
+        chat_id=callback.from_user.id,
+        message_id=callback.message.message_id,
+        text=text,
+        reply_markup=reply_markup,
+    )
     await callback.answer()

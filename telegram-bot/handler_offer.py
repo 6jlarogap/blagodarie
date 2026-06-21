@@ -27,6 +27,14 @@ dp, bot, bot_data = me.dp, me.bot, me.bot_data
 
 router = Router()
 
+MSG_STATE_STALE = 'Ввод больше не актуален. Повторите команду и попробуйте снова.'
+
+
+async def reply_and_clear_state(message: Message, state: FSMContext, text=MSG_STATE_STALE):
+    await message.reply(text)
+    await state.clear()
+
+
 class FSMofferPlace(StatesGroup):
     # После создания оффера спросить о месте
     ask = State()
@@ -561,9 +569,12 @@ async def process_offer_location(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     status_from, profile_from = await Misc.post_tg_user(message.from_user)
-    if status_from != 200 or not data.get('create_offer_dict') or \
+    if status_from != 200:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
+    if not data.get('create_offer_dict') or \
         profile_from['uuid'] != data['create_offer_dict']['user_uuid']:
-        await state.clear()
+        await reply_and_clear_state(message, state)
         return
     latitude, longitude = Misc.check_location_str(message.text)
     if latitude is None or longitude is None:
@@ -592,10 +603,17 @@ async def process_offer_location(message: Message, state: FSMContext):
 async def cbq_offer_geo_pass(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if status_from != 200:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    if not data.get('create_offer_dict') or \
+       profile_from['uuid'] != data['create_offer_dict']['user_uuid']:
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
     await state.clear()
-    if status_from == 200 and data.get('create_offer_dict') and \
-       profile_from['uuid'] == data['create_offer_dict']['user_uuid']:
-        await Offer.create_offer(data, profile_from, callback.message)
+    await Offer.create_offer(data, profile_from, callback.message)
     await callback.answer()
 
 
@@ -662,41 +680,43 @@ async def cbq_offer_answer(callback: CallbackQuery, state: FSMContext):
 
     if number == -6:
         status_offer, response_offer = await Offer.post_offer_answer(offer_uuid, profile_from, [-1])
-        if status_offer == 200:
-            offer = response_offer['offer']
-            if offer['desc']:
-                if profile_from['username'] == offer['owner']['username']:
-                    await callback.message.reply(
-                        '\u2193\u2193\u2193 Текущее описание \u2193\u2193\u2193',
-                    )
-                payload_send_pack = dict(
-                    tg_token=settings.TOKEN,
-                    messages=offer['desc'],
-                    username=profile_from['username'],
-                    what='tgdesc',
-                )
-                # Api пошлёт всем
-                status_send_pack, response_send_pack = await Misc.api_request(
-                    path='/api/show_tgmsg_pack',
-                    method='post',
-                    json=payload_send_pack,
-                )
-            else:
-                await callback.message.reply(
-                    'Опрос не имеет описания',
-                )
-
+        if status_offer != 200:
+            await Misc.answer_callback_notice(callback, Misc.MSG_ERROR_API)
+            return
+        offer = response_offer['offer']
+        if offer['desc']:
             if profile_from['username'] == offer['owner']['username']:
-                await state.set_state(FSMofferPutDesc.ask)
-                await state.update_data(
-                    username=profile_from['username'],
-                    offer=offer,
-                    uuid_pack=str(uuid4()),
-                )
                 await callback.message.reply(
-                    'Отправьте мне в одном сообщении - фото/видео/текстовое описание опроса',
-                    reply_markup=Misc.reply_markup_cancel_row(),
+                    '\u2193\u2193\u2193 Текущее описание \u2193\u2193\u2193',
                 )
+            payload_send_pack = dict(
+                tg_token=settings.TOKEN,
+                messages=offer['desc'],
+                username=profile_from['username'],
+                what='tgdesc',
+            )
+            # Api пошлёт всем
+            status_send_pack, response_send_pack = await Misc.api_request(
+                path='/api/show_tgmsg_pack',
+                method='post',
+                json=payload_send_pack,
+            )
+        else:
+            await callback.message.reply(
+                'Опрос не имеет описания',
+            )
+
+        if profile_from['username'] == offer['owner']['username']:
+            await state.set_state(FSMofferPutDesc.ask)
+            await state.update_data(
+                username=profile_from['username'],
+                offer=offer,
+                uuid_pack=str(uuid4()),
+            )
+            await callback.message.reply(
+                'Отправьте мне в одном сообщении - фото/видео/текстовое описание опроса',
+                reply_markup=Misc.reply_markup_cancel_row(),
+            )
         await callback.answer()
         return
 
@@ -830,27 +850,37 @@ async def process_existing_offer_desc(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     status_from, profile_from = await Misc.post_tg_user(message.from_user)
-    if data.get('username') and data.get('offer') and \
-       profile_from['username'] == data['username'] and \
-       data.get('offer', {}).get('owner', {}).get('username') and \
-       data['offer']['owner']['username'] == data['username'] and \
-       data.get('uuid_pack'):
-        key = (
-            f'{Rcache.OFFER_DESC_PREFIX}{Rcache.KEY_SEP}'
-            f'{data["uuid_pack"]}'
+    if status_from != 200:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
+    if not data.get('username') or not data.get('offer') or \
+       profile_from['username'] != data['username'] or \
+       not data.get('offer', {}).get('owner', {}).get('username') or \
+       data['offer']['owner']['username'] != data['username'] or \
+       not data.get('uuid_pack'):
+        await reply_and_clear_state(message, state)
+        return
+    key = (
+        f'{Rcache.OFFER_DESC_PREFIX}{Rcache.KEY_SEP}'
+        f'{data["uuid_pack"]}'
+    )
+    if await Misc.check_none_n_clear(is_first := Misc.redis_is_key_first_up(key), state):
+        status, response = await Offer.put_offer_properties(
+            username=data['username'],
+            offer_uuid=data['offer']['uuid'],
+            is_first=is_first,
+            tgdesc=TgDesc.from_message(message, data['uuid_pack'])
         )
-        if await Misc.check_none_n_clear(is_first := Misc.redis_is_key_first_up(key), state):
-            status, response = await Offer.put_offer_properties(
-                username=data['username'],
-                offer_uuid=data['offer']['uuid'],
-                is_first=is_first,
-                tgdesc=TgDesc.from_message(message, data['uuid_pack'])
-            )
-            if not is_first:
-                return
-            if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
-                return
-            await message.reply('Описание сохранено')
+        if status != 200:
+            if is_first:
+                await message.reply(Misc.MSG_ERROR_API)
+            await state.clear()
+            return
+        if not is_first:
+            return
+        if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
+            return
+        await message.reply('Описание сохранено')
     await state.clear()
 
 
@@ -860,16 +890,21 @@ async def process_existing_offer_location(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     status_from, profile_from = await Misc.post_tg_user(message.from_user)
-    if data.get('uuid') and data.get('offer_uuid') and \
-       profile_from['uuid'] == data['uuid']:
-        latitude, longitude = Misc.check_location_str(message.text)
-        if latitude is None or longitude is None:
-            error_message = Misc.MSG_ERR_GEO + '\n\n' + Offer.PROMPT_OFFER_GEO
-            await message.reply(
-                error_message,
-                reply_markup=Misc.reply_markup_cancel_row(),
-            )
-            return
+    if status_from != 200:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
+    if not data.get('uuid') or not data.get('offer_uuid') or \
+       profile_from['uuid'] != data['uuid']:
+        await reply_and_clear_state(message, state)
+        return
+    latitude, longitude = Misc.check_location_str(message.text)
+    if latitude is None or longitude is None:
+        error_message = Misc.MSG_ERR_GEO + '\n\n' + Offer.PROMPT_OFFER_GEO
+        await message.reply(
+            error_message,
+            reply_markup=Misc.reply_markup_cancel_row(),
+        )
+        return
     status_answer, response_answer = await Offer.post_offer_answer(
         data['offer_uuid'],
         profile_from,
@@ -890,70 +925,74 @@ async def process_message_to_offer(message: Message, state: FSMContext):
         return
     state_finished = False
     data = await state.get_data()
-    if data.get('uuid') and data.get('offer_uuid'):
-        status_sender, response_sender = await Misc.post_tg_user(message.from_user)
-        if status_sender == 200 and response_sender.get('uuid') == data['uuid']:
-            payload = dict(
-                tg_token=settings.TOKEN,
-                user_uuid=data['uuid'],
-                offer_uuid=data['offer_uuid']
+    if not data.get('uuid') or not data.get('offer_uuid'):
+        await reply_and_clear_state(message, state)
+        return
+    status_sender, response_sender = await Misc.post_tg_user(message.from_user)
+    if status_sender != 200 or response_sender.get('uuid') != data['uuid']:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
+    payload = dict(
+        tg_token=settings.TOKEN,
+        user_uuid=data['uuid'],
+        offer_uuid=data['offer_uuid']
+    )
+    logging.debug('/api/offer/voted/tg_users %s' % Misc.secret(payload ))
+    status, response = await Misc.api_request(
+        path='/api/offer/voted/tg_users',
+        method='post',
+        json=payload,
+    )
+    logging.debug('/api/offer/voted/tg_users, status: %s' % status)
+    logging.debug('/api/offer/voted/tg_users: %s' % response)
+    if status == 200:
+        n_delivered = 0
+        if response['users']:
+            msg_to = (
+                    'Сообщение участникам опроса:\n'
+                    '\n'
+                    '%(offer_deeplink)s\n'
+                    '\n'
+                    'от %(sender_deeplink)s\n'
+                    '\n'
+                    '\u2193\u2193\u2193'
+                ) % dict(
+                offer_deeplink=Misc.get_html_a(
+                    # ниже: username_href=None, при открытии ссылки username_ref будет владелец опроса,
+                    # он же попадет в реферер
+                    href=Offer.get_deeplink(data["offer_uuid"], username_href=None),
+                    text=response['question'],
+                ),
+                sender_deeplink=Misc.get_deeplink_with_name(response_sender)
             )
-            logging.debug('/api/offer/voted/tg_users %s' % Misc.secret(payload ))
-            status, response = await Misc.api_request(
-                path='/api/offer/voted/tg_users',
-                method='post',
-                json=payload,
+            await state.clear()
+            state_finished = True
+            for user in response['users']:
+                delivered_to_user = False
+                for tg_account in user['tg_data']:
+                    tg_uid = tg_account['tg_uid']
+                    try:
+                        await bot.send_message(tg_uid, text=msg_to)
+                        await bot.copy_message(
+                            tg_uid,
+                            from_chat_id=message.chat.id,
+                            message_id=message.message_id,
+                        )
+                        delivered_to_user = True
+                    except (TelegramBadRequest, TelegramForbiddenError,):
+                        pass
+                if delivered_to_user:
+                    n_delivered += 1
+        if n_delivered == 0:
+            msg = 'Сообщение никому не отправлено'
+        else:
+            msg = 'Сообщение отправлено %s %s' % (
+                n_delivered,
+                'адресату' if n_delivered == 1 else 'адресатам',
             )
-            logging.debug('/api/offer/voted/tg_users, status: %s' % status)
-            logging.debug('/api/offer/voted/tg_users: %s' % response)
-            if status == 200:
-                n_delivered = 0
-                if response['users']:
-                    msg_to = (
-                            'Сообщение участникам опроса:\n'
-                            '\n'
-                            '%(offer_deeplink)s\n'
-                            '\n'
-                            'от %(sender_deeplink)s\n'
-                            '\n'
-                            '\u2193\u2193\u2193'
-                        ) % dict(
-                        offer_deeplink=Misc.get_html_a(
-                            # ниже: username_href=None, при открытии ссылки username_ref будет владелец опроса,
-                            # он же попадет в реферер
-                            href=Offer.get_deeplink(data["offer_uuid"], username_href=None),
-                            text=response['question'],
-                        ),
-                        sender_deeplink=Misc.get_deeplink_with_name(response_sender)
-                    )
-                    await state.clear()
-                    state_finished = True
-                    for user in response['users']:
-                        delivered_to_user = False
-                        for tg_account in user['tg_data']:
-                            tg_uid = tg_account['tg_uid']
-                            try:
-                                await bot.send_message(tg_uid, text=msg_to)
-                                await bot.copy_message(
-                                    tg_uid,
-                                    from_chat_id=message.chat.id,
-                                    message_id=message.message_id,
-                                )
-                                delivered_to_user = True
-                            except (TelegramBadRequest, TelegramForbiddenError,):
-                                pass
-                        if delivered_to_user:
-                            n_delivered += 1
-                if n_delivered == 0:
-                    msg = 'Сообщение никому не отправлено'
-                else:
-                    msg = 'Сообщение отправлено %s %s' % (
-                        n_delivered,
-                        'адресату' if n_delivered == 1 else 'адресатам',
-                    )
-                await message.reply(msg)
-            else:
-                await message.reply('Опрос не найден или вы не его ваделец')
+        await message.reply(msg)
+    else:
+        await message.reply('Опрос не найден или вы не его ваделец')
     if not state_finished:
         await state.clear()
 
@@ -1021,11 +1060,16 @@ async def process_message_thank_office_choice(message: Message, state: FSMContex
     if await is_it_command(message, state):
         return
     data = await state.get_data()
-    if not (profile_to := data.get('profile_to')) or not (journal_id := data.get('journal_id')):
-        await state.clear(); return
+    if not (profile_to := data.get('profile_to')) or \
+       not (journal_id := data.get('journal_id')) or \
+       not data.get('profile_from') or not data.get('uuid_pack') or \
+       not data.get('offer_uuid'):
+        await reply_and_clear_state(message, state)
+        return
     status_from, profile_from = await Misc.post_tg_user(message.from_user)
     if status_from != 200 or profile_from['uuid'] != data.get('profile_from', {}).get('uuid', ''):
-        await state.clear(); return
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
     key = (
         f'{Rcache.DONATE_OFFER_CHOICE}{Rcache.KEY_SEP}'
         f'{data["uuid_pack"]}'
@@ -1046,44 +1090,48 @@ async def process_message_thank_office_choice(message: Message, state: FSMContex
     )
     logging.debug('post donate offer, status: %s' % status)
     logging.debug('post donate offer, response: %s' % response)
-    if status == 200:
-        if not is_first:
-            return
-        if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
-            return
+    if status != 200:
+        if is_first:
+            await message.reply(Misc.MSG_ERROR_API)
+        await state.clear()
+        return
+    if not is_first:
+        return
+    if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
+        return
 
-        offer_link = Misc.get_html_a(
-            Offer.get_deeplink(data['offer_uuid'], data['username_ref']),
-            'опрос',
-        )
-        text = (
-            f'Вам поступил добровольный дар от '
-            f'{Misc.get_deeplink_with_name(profile_from)} за {offer_link}'
-            '\n'
-            '\u2193\u2193\u2193'
-        )
-        for tg_account in data['profile_to']['tg_data']:
-            try:
-                await bot.send_message(tg_account['tg_uid'], text=text)
-            except (TelegramBadRequest, TelegramForbiddenError,):
-                pass
+    offer_link = Misc.get_html_a(
+        Offer.get_deeplink(data['offer_uuid'], data.get('username_ref')),
+        'опрос',
+    )
+    text = (
+        f'Вам поступил добровольный дар от '
+        f'{Misc.get_deeplink_with_name(profile_from)} за {offer_link}'
+        '\n'
+        '\u2193\u2193\u2193'
+    )
+    for tg_account in data['profile_to']['tg_data']:
+        try:
+            await bot.send_message(tg_account['tg_uid'], text=text)
+        except (TelegramBadRequest, TelegramForbiddenError,):
+            pass
 
-        payload_send_pack = dict(
-            tg_token=settings.TOKEN,
-            uuid_pack=data['uuid_pack'],
-            username=profile_to['username'],
-            what='tgdesc',
-        )
-        # Api пошлёт всем
-        status_send_pack, response_send_pack = await Misc.api_request(
-            path='/api/show_tgmsg_pack',
-            method='post',
-            json=payload_send_pack,
-        )
-        await message.reply(
-            'Сообщение передано получателю' if status_send_pack == 200 else \
-            'Получатель не принял сообщение'
-        )
+    payload_send_pack = dict(
+        tg_token=settings.TOKEN,
+        uuid_pack=data['uuid_pack'],
+        username=profile_to['username'],
+        what='tgdesc',
+    )
+    # Api пошлёт всем
+    status_send_pack, response_send_pack = await Misc.api_request(
+        path='/api/show_tgmsg_pack',
+        method='post',
+        json=payload_send_pack,
+    )
+    await message.reply(
+        'Сообщение передано получателю' if status_send_pack == 200 else \
+        'Получатель не принял сообщение'
+    )
     await state.clear()
 
 @router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
