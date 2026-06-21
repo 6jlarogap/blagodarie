@@ -51,6 +51,52 @@ class Offer(object):
     PROMPT_OFFER_GEO = 'Укажите координаты опроса вида: хх.ххх,уу.ууу - их удобно скопировать из карт яндекса или гугла'
 
     @classmethod
+    def parse_answer_callback_data(cls, callback):
+        code = Misc.parse_callback_data(callback, KeyboardType.OFFER_ANSWER, min_parts=3)
+        if not code:
+            return '', None, None
+        try:
+            number = int(code[2])
+        except ValueError:
+            return '', None, None
+        username_ref = code[3] if len(code) > 3 else None
+        return code[1], number, username_ref
+
+    @classmethod
+    def parse_donate_choice_callback_data(cls, callback):
+        code = Misc.parse_callback_data(callback, KeyboardType.DONATE_OFFER_CHOICE, min_parts=5)
+        if not code:
+            return None
+        try:
+            journal_id = int(code[1])
+        except ValueError:
+            return None
+        if not code[2] or not code[4]:
+            return None
+        return dict(
+            journal_id=journal_id,
+            donate_to_username=code[2],
+            username_ref=code[3],
+            offer_id=code[4],
+        )
+
+    @classmethod
+    def parse_donate_revoke_callback_data(cls, callback):
+        code = Misc.parse_callback_data(callback, KeyboardType.DONATE_OFFER_REVOKE_VOICE, min_parts=5)
+        if not code or not code[1] or not code[2]:
+            return None
+        try:
+            message_id = int(code[2])
+        except ValueError:
+            return None
+        return dict(
+            offer_id=code[1],
+            message_id=message_id,
+            username_href=code[3],
+            username_ref=code[4],
+        )
+
+    @classmethod
     async def get_offer(cls, **kwargs):
         """
         Получить минимум сведений об офере
@@ -573,21 +619,16 @@ async def cbq_offer_geo_pass(callback: CallbackQuery, state: FSMContext):
         #
 async def cbq_offer_answer(callback: CallbackQuery, state: FSMContext):
     tg_user_sender = callback.from_user
-    code = callback.data.split(KeyboardType.SEP)
-    try:
-        offer_uuid = code[1]
-        number = int(code[2])
-    except (IndexError, ValueError,):
+    offer_uuid, number, username_ref = Offer.parse_answer_callback_data(callback)
+    if not offer_uuid or number is None:
+        await Misc.answer_callback_notice(callback)
         return
-    try:
-        username_ref = code[3]
-    except (IndexError, ValueError,):
-        username_ref = None
     status_from, profile_from = await Misc.post_tg_user(
         tg_user_sender,
         did_bot_start=callback.message.chat.type == ChatType.PRIVATE
     )
     if status_from != 200:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     if number == -2:
         # Сообщение участникам
@@ -921,21 +962,23 @@ async def process_message_to_offer(message: Message, state: FSMContext):
         KeyboardType.DONATE_OFFER_CHOICE,
         KeyboardType.SEP,
     )), StateFilter(None))
-async def cbq_donate_office_choice(callback: CallbackQuery, state: FSMContext):
-    try:
-        split = callback.data.split(KeyboardType.SEP)
-        journal_id = int(split[1])
-        donate_to_username=split[2]
-        username_ref=split[3]
-        offer_id=split[4]
-    except (TypeError, ValueError, IndexError,):
-        await callback.answer(); return
+async def cbq_donate_offer_choice(callback: CallbackQuery, state: FSMContext):
+    parsed = Offer.parse_donate_choice_callback_data(callback)
+    if not parsed:
+        await Misc.answer_callback_notice(callback)
+        return
+    journal_id = parsed['journal_id']
+    donate_to_username = parsed['donate_to_username']
+    username_ref = parsed['username_ref']
+    offer_id = parsed['offer_id']
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
     if status_from != 200:
-        await callback.answer(); return
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
     status_to, profile_to = await Misc.get_user_by_sid(donate_to_username)
     if status_to != 200:
-        await callback.answer(); return
+        await Misc.answer_callback_notice(callback)
+        return
     bank_details = await Misc.get_bank_details(profile_to['uuid'])
     if bank_details:
         status_offer, response_offer = await Offer.get_offer(offer_id=offer_id, user_ids_only='on')
@@ -1047,23 +1090,25 @@ async def process_message_thank_office_choice(message: Message, state: FSMContex
         KeyboardType.DONATE_OFFER_REVOKE_VOICE,
         KeyboardType.SEP,
     )), StateFilter(None))
-async def cbq_donate_office_choice(callback: CallbackQuery, state: FSMContext):
-    try:
-        split = callback.data.split(KeyboardType.SEP)
-        offer_id = split[1]
-        message_id = split[2]
-        username_href = split[3]
-        username_ref = split[4]
-    except (TypeError, ValueError, IndexError,):
-        await callback.answer(); return
+async def cbq_donate_offer_revoke_choice(callback: CallbackQuery, state: FSMContext):
+    parsed = Offer.parse_donate_revoke_callback_data(callback)
+    if not parsed:
+        await Misc.answer_callback_notice(callback)
+        return
+    offer_id = parsed['offer_id']
+    message_id = parsed['message_id']
+    username_href = parsed['username_href']
+    username_ref = parsed['username_ref']
 
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
     if status_from != 200:
-        await callback.answer(); return
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
 
     status_offer, response_offer = await Offer.get_offer(offer_id=offer_id, user_ids_only='on')
     if status_offer != 200:
-        await callback.answer(); return
+        await Misc.answer_callback_notice(callback)
+        return
     offer_uuid = response_offer['offer']['uuid']
 
     profile_ref = None
@@ -1079,7 +1124,8 @@ async def cbq_donate_office_choice(callback: CallbackQuery, state: FSMContext):
         username_ref=username_ref,
     )
     if status_answer != 200:
-        await callback.answer(); return
+        await Misc.answer_callback_notice(callback)
+        return
     offer = response_answer['offer']
 
     text = Offer.text_offer(

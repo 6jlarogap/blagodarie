@@ -75,10 +75,7 @@ class FSMaskMoney(StatesGroup):
         KeyboardType.SEP,
         )))
 async def cbq_cancel_any(callback: CallbackQuery, state: FSMContext):
-    try:
-        reply_code = callback.data.split(KeyboardType.SEP)[1]
-    except IndexError:
-        pass
+    reply_code = Misc.callback_part(callback, 1)
     if reply_code and Misc.CANCEL_BTN_REPLIES.get(reply_code):
         reply = Misc.CANCEL_BTN_REPLIES[reply_code]
     else:
@@ -234,12 +231,14 @@ async def cbq_gender_new_person(callback: CallbackQuery, state: FSMContext):
         KeyboardType.GENDER,
         KeyboardType.SEP,
     )), StateFilter(None))
-async def cbq_gender(callback: CallbackQuery, state: FSMContext):
+async def cbq_gender_from_card(callback: CallbackQuery, state: FSMContext):
     uuid, card_message_id, card_type = Misc.parse_uid_message_calback(callback)
     if not uuid:
+        await Misc.answer_callback_notice(callback)
         return
     response_sender = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid)
     if not response_sender:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     response_uuid = response_sender['response_uuid']
     dict_gender = dict(
@@ -288,7 +287,7 @@ async def got_gender_text(message: Message, state: FSMContext):
         KeyboardType.GENDER_MALE, KeyboardType.GENDER_FEMALE,
         KeyboardType.SEP,
     )), StateFilter(FSMgender.ask))
-async def cbq_gender(callback: CallbackQuery, state: FSMContext):
+async def cbq_gender_from_state(callback: CallbackQuery, state: FSMContext):
     status_sender, response_sender = await Misc.post_tg_user(callback.from_user)
     if status_sender == 200:
         data = await state.get_data()
@@ -330,16 +329,16 @@ async def cbq_location(callback: CallbackQuery, state: FSMContext):
         <KeyboardType.SEP>
     """
     tg_user_sender = callback.from_user
-    code = callback.data.split(KeyboardType.SEP)
-    try:
-        uuid = code[1]
-        if uuid and not await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid):
-            return
-    except IndexError:
-        uuid = None
+    code = Misc.parse_callback_data(callback, KeyboardType.LOCATION, min_parts=2)
+    if not code or not code[1]:
+        await Misc.answer_callback_notice(callback)
+        return
+    uuid = code[1]
+    if not await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid):
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
     await callback.answer()
-    if uuid:
-        await Misc.prompt_location(callback.message, state, uuid=uuid)
+    await Misc.prompt_location(callback.message, state, uuid=uuid)
 
 
 async def meet_quest_gender(state):
@@ -476,15 +475,17 @@ async def process_message_meet_dob(message: Message, state: FSMContext):
     )), StateFilter(None))
 async def cbq_meet_do_or_revoke(callback: CallbackQuery, state: FSMContext):
     if not (username_from := Misc.get_sid_from_callback(callback)):
+        await Misc.answer_callback_notice(callback)
         return
-    code = callback.data.split(KeyboardType.SEP)
+    code = Misc.callback_parts(callback)
     what = int(code[0])
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if status_from != 200 or profile_from.get('username') != username_from:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
     if not profile_from['is_active']:
         await callback.message.reply(Misc.MSG_NOT_SENDER_NOT_ACTIVE)
         await callback.answer()
-        return
-    if status_from != 200 or profile_from['username'] != username_from:
         return
     text_scram = ''
     if profile_from['did_meet'] and what == KeyboardType.MEET_DO:
@@ -754,7 +755,8 @@ async def cbq_attitude(callback: CallbackQuery, state: FSMContext):
             did_bot_start=message.chat.type == ChatType.PRIVATE,
         )
         if status_sender != 200:
-            raise ValueError
+            await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+            return
         if not operation_type_id or operation_type_id not in (
                 OperationType.TRUST,
                 OperationType.MISTRUST, OperationType.NULLIFY_ATTITUDE,
@@ -765,6 +767,7 @@ async def cbq_attitude(callback: CallbackQuery, state: FSMContext):
         if status_to != 200:
             raise ValueError
     except ValueError:
+        await Misc.answer_callback_notice(callback)
         return
 
     if profile_sender['uuid'] == profile_to['uuid']:
@@ -807,9 +810,9 @@ async def cbq_attitude(callback: CallbackQuery, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_cancel_thank(callback: CallbackQuery, state: FSMContext):
-    try:
-        journal_id = int(callback.data.split(KeyboardType.SEP)[1])
-    except (TypeError, ValueError, IndexError,):
+    journal_id = Misc.callback_int_part(callback, 1)
+    if not journal_id:
+        await Misc.answer_callback_notice(callback)
         return
     payload = dict(tg_token=settings.TOKEN, journal_id=journal_id)
     logging.debug('cancel thank in api, payload: %s' % Misc.secret(payload))
@@ -1771,16 +1774,19 @@ async def process_message_thank_ask_money(message: Message, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_donate_thank(callback: CallbackQuery, state: FSMContext):
-    try:
-        journal_id = int(callback.data.split(KeyboardType.SEP)[1])
-        sid = callback.data.split(KeyboardType.SEP)[2]
-    except (TypeError, ValueError, IndexError,):
+    code = Misc.parse_callback_data(callback, KeyboardType.DONATE_THANK, min_parts=3)
+    journal_id = Misc.callback_int_part(callback, 1)
+    if not code or not journal_id or not code[2]:
+        await Misc.answer_callback_notice(callback)
         return
+    sid = code[2]
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
     if status_from != 200:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     status_to, profile_to = await Misc.get_user_by_sid(sid)
     if status_to != 200:
+        await Misc.answer_callback_notice(callback)
         return
     bank_details = await Misc.get_bank_details(profile_to['uuid'])
     if bank_details:
@@ -1817,20 +1823,23 @@ async def cbq_donate_thank(callback: CallbackQuery, state: FSMContext):
     )), StateFilter(None))
 async def cbq_meet_edit(callback: CallbackQuery, state: FSMContext):
     if not (username_from := Misc.get_sid_from_callback(callback)):
-        await callback.answer(); return
+        await Misc.answer_callback_notice(callback); return
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
     if status_from == 200:
         if not profile_from['is_active']:
             await callback.message.reply(Misc.MSG_NOT_SENDER_NOT_ACTIVE)
             await callback.answer(); return
         if status_from != 200 or profile_from['username'] != username_from:
-            await callback.answer(); return
+            await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH); return
         await Misc.show_edit_meet(
             callback.from_user.id,
             profile_from,
             edit=True,
             card_message_id=callback.message.message_id,
         )
+    else:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
     await callback.answer()
 
 

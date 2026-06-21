@@ -60,6 +60,8 @@ class ContentTypeStub:
 
 class ChatTypeStub:
     PRIVATE = 'private'
+    GROUP = 'group'
+    SUPERGROUP = 'supergroup'
 
 
 class TelegramBadRequestStub(Exception):
@@ -67,6 +69,10 @@ class TelegramBadRequestStub(Exception):
 
 
 class TelegramForbiddenErrorStub(Exception):
+    pass
+
+
+class TelegramNetworkErrorStub(Exception):
     pass
 
 
@@ -121,12 +127,26 @@ class BotStub:
         pass
 
 
-def install_dependency_stubs():
+def install_dependency_stubs(stub_common=True):
     settings = types.ModuleType('settings')
     settings.TOKEN = '123:test'
     settings.HTTP_TIMEOUT = 60
     settings.API_HOST = 'https://api.doverabot.ru'
     settings.MAP_HOST = 'https://map.doverabot.ru'
+    settings.GRAPH_HOST = 'https://d3.doverabot.ru'
+    settings.GRAPH_MEET_HOST = 'https://mgraph.doverabot.ru'
+    settings.MEET_HOST = 'https://doverabot.ru'
+    settings.FRONTEND_HOST = 'https://doverabot.ru'
+    settings.FRONTEND_AUTH_PATH = 'auth/telegram/'
+    settings.SHORT_ID_LINK = 'doverabot.ru/t/%s'
+    settings.BOT_ADMINS = []
+    settings.GROUPS_WITH_CARDS = {}
+    settings.MIN_LEN_SEARCHED_TEXT = 3
+    settings.DOWNLOAD_PHOTO_MAX_SIZE = 10
+    settings.PHOTO_MAX_SIZE = 1024 * 1024
+    settings.MULTI_MESSAGE_TIMEOUT = 60
+    settings.REDIS_SET_NEXT_SYMPA_WAIT = 60
+    settings.OFFER_MAX_NUM_ANSWERS = 10
     settings.RENTAL_STT_CONTRACT = 'organizm_hermes_v1'
     settings.RENTAL_STT_URL = 'https://hermes.example/transcribe'
     settings.RENTAL_STT_TOKEN = 'stt-token'
@@ -175,25 +195,41 @@ def install_dependency_stubs():
     sys.modules['aiogram.fsm.storage'] = aiogram_fsm_storage
 
     filters = types.ModuleType('aiogram.filters')
+    filters.Command = lambda *_args, **_kwargs: None
     filters.StateFilter = lambda *_args, **_kwargs: None
     sys.modules['aiogram.filters'] = filters
 
     types_mod = types.ModuleType('aiogram.types')
+    types_mod.__path__ = []
     types_mod.Message = object
     types_mod.CallbackQuery = object
     types_mod.ContentType = ContentTypeStub
     types_mod.InlineKeyboardMarkup = InlineKeyboardMarkupStub
     types_mod.InlineKeyboardButton = InlineKeyboardButtonStub
+    types_mod.BufferedInputFile = lambda *args, **kwargs: (args, kwargs)
     sys.modules['aiogram.types'] = types_mod
+
+    types_login_url = types.ModuleType('aiogram.types.login_url')
+    types_login_url.LoginUrl = lambda **kwargs: kwargs
+    sys.modules['aiogram.types.login_url'] = types_login_url
+
+    types_input_media_photo = types.ModuleType('aiogram.types.input_media_photo')
+    types_input_media_photo.InputMediaPhoto = lambda **kwargs: kwargs
+    sys.modules['aiogram.types.input_media_photo'] = types_input_media_photo
 
     enums = types.ModuleType('aiogram.enums')
     enums.ChatType = ChatTypeStub
     enums.ParseMode = types.SimpleNamespace(HTML='HTML')
     sys.modules['aiogram.enums'] = enums
 
+    message_entity_type = types.ModuleType('aiogram.enums.message_entity_type')
+    message_entity_type.MessageEntityType = types.SimpleNamespace(BOT_COMMAND='bot_command')
+    sys.modules['aiogram.enums.message_entity_type'] = message_entity_type
+
     exceptions = types.ModuleType('aiogram.exceptions')
     exceptions.TelegramBadRequest = TelegramBadRequestStub
     exceptions.TelegramForbiddenError = TelegramForbiddenErrorStub
+    exceptions.TelegramNetworkError = TelegramNetworkErrorStub
     sys.modules['aiogram.exceptions'] = exceptions
 
     fsm_context = types.ModuleType('aiogram.fsm.context')
@@ -263,65 +299,81 @@ def install_dependency_stubs():
     aiohttp.FormData = FormDataStub
     sys.modules['aiohttp'] = aiohttp
 
-    common = types.ModuleType('common')
+    qrcode_mod = types.ModuleType('qrcode')
+    qrcode_mod.make = lambda *_args, **_kwargs: types.SimpleNamespace(
+        save=lambda *_save_args, **_save_kwargs: None,
+    )
+    sys.modules['qrcode'] = qrcode_mod
 
-    class KeyboardTypeStub:
-        RENTAL_CONTACT = 81
-        RENTAL_BOOK = 82
-        RENTAL_RESERVATION_ACTION = 83
-        SEP = '~'
+    pil_mod = types.ModuleType('PIL')
+    pil_mod.__path__ = []
+    image_mod = types.ModuleType('PIL.Image')
+    image_mod.open = lambda *_args, **_kwargs: types.SimpleNamespace()
+    sys.modules['PIL'] = pil_mod
+    sys.modules['PIL.Image'] = image_mod
 
-    class RcacheStub:
-        KEY_SEP = '~'
-        RENTAL_DESC_PREFIX = 'rental_desc'
-        RENTAL_PAYMENT_PROOF_PREFIX = 'rental_payment_proof'
+    if stub_common:
+        common = types.ModuleType('common')
 
-    class MiscStub:
-        MSG_ERROR_API = 'api error'
-        RE_KEY_SEP = r'^%s%s'
+        class KeyboardTypeStub:
+            RENTAL_CONTACT = 81
+            RENTAL_BOOK = 82
+            RENTAL_RESERVATION_ACTION = 83
+            SEP = '~'
 
-        @staticmethod
-        def get_html_a(href, text):
-            return '<a href="%s">%s</a>' % (href, text)
+        class RcacheStub:
+            KEY_SEP = '~'
+            RENTAL_DESC_PREFIX = 'rental_desc'
+            RENTAL_PAYMENT_PROOF_PREFIX = 'rental_payment_proof'
 
-        @staticmethod
-        def get_deeplink_with_name(profile):
-            return profile.get('first_name') or profile.get('username') or str(profile.get('uuid', ''))
+        class MiscStub:
+            MSG_ERROR_API = 'api error'
+            RE_KEY_SEP = r'^%s%s'
 
-        @staticmethod
-        def reply_markup_cancel_row():
-            return InlineKeyboardMarkupStub(inline_keyboard=[])
+            @staticmethod
+            def get_html_a(href, text):
+                return '<a href="%s">%s</a>' % (href, text)
 
-        @staticmethod
-        async def post_tg_user(_user):
-            return 200, {'uuid': 'requester-uuid', 'first_name': 'Requester'}
+            @staticmethod
+            def get_deeplink_with_name(profile):
+                return profile.get('first_name') or profile.get('username') or str(profile.get('uuid', ''))
 
-        @staticmethod
-        async def get_file_bytes(_voice):
-            return b'voice'
+            @staticmethod
+            def reply_markup_cancel_row():
+                return InlineKeyboardMarkupStub(inline_keyboard=[])
 
-        @staticmethod
-        def redis_is_key_first_up(_key):
-            return True
+            @staticmethod
+            async def post_tg_user(_user):
+                return 200, {'uuid': 'requester-uuid', 'first_name': 'Requester'}
 
-        @staticmethod
-        async def redis_wait_last_in_pack(_key):
-            return True
+            @staticmethod
+            async def get_file_bytes(_voice):
+                return b'voice'
 
-        @staticmethod
-        async def check_none_n_clear(value, _state):
-            return value is not None
+            @staticmethod
+            def redis_is_key_first_up(_key):
+                return True
 
-    class TgDescStub:
-        @staticmethod
-        def from_message(_message, uuid_pack):
-            return {'uuid_pack': uuid_pack, 'file_type': 'text'}
+            @staticmethod
+            async def redis_wait_last_in_pack(_key):
+                return True
 
-    common.Misc = MiscStub
-    common.KeyboardType = KeyboardTypeStub
-    common.Rcache = RcacheStub
-    common.TgDesc = TgDescStub
-    sys.modules['common'] = common
+            @staticmethod
+            async def check_none_n_clear(value, _state):
+                return value is not None
+
+        class TgDescStub:
+            @staticmethod
+            def from_message(_message, uuid_pack):
+                return {'uuid_pack': uuid_pack, 'file_type': 'text'}
+
+        common.Misc = MiscStub
+        common.KeyboardType = KeyboardTypeStub
+        common.Rcache = RcacheStub
+        common.TgDesc = TgDescStub
+        sys.modules['common'] = common
+    else:
+        sys.modules.pop('common', None)
 
     handler_bot = types.ModuleType('handler_bot')
 
@@ -405,6 +457,74 @@ class FakeBot:
 def import_fresh(module_name):
     sys.modules.pop(module_name, None)
     return importlib.import_module(module_name)
+
+
+class CommonCallbackParserTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+
+    async def test_callback_parts_and_notice(self):
+        callback = FakeCallback('44~offer-uuid~2~referrer')
+
+        self.assertEqual(
+            self.common.Misc.parse_callback_data(
+                callback,
+                self.common.KeyboardType.OFFER_ANSWER,
+                min_parts=3,
+            ),
+            ['44', 'offer-uuid', '2', 'referrer'],
+        )
+        self.assertEqual(self.common.Misc.callback_int_part(callback, 2), 2)
+
+        await self.common.Misc.answer_callback_notice(callback)
+
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    def test_get_sid_from_callback_validates_payload(self):
+        valid = FakeCallback('65~abcdefghij~targetuser1~123')
+        invalid = FakeCallback('65~not-valid~targetuser1~123')
+
+        self.assertEqual(self.common.Misc.get_sid_from_callback(valid), 'abcdefghij')
+        self.assertIsNone(self.common.Misc.get_sid_from_callback(invalid))
+
+
+class OfferCallbackFeedbackTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+        self.handler_offer = import_fresh('handler_offer')
+
+    async def test_malformed_offer_answer_shows_notice_and_skips_auth(self):
+        callback = FakeCallback('44~offer-uuid')
+
+        with mock.patch.object(
+            self.handler_offer.Misc,
+            'post_tg_user',
+            mock.AsyncMock(),
+        ) as post_tg_user:
+            await self.handler_offer.cbq_offer_answer(callback, FakeState())
+
+        post_tg_user.assert_not_awaited()
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_offer_answer_auth_failure_shows_profile_notice(self):
+        callback = FakeCallback('44~offer-uuid~1~')
+
+        with mock.patch.object(
+            self.handler_offer.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(500, {})),
+        ):
+            await self.handler_offer.cbq_offer_answer(callback, FakeState())
+
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('профиль', callback.answer_text.lower())
 
 
 class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):

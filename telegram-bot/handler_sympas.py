@@ -75,9 +75,10 @@ class Common(object):
     @classmethod
     async def check_common_callback(cls, callback):
         profile_from = profile_to = journal_id = None
-        profile_from, profile_to = await Misc.check_sids_from_callback(callback)
+        profile_from, profile_to = await Misc.check_sids_from_callback(callback, answer_errors=True)
         if profile_from and profile_to:
             if not (journal_id := cls.check_journal_id(callback)):
+                await Misc.answer_callback_notice(callback)
                 profile_from = profile_to = journal_id = None
         return profile_from, profile_to, journal_id
 
@@ -309,11 +310,8 @@ class Common(object):
     @classmethod
     def check_journal_id(cls, callback):
         journal_id = 0
-        try:
-            if not (journal_id := int((callback.data.split(KeyboardType.SEP))[3])):
-                raise ValueError
-        except (IndexError, ValueError, TypeError):
-            pass
+        if parsed := Misc.callback_int_part(callback, 3):
+            journal_id = parsed
         return journal_id
 
 # --- end of class Common ---

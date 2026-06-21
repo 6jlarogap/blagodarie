@@ -471,6 +471,8 @@ class Misc(object):
     MSG_ERROR_API = 'Ошибка доступа к данным'
     MSG_ERROR_TEXT_ONLY = 'Принимается только текст'
     MSG_REPEATE_PLEASE = 'Повторите, пожалуйста!'
+    MSG_CALLBACK_STALE = 'Эта кнопка устарела. Откройте актуальное сообщение или повторите команду.'
+    MSG_CALLBACK_AUTH = 'Не удалось проверить ваш профиль. Откройте бота командой /start и попробуйте еще раз.'
 
     PROMPT_ABILITY = 'Отправьте мне <u>текст</u> с <b>возможностями</b>'
     PROMPT_WISH = 'Отправьте мне <u>текст</u> с <b>потребностями</b>'
@@ -1965,12 +1967,8 @@ class Misc(object):
         Получить uuid из самых распространенных callbacks
         """
         result = None
-        if getattr(callback, 'message', None) and getattr(callback, 'data', None):
-            code = (callback.data or '').split(KeyboardType.SEP)
-            try:
-                result = code[1]
-            except IndexError:
-                pass
+        if getattr(callback, 'message', None):
+            result = cls.callback_part(callback, 1)
         return result
 
     @classmethod
@@ -1979,15 +1977,43 @@ class Misc(object):
         Получить username из самых распространенных callbacks
         """
         result = None
-        if getattr(callback, 'message', None) and getattr(callback, 'data', None):
-            code = (callback.data or '').split(KeyboardType.SEP)
-            try:
-                result = code[1]
-                if not re.search(cls.RE_SID, result):
-                    result = None
-            except IndexError:
-                pass
+        if getattr(callback, 'message', None):
+            result = cls.callback_part(callback, 1)
+            if not result or not re.search(cls.RE_SID, result):
+                result = None
         return result
+
+    @classmethod
+    def callback_parts(cls, callback):
+        data = getattr(callback, 'data', '') or ''
+        return data.split(KeyboardType.SEP) if data else []
+
+    @classmethod
+    def parse_callback_data(cls, callback, keyboard_type=None, min_parts=1):
+        parts = cls.callback_parts(callback)
+        if len(parts) < min_parts:
+            return []
+        if keyboard_type is not None and parts[0] != str(keyboard_type):
+            return []
+        return parts
+
+    @classmethod
+    def callback_part(cls, callback, index, default=None):
+        try:
+            return cls.callback_parts(callback)[index]
+        except (IndexError, TypeError):
+            return default
+
+    @classmethod
+    def callback_int_part(cls, callback, index, default=None):
+        try:
+            return int(cls.callback_parts(callback)[index])
+        except (IndexError, TypeError, ValueError):
+            return default
+
+    @classmethod
+    async def answer_callback_notice(cls, callback, text=None):
+        await callback.answer(text or cls.MSG_CALLBACK_STALE, show_alert=True)
 
     @classmethod
     def check_location_str(cls, message_text):
@@ -2553,7 +2579,7 @@ class Misc(object):
         return result
 
     @classmethod
-    async def check_sids_from_callback(cls, callback):
+    async def check_sids_from_callback(cls, callback, answer_errors=False):
 
         # Из апи приходит типа:
         #   f'{KeyboardType.что-то}'
@@ -2564,17 +2590,20 @@ class Misc(object):
         #   user_from должен быть текущим юзером. user_to должен существовать
 
         profile_from, profile_to = None, None
-        if username_from := cls.get_sid_from_callback(callback):
-            code = callback.data.split(KeyboardType.SEP)
+        code = cls.parse_callback_data(callback, min_parts=3)
+        username_from = cls.get_sid_from_callback(callback) if code else None
+        if username_from:
             if profile_from := await Misc.check_owner_by_sid(
-                        callback.from_user, username_from, check_own_only=True
-               ):
-                try:
-                    status, response = await Misc.get_user_by_sid(code[2])
-                    if status == 200:
-                        profile_to = response
-                except IndexError:
-                    profile_from = None
+                    callback.from_user, username_from, check_own_only=True):
+                status, response = await Misc.get_user_by_sid(code[2])
+                if status == 200:
+                    profile_to = response
+                elif answer_errors:
+                    await cls.answer_callback_notice(callback)
+            elif answer_errors:
+                await cls.answer_callback_notice(callback, cls.MSG_CALLBACK_AUTH)
+        elif answer_errors:
+            await cls.answer_callback_notice(callback)
         return profile_from, profile_to
 
 
@@ -2650,7 +2679,7 @@ class Misc(object):
     @classmethod
     def parse_uid_message_calback(cls, callback):
         uid, card_message_id, card_type = None, None, 0
-        code = callback.data.split(KeyboardType.SEP)
+        code = cls.callback_parts(callback)
         try:
             # uuid or sid
             uid = code[1]
