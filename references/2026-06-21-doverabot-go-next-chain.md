@@ -1,13 +1,15 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-9 implemented; rental proof dispute controls active
+Status: slices 1-9 implemented; slices 10-17 planned; rental proof dispute controls active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 Current completed chain: [2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md](2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md)
 
 Active next slice: Rental Proof Dispute Controls
 Active next `/new-go-slug`: `doverabot-rental-proof-dispute-controls`
-After active slice, choose and print the next `/new-go-slug`.
+After active slice, advance to the next planned slice and print its
+`/new-go-slug`; do not run another decision refresh until this saved sequence is
+exhausted or new production facts invalidate it.
 
 ## Chain Purpose
 
@@ -25,6 +27,8 @@ Always-visible next-slice rule:
   Basket, so the next command is visible from either file.
 - When a slice is completed, advance the active next slice above to the next
   planned slice and keep the chain moving.
+- When this saved sequence is exhausted, use `doverabot-next-decision-refresh`
+  to re-read source state and choose the next batch.
 
 ## Slice 1: Offer And Sympathy Feedback Coverage
 
@@ -291,6 +295,195 @@ Completion criteria:
   terminal status behavior.
 - Mocked bot tests cover owner markup, callback handling, and notification text.
 - Local bot tests, backend checks, reindex, and graph update pass.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-hold-duration-config`
+
+## Slice 11: Rental Hold Duration Config
+
+Suggested `/new-go-slug`: `doverabot-rental-hold-duration-config`
+
+Status: planned
+
+Scope:
+
+- Replace the hard-coded 10 minute reservation hold with a runtime setting,
+  defaulting to the current 600 seconds.
+- Keep this slice system-level only: no owner/listing-specific duration UI or
+  schema yet.
+- Make reservation creation events, API responses, and bot text use the
+  configured value consistently.
+- Keep overlap, expiration, and payment-proof behavior otherwise unchanged.
+
+Completion criteria:
+
+- Backend tests cover the default hold duration and an overridden setting.
+- Mocked bot tests cover hold-duration text from API payloads.
+- No migration is required unless implementation evidence proves otherwise.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-voice-listing-clarifications`
+
+## Slice 12: Rental Voice Listing Clarifications
+
+Suggested `/new-go-slug`: `doverabot-rental-voice-listing-clarifications`
+
+Status: planned
+
+Scope:
+
+- Improve `/rent_offer` voice/text listing creation so the bot asks concise
+  follow-up questions for missing core fields instead of accepting a weak
+  one-message listing.
+- Reuse the existing Organizm/Hermes STT helpers and durable FSM state.
+- Start with title/item, place or coordinates, dates/availability, price terms,
+  and optional media; do not add geocoding in this slice.
+- Keep successful current one-message listing creation compatible when enough
+  information is present.
+
+Completion criteria:
+
+- Mocked bot tests cover voice transcript slot extraction, missing-field
+  prompts, command interruption, and final API payload.
+- Backend tests cover any new normalized fields or validation rules.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-voice-search-refinement`
+
+## Slice 13: Rental Voice Search Refinement
+
+Suggested `/new-go-slug`: `doverabot-rental-voice-search-refinement`
+
+Status: planned
+
+Scope:
+
+- Improve `/rent_search` voice/text search so the bot asks for missing
+  constraints and then issues a structured search request.
+- Preserve existing taxonomy clarification for ambiguous equipment terms.
+- Include date, location/context text, price ceiling, trusted-only, and map
+  intent where they can be parsed without geocoding.
+- Keep result cards compatible with existing Reserve, Contact, and Show on map
+  buttons.
+
+Completion criteria:
+
+- Mocked bot tests cover missing-context prompts, date/price/trusted-only slot
+  extraction, ambiguous equipment clarification, and command interruption.
+- Backend tests cover any new search query parameters or parser expectations.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-map-query-link-polish`
+
+## Slice 14: Rental Map Query Link Polish
+
+Suggested `/new-go-slug`: `doverabot-rental-map-query-link-polish`
+
+Status: planned
+
+Scope:
+
+- Improve source-owned rental map behavior without editing generated
+  `frontend/*/dist/` bundles.
+- Make bot `Show on map` links carry useful rental query parameters such as
+  equipment, dates, price ceiling, trusted-only, and selected rental UUID when
+  known.
+- Ensure `/api/user/points?rental=on` and `with_rentals=on` honor those
+  parameters consistently and keep private/mistrusted listings hidden.
+- Document any frontend limitation that cannot be solved without editable map
+  source or an explicit generated-bundle deployment.
+
+Completion criteria:
+
+- Backend tests cover rental map filters, mistrust hiding, private listing
+  hiding, and URL parameter compatibility.
+- Mocked bot tests cover generated map links from search/history/listing cards.
+- Public read-only smoke commands are recorded for rental search and map points.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-inventory-quantity-groundwork`
+
+## Slice 15: Rental Inventory Quantity Groundwork
+
+Suggested `/new-go-slug`: `doverabot-rental-inventory-quantity-groundwork`
+
+Status: planned
+
+Scope:
+
+- Decide and implement the smallest safe model for one listing representing
+  multiple identical rentable items.
+- Add quantity fields and overlap/capacity checks only if the selected model
+  needs them; preserve current one-listing-as-one-item behavior by default.
+- Keep owner UX minimal: creation/update payloads, owner listing text, and
+  reservation availability checks.
+- Do not add per-item serial tracking, deposits, escrow, or complex inventory
+  calendars in this slice.
+
+Completion criteria:
+
+- Migration and backend tests cover default quantity, quantity update,
+  overlapping holds up to capacity, and rejection over capacity.
+- Bot tests cover owner/listing text and reservation behavior affected by
+  quantity.
+- Migration, deploy, status, and log checks are completed and recorded.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-geocoding-contract`
+
+## Slice 16: Rental Geocoding Contract
+
+Suggested `/new-go-slug`: `doverabot-rental-geocoding-contract`
+
+Status: planned
+
+Scope:
+
+- Add a narrow, configurable geocoding contract for rental addresses without
+  making any provider mandatory.
+- Use mocked provider tests; production should degrade cleanly when no provider
+  is configured.
+- Offer address-to-coordinate suggestions for listing/search only after explicit
+  user confirmation.
+- Keep map visibility rules unchanged and do not leak private or mistrusted
+  listings through geocoding results.
+
+Completion criteria:
+
+- Backend or bot adapter tests cover configured provider success, no-provider
+  fallback, ambiguous result prompting, and failed lookup.
+- Bot tests cover confirmation before coordinates are stored or used.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-semantic-search-ranking`
+
+## Slice 17: Rental Semantic Search Ranking
+
+Suggested `/new-go-slug`: `doverabot-rental-semantic-search-ranking`
+
+Status: planned
+
+Scope:
+
+- Improve rental search ranking beyond exact text and curated taxonomy while
+  keeping trust and visibility rules as hard filters.
+- Start with a bounded adapter or PostgreSQL-backed approach that can be tested
+  locally; do not make an external vector service the source of truth.
+- Preserve equipment taxonomy clarification for ambiguous terms.
+- Keep generated frontend bundles out of scope.
+
+Completion criteria:
+
+- Backend tests prove visibility/mistrust filters run before ranking and cannot
+  be bypassed by semantic matches.
+- Search tests cover taxonomy-only, text fallback, and semantic/ranking-enabled
+  cases with deterministic fixtures.
 - Runtime code changes are committed, deployed, and logged.
 
 Print after completion, suggested next `/new-go-slug`:

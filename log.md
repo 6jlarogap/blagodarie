@@ -2,6 +2,13 @@
 
 ## 2026-06-21
 
+- Extended the Doverabot go-next chain beyond the active proof-dispute slice:
+  saved ordered follow-up slugs for hold-duration config, voice listing
+  clarifications, voice search refinement, map query/link polish, inventory
+  quantity groundwork, geocoding contract, and semantic search ranking, so
+  future `/new go` runs can advance without repeating decision-refresh
+  investigations after every slice; diff check, reindex, and graphify update
+  passed; skipped deploy because only handoff documentation changed.
 - Implemented `doverabot-next-decision-refresh` after reservation history:
   re-read the Doverabot project note, go-next chain, completed rental owner
   listing and reservation history references, and current rental map/proof

@@ -109,10 +109,15 @@ Remaining product backlog:
 
 - Add owner-side proof-dispute controls for unacceptable or fake payment proof
   without automatically creating mistrust.
-- Improve rental map/frontend filters only when editable frontend source is
-  available or a generated-bundle deployment slice is explicitly accepted.
-- Decide later on inventory quantities, configurable hold duration, geocoding,
-  and vector search.
+- Make the reservation hold duration configurable at runtime while preserving
+  the current 10 minute default.
+- Improve voice-first listing and search conversations using the existing
+  Organizm/Hermes STT adapter and durable FSM state.
+- Polish source-owned rental map query links and map-point filters without
+  editing generated frontend bundles.
+- Add inventory quantity groundwork for multiple identical rentable items.
+- Add configurable geocoding and semantic/ranked search only after the smaller
+  rental flow slices above.
 
 ## Next Implementation Slice
 
@@ -121,9 +126,12 @@ Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-n
 Active next `/new-go-slug`: `doverabot-rental-proof-dispute-controls`.
 
 After that slice, print next `/new-go-slug`:
-`doverabot-next-decision-refresh`.
+`doverabot-rental-hold-duration-config`.
 
-After that, keep each completed chain pointing to the next slug in the go-next chain.
+After that, continue the saved slices in the go-next chain through
+`doverabot-rental-semantic-search-ranking`, then run
+`doverabot-next-decision-refresh` only when the saved sequence is exhausted or
+new production facts invalidate it.
 
 Accepted prior-session decisions:
 

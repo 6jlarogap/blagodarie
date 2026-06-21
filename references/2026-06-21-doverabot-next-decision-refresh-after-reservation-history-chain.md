@@ -36,7 +36,7 @@ Chosen next `/new-go-slug`:
 `doverabot-rental-proof-dispute-controls`
 
 Planned follow-up after that:
-`doverabot-next-decision-refresh`
+`doverabot-rental-hold-duration-config`
 
 ## Source And Test State Read
 
@@ -63,6 +63,8 @@ Planned follow-up after that:
   is available or a generated-bundle deployment slice is explicitly accepted.
 - Inventory quantities, configurable hold duration, geocoding, vector search,
   and auto-mistrust policy remain deferred beyond proof-dispute controls.
+- A later chain extension saved concrete post-dispute slices so completion of
+  proof-dispute controls can advance directly without another investigation.
 
 ## Next Slice Scope
 
