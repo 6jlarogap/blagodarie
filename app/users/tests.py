@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import datetime
 import time
 from decimal import Decimal
 from unittest import mock
@@ -552,3 +553,185 @@ class ApiRentalOfferTests(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data['message'], 'Заявка уже закрыта')
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    def test_reservation_history_filters_roles_and_terminal_status_groups(self):
+        requester_owned_offer = RentalOffer.objects.create(
+            owner=self.requester,
+            title='Requester board',
+        )
+        owner_offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Owner tent',
+        )
+        open_as_requester = RentalReservationIntent.objects.create(
+            offer=owner_offer,
+            requester=self.requester,
+            date_from=datetime.date(2026, 7, 1),
+            date_to=datetime.date(2026, 7, 3),
+            status=RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+            hold_expires_at=int(time.time()) + 600,
+        )
+        open_as_owner = RentalReservationIntent.objects.create(
+            offer=requester_owned_offer,
+            requester=self.owner,
+            date_from=datetime.date(2026, 8, 1),
+            date_to=datetime.date(2026, 8, 2),
+            status=RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED,
+            hold_expires_at=int(time.time()) + 600,
+        )
+        closed_as_requester = RentalReservationIntent.objects.create(
+            offer=owner_offer,
+            requester=self.requester,
+            date_from=datetime.date(2026, 9, 1),
+            date_to=datetime.date(2026, 9, 2),
+            status=RentalReservationIntent.STATUS_CONFIRMED,
+        )
+        expired_as_requester = RentalReservationIntent.objects.create(
+            offer=owner_offer,
+            requester=self.requester,
+            date_from=datetime.date(2026, 9, 3),
+            date_to=datetime.date(2026, 9, 4),
+            status=RentalReservationIntent.STATUS_OWNER_ACCEPTED,
+            hold_expires_at=int(time.time()) - 1,
+        )
+        RentalReservationIntent.objects.create(
+            offer=owner_offer,
+            requester=self.requester,
+            date_from=datetime.date(2026, 10, 1),
+            date_to=datetime.date(2026, 10, 2),
+            status=RentalReservationIntent.STATUS_CANCELLED,
+        )
+        RentalReservationEvent.objects.create(
+            reservation=open_as_requester,
+            actor=self.requester,
+            actor_role=RentalReservationEvent.ROLE_REQUESTER,
+            event_type=RentalReservationEvent.EVENT_CREATED,
+            status_to=RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+        )
+        RentalReservationPaymentProof.objects.create(
+            reservation=open_as_owner,
+            sender=self.owner,
+            uuid_pack='00000000-0000-0000-0000-000000000003',
+            recipient_kind=RentalReservationIntent.RECIPIENT_OWNER,
+        )
+        other = User.objects.create_user(username='other', first_name='Other')
+        Profile.objects.create(user=other)
+        RentalReservationIntent.objects.create(
+            offer=owner_offer,
+            requester=other,
+            status=RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+            hold_expires_at=int(time.time()) + 600,
+        )
+
+        response = self.client.get('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'status_group': 'open',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {item['reservation']['id'] for item in response.data['reservations']},
+            {open_as_requester.pk, open_as_owner.pk},
+        )
+        self.assertEqual(
+            {
+                item['reservation']['id']: item['viewer_role']
+                for item in response.data['reservations']
+            },
+            {
+                open_as_requester.pk: RentalReservationEvent.ROLE_REQUESTER,
+                open_as_owner.pk: RentalReservationEvent.ROLE_OWNER,
+            },
+        )
+
+        response = self.client.get('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'role': RentalReservationEvent.ROLE_REQUESTER,
+            'status_group': 'open',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item['reservation']['id'] for item in response.data['reservations']],
+            [open_as_requester.pk],
+        )
+        self.assertEqual(response.data['reservations'][0]['events'][0]['event_type'], 'created')
+
+        response = self.client.get('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'role': RentalReservationEvent.ROLE_OWNER,
+            'status_group': 'open',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item['reservation']['id'] for item in response.data['reservations']],
+            [open_as_owner.pk],
+        )
+        self.assertEqual(len(response.data['reservations'][0]['payment_proofs']), 1)
+
+        response = self.client.get('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'status_group': 'recent_closed',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {
+                item['reservation']['status']
+                for item in response.data['reservations']
+            },
+            {
+                RentalReservationIntent.STATUS_CONFIRMED,
+                RentalReservationIntent.STATUS_CANCELLED,
+                RentalReservationIntent.STATUS_EXPIRED,
+            },
+        )
+        self.assertIn(
+            closed_as_requester.pk,
+            {item['reservation']['id'] for item in response.data['reservations']},
+        )
+        self.assertIn(
+            expired_as_requester.pk,
+            {item['reservation']['id'] for item in response.data['reservations']},
+        )
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    def test_reservation_history_requires_bot_token_and_hides_unrelated_rows(self):
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Tent',
+        )
+        reservation = RentalReservationIntent.objects.create(
+            offer=offer,
+            requester=self.requester,
+            status=RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+            hold_expires_at=int(time.time()) + 600,
+        )
+        intruder = User.objects.create_user(username='intruder', first_name='Intruder')
+        intruder_profile = Profile.objects.create(user=intruder)
+
+        response = self.client.get('/api/rental/reservation/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Неверный токен телеграм бота')
+
+        response = self.client.get('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(intruder_profile.uuid),
+            'status_group': 'all',
+            'reservation_id': reservation.pk,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['reservations'], [])
+
+        response = self.client.get('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'role': 'bad-role',
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Неверная роль в истории брони')

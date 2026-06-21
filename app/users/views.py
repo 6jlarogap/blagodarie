@@ -4096,6 +4096,20 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
 
     RESERVATION_HOLD_SECONDS = 10 * 60
 
+    OPEN_RESERVATION_STATUSES = (
+        RentalReservationIntent.STATUS_DRAFT,
+        RentalReservationIntent.STATUS_SENT,
+        RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+        RentalReservationIntent.STATUS_OWNER_ACCEPTED,
+        RentalReservationIntent.STATUS_PAYMENT_REPORTED,
+        RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED,
+    )
+    TERMINAL_RESERVATION_STATUSES = (
+        RentalReservationIntent.STATUS_CONFIRMED,
+        RentalReservationIntent.STATUS_CANCELLED,
+        RentalReservationIntent.STATUS_EXPIRED,
+    )
+
     RENTAL_TEXT_FIELDS = (
         'title',
         'item_text',
@@ -4262,7 +4276,11 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
     def expire_reservation_holds(self, offer=None, now=None):
         now = now or self.now_timestamp()
         qs = RentalReservationIntent.objects.select_for_update().filter(
-            status=RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+            status__in=(
+                RentalReservationIntent.STATUS_SENT,
+                RentalReservationIntent.STATUS_AWAITING_PAYMENT,
+                RentalReservationIntent.STATUS_OWNER_ACCEPTED,
+            ),
             hold_expires_at__gt=0,
             hold_expires_at__lte=now,
         )
@@ -4336,6 +4354,15 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
         if actor == reservation.requester:
             return RentalReservationEvent.ROLE_REQUESTER
         raise PermissionDenied()
+
+    def reservation_viewer_role(self, reservation, viewer_user):
+        if not viewer_user:
+            return ''
+        if reservation.offer.owner_id == viewer_user.pk:
+            return RentalReservationEvent.ROLE_OWNER
+        if reservation.requester_id == viewer_user.pk:
+            return RentalReservationEvent.ROLE_REQUESTER
+        return ''
 
     def create_reservation_event(self, reservation, actor, actor_role, event_type,
                                  status_from='', status_to='', note='', payload=None):
@@ -4483,7 +4510,9 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
             )
         return proof, event
 
-    def rental_reservation_response(self, request, reservation, created=False, event=None):
+    def rental_reservation_response(self, request, reservation, created=False, event=None,
+                                    viewer_user=None):
+        viewer_user = viewer_user or reservation.requester
         payment_user = self.system_payment_user() if \
             reservation.recipient_kind == RentalReservationIntent.RECIPIENT_SYSTEM else \
             reservation.offer.owner
@@ -4508,12 +4537,13 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
             ],
             offer=reservation.offer.data_dict(
                 request=request,
-                viewer_user=reservation.requester,
+                viewer_user=viewer_user,
                 include_payment=True,
             ),
             owner=self.rental_user_payload(reservation.offer.owner),
             requester=self.rental_user_payload(reservation.requester),
             payment_recipient=recipient_profile,
+            viewer_role=self.reservation_viewer_role(reservation, viewer_user),
         )
 
 
@@ -4859,6 +4889,85 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
             ).order_by('-insert_timestamp', '-pk').first()
         except (TypeError, ValueError):
             return None
+
+    def reservation_history_queryset(self, viewer_user, role, status_group, status_value=''):
+        if role not in ('all', RentalReservationEvent.ROLE_REQUESTER, RentalReservationEvent.ROLE_OWNER):
+            raise ServiceException('Неверная роль в истории брони')
+        if status_group not in ('open', 'recent_closed', 'closed', 'all'):
+            raise ServiceException('Неверная группа статусов брони')
+
+        qs = RentalReservationIntent.objects.select_related(
+            'offer',
+            'offer__owner',
+            'offer__owner__profile',
+            'requester',
+            'requester__profile',
+        ).prefetch_related(
+            'offer__tgdesc',
+            'offer__equipment_types',
+            'offer__telegram_messages_set',
+        )
+
+        if role == RentalReservationEvent.ROLE_REQUESTER:
+            qs = qs.filter(requester=viewer_user)
+        elif role == RentalReservationEvent.ROLE_OWNER:
+            qs = qs.filter(offer__owner=viewer_user)
+        else:
+            qs = qs.filter(Q(requester=viewer_user) | Q(offer__owner=viewer_user))
+
+        if status_value:
+            if status_value not in dict(RentalReservationIntent.STATUSES):
+                raise ServiceException('Неверный статус брони')
+            qs = qs.filter(status=status_value)
+        elif status_group == 'open':
+            qs = qs.filter(status__in=self.OPEN_RESERVATION_STATUSES)
+        elif status_group in ('recent_closed', 'closed'):
+            qs = qs.filter(status__in=self.TERMINAL_RESERVATION_STATUSES)
+        return qs.order_by('-update_timestamp', '-insert_timestamp', '-pk')
+
+    @transaction.atomic
+    def get(self, request):
+        try:
+            self.check_bot_token(request)
+            viewer, profile = self.check_user_uuid(
+                uuid=request.GET.get('user_uuid'),
+                related=('user',),
+            )
+            self.expire_reservation_holds(now=self.now_timestamp())
+            role = self.clean_text(request.GET, 'role', 'all') or 'all'
+            status_group = self.clean_text(request.GET, 'status_group', 'open') or 'open'
+            status_value = self.clean_text(request.GET, 'status')
+            qs = self.reservation_history_queryset(
+                viewer_user=viewer,
+                role=role,
+                status_group=status_group,
+                status_value=status_value,
+            )
+            if request.GET.get('reservation_id') not in (None, ''):
+                qs = qs.filter(pk=self.parse_int(request.GET, 'reservation_id'))
+            try:
+                number = min(max(int(request.GET.get('number', 10)), 1), 50)
+            except (TypeError, ValueError):
+                number = 10
+            reservations = [
+                self.rental_reservation_response(
+                    request=request,
+                    reservation=reservation,
+                    viewer_user=viewer,
+                )
+                for reservation in qs[:number]
+            ]
+            data = dict(
+                reservations=reservations,
+                role=role,
+                status_group=status_group,
+            )
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            transaction.set_rollback(True)
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
 
     @transaction.atomic
     def post(self, request):

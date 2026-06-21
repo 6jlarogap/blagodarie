@@ -556,6 +556,18 @@ async def cmd_rent_my(message: Message, state: FSMContext):
     F.text,
     F.chat.type.in_((ChatType.PRIVATE,)),
     StateFilter(None),
+    Command(re.compile('^rent_history$', flags=re.I)),
+)
+async def cmd_rent_history(message: Message, state: FSMContext):
+    logging.debug(f"Executing cmd_rent_history command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
+    from handler_rental import Rental
+    await Rental.cmd_rent_history(message, state)
+
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
     Command(re.compile('^quit$', flags=re.I)),
 )
 async def cmd_quit(message: Message, state: FSMContext):
@@ -755,6 +767,7 @@ commands_dict = {
     'rent_offer': cmd_rent_offer,
     'rent_search': cmd_rent_search,
     'rent_my': cmd_rent_my,
+    'rent_history': cmd_rent_history,
     'quit': cmd_quit,
 }
 

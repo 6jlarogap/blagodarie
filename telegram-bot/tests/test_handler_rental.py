@@ -66,6 +66,7 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         await self.handler_rental.Rental.cmd_rent(message, state)
 
         self.assertIn('/rent_my', message.replies[-1].text)
+        self.assertIn('/rent_history', message.replies[-1].text)
 
     async def test_cmd_rent_my_lists_owner_offers_with_controls(self):
         message = FakeMessage(text='/rent_my')
@@ -102,6 +103,97 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Пауза', [button.text for button in buttons])
         self.assertIn('В архив', [button.text for button in buttons])
         self.assertIn('На карте', [button.text for button in buttons])
+
+    async def test_cmd_rent_history_lists_open_and_closed_reservations_with_audit(self):
+        message = FakeMessage(text='/rent_history')
+        state = FakeState()
+        open_response = {
+            'reservations': [{
+                'viewer_role': 'requester',
+                'reservation': {
+                    'id': 44,
+                    'sequence_number': 3,
+                    'status': 'awaiting_payment',
+                    'date_from': '2026-07-01',
+                    'date_to': '2026-07-03',
+                },
+                'offer': {'uuid': 'offer-uuid', 'title': 'Travel tent'},
+                'owner': {'first_name': 'Owner'},
+                'events': [{
+                    'event_type': 'created',
+                    'status_to': 'awaiting_payment',
+                }],
+                'payment_proofs': [],
+            }],
+        }
+        closed_response = {
+            'reservations': [{
+                'viewer_role': 'owner',
+                'reservation': {
+                    'id': 45,
+                    'sequence_number': 4,
+                    'status': 'confirmed',
+                    'date_from': '2026-08-01',
+                    'date_to': '2026-08-02',
+                },
+                'offer': {'uuid': 'offer-uuid-2', 'title': 'Snowboard'},
+                'requester': {'first_name': 'Requester'},
+                'events': [{
+                    'event_type': 'owner_confirm',
+                    'status_to': 'confirmed',
+                }],
+                'payment_proofs': [{
+                    'id': 1,
+                    'uuid_pack': '00000000-0000-0000-0000-000000000003',
+                    'messages': [{'file_type': 'photo'}],
+                }],
+            }],
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'list_reservations',
+            mock.AsyncMock(side_effect=[(200, open_response), (200, closed_response)]),
+        ) as list_reservations:
+            await self.handler_rental.Rental.cmd_rent_history(message, state)
+
+        self.assertEqual(list_reservations.await_count, 2)
+        list_reservations.assert_any_await(
+            {'uuid': 'requester-uuid', 'first_name': 'Requester'},
+            status_group='open',
+        )
+        list_reservations.assert_any_await(
+            {'uuid': 'requester-uuid', 'first_name': 'Requester'},
+            status_group='recent_closed',
+        )
+        self.assertEqual(message.replies[0].text, 'Активные брони')
+        self.assertIn('Travel tent', message.replies[1].text)
+        self.assertIn('События: создана -> ожидает подтверждения оплаты', message.replies[1].text)
+        open_buttons = [
+            button
+            for row in message.replies[1].reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertIn('Отправить чек', [button.text for button in open_buttons])
+        self.assertEqual(message.replies[2].text, 'Недавно закрытые брони')
+        self.assertIn('Подтверждения: 00000000 (photo)', message.replies[3].text)
+        self.assertIsNone(message.replies[3].reply_markup)
+
+    async def test_owner_history_card_renders_available_accept_button(self):
+        markup = self.handler_rental.Rental.reservation_history_markup({
+            'viewer_role': 'owner',
+            'reservation': {
+                'id': 44,
+                'status': 'awaiting_payment',
+            },
+        })
+
+        buttons = [
+            button
+            for row in markup.inline_keyboard
+            for button in row
+        ]
+        self.assertIn('Принять', [button.text for button in buttons])
 
     async def test_owner_pause_callback_updates_offer_and_renders_resume_controls(self):
         callback = FakeCallback('84~pause~offer-uuid')

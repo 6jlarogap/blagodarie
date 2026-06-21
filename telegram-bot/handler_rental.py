@@ -100,6 +100,15 @@ class Rental(object):
         'cancelled': 'заявка отменена',
         'expired': 'время удержания истекло',
     }
+    EVENT_LABELS = {
+        'created': 'создана',
+        'owner_accept': 'принята владельцем',
+        'payment_reported': 'оплата отмечена',
+        'payment_proof_submitted': 'подтверждение оплаты отправлено',
+        'owner_confirm': 'подтверждена владельцем',
+        'cancel': 'отменена',
+        'expire': 'истекла',
+    }
 
     @classmethod
     def message_text(cls, message):
@@ -267,7 +276,8 @@ class Rental(object):
             'Прокат снаряжения:\n'
             '/rent_offer - создать объявление\n'
             '/rent_search - найти снаряжение\n'
-            '/rent_my - мои объявления'
+            '/rent_my - мои объявления\n'
+            '/rent_history - мои брони'
         )
 
     @classmethod
@@ -300,6 +310,14 @@ class Rental(object):
             await message.reply(Misc.MSG_ERROR_API)
             return
         await cls.send_owner_offers(message, response_sender)
+
+    @classmethod
+    async def cmd_rent_history(cls, message: Message, state: FSMContext):
+        status_sender, response_sender = await Misc.post_tg_user(message.from_user)
+        if status_sender != 200:
+            await message.reply(Misc.MSG_ERROR_API)
+            return
+        await cls.send_reservation_history(message, response_sender)
 
     @classmethod
     async def create_offer(cls, payload):
@@ -352,6 +370,22 @@ class Rental(object):
             params.update(status=status_filter)
         status, response = await Misc.api_request(
             path='/api/rental/offer',
+            method='get',
+            params=params,
+        )
+        return status, response
+
+    @classmethod
+    async def list_reservations(cls, profile_from, role='all', status_group='open'):
+        params = dict(
+            tg_token=settings.TOKEN,
+            user_uuid=profile_from['uuid'],
+            role=role,
+            status_group=status_group,
+            number=10,
+        )
+        status, response = await Misc.api_request(
+            path='/api/rental/reservation',
             method='get',
             params=params,
         )
@@ -660,6 +694,116 @@ class Rental(object):
             )
 
     @classmethod
+    def reservation_history_markup(cls, response):
+        reservation = response.get('reservation') or {}
+        if response.get('viewer_role') == 'owner':
+            return cls.markup_reservation_owner(reservation)
+        return cls.markup_reservation_consumer(reservation)
+
+    @classmethod
+    def text_reservation_audit(cls, response):
+        events = response.get('events') or []
+        proofs = response.get('payment_proofs') or []
+        lines = []
+        if events:
+            shown_events = events[-4:]
+            parts = []
+            if len(events) > len(shown_events):
+                parts.append('еще %s ранее' % (len(events) - len(shown_events)))
+            for event in shown_events:
+                event_text = cls.EVENT_LABELS.get(
+                    event.get('event_type'),
+                    event.get('event_type') or 'событие',
+                )
+                status_text = cls.STATUS_LABELS.get(event.get('status_to') or '')
+                parts.append(
+                    '%s -> %s' % (event_text, status_text)
+                    if status_text else event_text
+                )
+            lines.append('События: %s' % '; '.join(parts))
+        if proofs:
+            proof_parts = []
+            for proof in proofs[-2:]:
+                label = (proof.get('uuid_pack') or str(proof.get('id') or ''))[:8]
+                file_types = sorted({
+                    message.get('file_type') or 'message'
+                    for message in proof.get('messages') or []
+                })
+                if file_types:
+                    label = '%s (%s)' % (label, ', '.join(file_types))
+                proof_parts.append(label)
+            lines.append('Подтверждения: %s' % ', '.join(proof_parts))
+        return '\n'.join(lines)
+
+    @classmethod
+    def text_reservation_history_card(cls, response):
+        text = cls.text_reservation_status(response)
+        reservation = response.get('reservation') or {}
+        role = response.get('viewer_role') or ''
+        if role == 'owner':
+            requester = response.get('requester') or {}
+            text += '\nРоль: владелец'
+            if requester:
+                text += '\nОт: %s' % Misc.get_deeplink_with_name(requester)
+        elif role == 'requester':
+            owner = response.get('owner') or {}
+            text += '\nРоль: арендатор'
+            if owner:
+                text += '\nВладелец: %s' % Misc.get_deeplink_with_name(owner)
+        if reservation.get('date_from') or reservation.get('date_to'):
+            text += '\nДаты: %s - %s' % (
+                html.quote(reservation.get('date_from') or '?'),
+                html.quote(reservation.get('date_to') or '?'),
+            )
+        audit = cls.text_reservation_audit(response)
+        if audit:
+            text += '\n\n%s' % audit
+        return text
+
+    @classmethod
+    async def send_reservation_history_group(cls, message, title, reservations):
+        if not reservations:
+            return
+        await message.reply(title)
+        for response in reservations:
+            await message.reply(
+                cls.text_reservation_history_card(response),
+                reply_markup=cls.reservation_history_markup(response),
+            )
+
+    @classmethod
+    async def send_reservation_history(cls, message, profile_from):
+        status_open, response_open = await cls.list_reservations(
+            profile_from,
+            status_group='open',
+        )
+        if status_open != 200:
+            await message.reply((response_open or {}).get('message') or 'Не удалось получить брони')
+            return
+        status_closed, response_closed = await cls.list_reservations(
+            profile_from,
+            status_group='recent_closed',
+        )
+        if status_closed != 200:
+            await message.reply((response_closed or {}).get('message') or 'Не удалось получить историю брони')
+            return
+        open_reservations = (response_open or {}).get('reservations') or []
+        closed_reservations = (response_closed or {}).get('reservations') or []
+        if not open_reservations and not closed_reservations:
+            await message.reply('У вас пока нет броней проката')
+            return
+        await cls.send_reservation_history_group(
+            message,
+            'Активные брони',
+            open_reservations,
+        )
+        await cls.send_reservation_history_group(
+            message,
+            'Недавно закрытые брони',
+            closed_reservations,
+        )
+
+    @classmethod
     def reservation_status_label(cls, reservation):
         return cls.STATUS_LABELS.get(
             reservation.get('status'),
@@ -729,7 +873,7 @@ class Rental(object):
     def markup_reservation_owner(cls, reservation):
         status = reservation.get('status')
         rows = []
-        if status == 'sent':
+        if status in ('sent', 'awaiting_payment'):
             rows.append([
                 InlineKeyboardButton(
                     text='Принять',
