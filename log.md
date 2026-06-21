@@ -3,6 +3,7 @@
 ## 2026-06-21
 
 - Implemented `doverabot-rental-durable-fsm-hermes-map-marker-tests`: durable Redis FSM selection for the bot, explicit Organizm/Hermes rental STT helpers, rental map links/markers/filter forwarding, backend rental map assertions, and mocked rental handler tests. DB-backed `manage.py test users` remains blocked by local PostgreSQL peer authentication for user `postgres`.
+- Committed and deployed `doverabot-rental-durable-fsm-hermes-map-marker-tests`: source commit `e85a984`, no migrations to apply, nginx/web/bot active, rental search and rental map smoke checks returned HTTP 200, and recent web/bot log tails showed no new traceback after restart.
 
 ## 2026-06-20
 

@@ -1,7 +1,7 @@
 # Doverabot Rental Durable FSM Hermes Map Marker Tests Chain
 
 Date: 2026-06-21
-Status: implemented, source checks run
+Status: implemented and deployed
 Started `/new-go-slug`: `doverabot-rental-durable-fsm-hermes-map-marker-tests`
 Parent chain: [2026-06-18-doverabot-rental-runtime-concierge-owner-consumer-agent-chain.md](2026-06-18-doverabot-rental-runtime-concierge-owner-consumer-agent-chain.md)
 
@@ -48,4 +48,21 @@ Reason: local PostgreSQL peer authentication rejects the current OS user for dat
 
 ## Operational Handoff
 
-Pending source commit and deployment wrapper checks.
+Source commit:
+
+- `git commit -m "doverabot-rental-durable-fsm-hermes-map-marker-tests"` -> `e85a984`
+
+Deploy checks:
+
+- `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run` -> OK; showed expected source sync changes for this chain.
+- `sudo -n /usr/local/sbin/blagodarie-admin check-django` -> OK with pre-existing `security.W002` clickjacking middleware warning.
+- `sudo -n /usr/local/sbin/blagodarie-admin status` -> nginx, web, and bot active before deploy.
+- `sudo -n /usr/local/sbin/blagodarie-admin sync` -> OK.
+- `sudo -n /usr/local/sbin/blagodarie-admin migrate` -> no migrations to apply; same pre-existing `security.W002` warning.
+- `sudo -n /usr/local/sbin/blagodarie-admin deploy` -> OK; nginx config test passed and web/bot restarted.
+- `sudo -n /usr/local/sbin/blagodarie-admin is-active` -> nginx, web, and bot active.
+- `curl -sS -w '\nHTTP_STATUS=%{http_code}\n' 'https://api.doverabot.ru/api/rental/search/?query=tent&number=1'` -> HTTP 200, `{"offers":[]}`.
+- `curl -sS -w '\nHTTP_STATUS=%{http_code}\n' 'https://api.doverabot.ru/api/user/points/?rental=on'` -> HTTP 200, empty points payload.
+- `curl -sS -w '\nHTTP_STATUS=%{http_code}\n' 'https://map.doverabot.ru/?rental=on'` -> HTTP 200 and returned the rental map wrapper.
+- `sudo -n /usr/local/sbin/blagodarie-admin logs-web 30` -> recent Jun 21 web restart, no new traceback in the checked tail.
+- `sudo -n /usr/local/sbin/blagodarie-admin logs-bot 30` -> recent Jun 21 bot restart, no new traceback in the checked tail.
