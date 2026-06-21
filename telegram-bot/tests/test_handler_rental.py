@@ -642,6 +642,133 @@ class LegacyProfileMediaCallbackFeedbackTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('профиль', callback.answer_text.lower())
 
 
+class LegacyProfileEditCallbackParserTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+        self.handler_callbacks = import_fresh('handler_callbacks')
+
+    async def test_malformed_new_person_gender_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback('bad~')
+        state = FakeState({'uuid': 'person-uuid', 'first_name': 'Person'})
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(),
+        ) as post_tg_user:
+            await self.handler_callbacks.cbq_gender_new_person(callback, state)
+
+        post_tg_user.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_malformed_gender_state_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback('bad~')
+        state = FakeState({'uuid': 'person-uuid'})
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(),
+        ) as post_tg_user:
+            await self.handler_callbacks.cbq_gender_from_state(callback, state)
+
+        post_tg_user.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_gender_state_auth_failure_shows_profile_notice(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.GENDER_MALE}{self.common.KeyboardType.SEP}'
+        )
+        state = FakeState({'uuid': 'person-uuid'})
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(200, {'uuid': 'requester-uuid'})),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(return_value=False),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'put_user_properties',
+            mock.AsyncMock(),
+        ) as put_user_properties:
+            await self.handler_callbacks.cbq_gender_from_state(callback, state)
+
+        put_user_properties.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('профиль', callback.answer_text.lower())
+
+    async def test_meet_gender_auth_failure_shows_profile_notice_before_state_use(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.MEET_GENDER_MALE}{self.common.KeyboardType.SEP}'
+        )
+        state = FakeState({'uuid': 'person-uuid'})
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(500, {})),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'put_user_properties',
+            mock.AsyncMock(),
+        ) as put_user_properties:
+            await self.handler_callbacks.cbq_meet_ask_gender(callback, state)
+
+        put_user_properties.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('профиль', callback.answer_text.lower())
+
+    async def test_malformed_attitude_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.TRUST_THANK}{self.common.KeyboardType.SEP}bad'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(),
+        ) as post_tg_user:
+            await self.handler_callbacks.cbq_attitude(callback, FakeState())
+
+        post_tg_user.assert_not_awaited()
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_malformed_dates_dod_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.DATES_DOD_NONE}{self.common.KeyboardType.SEP}'
+        )
+        state = FakeState({'uuid': 'person-uuid'})
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(),
+        ) as check_owner:
+            await self.handler_callbacks.cbq_dates_dod_done_or_dead(callback, state)
+
+        check_owner.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+
 class LegacySympaLinkTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         install_dependency_stubs(stub_common=False)

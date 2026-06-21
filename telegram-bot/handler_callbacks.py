@@ -196,12 +196,19 @@ async def new_iof_ask_gender(message: Message, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(FSMnewPerson.ask_gender))
 async def cbq_gender_new_person(callback: CallbackQuery, state: FSMContext):
-    gender = 'm' if callback.data.split(KeyboardType.SEP)[0] == str(KeyboardType.NEW_IOF_GENDER_MALE) else 'f'
+    keyboard_type = Misc.callback_int_part(callback, 0)
+    if keyboard_type not in (KeyboardType.NEW_IOF_GENDER_MALE, KeyboardType.NEW_IOF_GENDER_FEMALE):
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    gender = 'm' if keyboard_type == KeyboardType.NEW_IOF_GENDER_MALE else 'f'
     status_sender, response_sender = await Misc.post_tg_user(callback.from_user)
+    if status_sender != 200:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
     data = await state.get_data()
-    if status_sender == 200 and \
-       response_sender['uuid'] == data.get('uuid') and \
-       data.get('first_name'):
+    if response_sender['uuid'] == data.get('uuid') and data.get('first_name'):
         payload_iof = dict(
             tg_token=settings.TOKEN,
             owner_id=response_sender['user_id'],
@@ -223,6 +230,10 @@ async def cbq_gender_new_person(callback: CallbackQuery, state: FSMContext):
                 profile_sender=response_sender,
                 tg_user_sender=callback.from_user,
             )
+    else:
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
     await state.clear()
     await callback.answer()
 
@@ -288,28 +299,42 @@ async def got_gender_text(message: Message, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(FSMgender.ask))
 async def cbq_gender_from_state(callback: CallbackQuery, state: FSMContext):
+    keyboard_type = Misc.callback_int_part(callback, 0)
+    if keyboard_type not in (KeyboardType.GENDER_MALE, KeyboardType.GENDER_FEMALE):
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
     status_sender, response_sender = await Misc.post_tg_user(callback.from_user)
-    if status_sender == 200:
-        data = await state.get_data()
-        if data.get('uuid'):
-            response_sender = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=data['uuid'])
-            if response_sender:
-                gender = 'm' if callback.data.split(KeyboardType.SEP)[0] == str(KeyboardType.GENDER_MALE) else 'f'
-                status, response = await Misc.put_user_properties(
-                    uuid=data['uuid'],
-                    gender=gender,
-                )
-                if status == 200 and response:
-                    s_gender = 'мужской' if gender == 'm' else 'женский'
-                    deeplink = Misc.get_deeplink_with_name(response)
-                    await callback.message.reply(
-                        text= f'{deeplink}\nУстановлен пол: {s_gender}',
-                    )
-                    if data.get('card_type') == Misc.CARD_TYPE_MEET:
-                        await Misc.show_edit_meet(
-                            callback.from_user.id,
-                            response,
-                        )
+    if status_sender != 200:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    data = await state.get_data()
+    if not data.get('uuid'):
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    response_sender = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=data['uuid'])
+    if not response_sender:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    gender = 'm' if keyboard_type == KeyboardType.GENDER_MALE else 'f'
+    status, response = await Misc.put_user_properties(
+        uuid=data['uuid'],
+        gender=gender,
+    )
+    if status == 200 and response:
+        s_gender = 'мужской' if gender == 'm' else 'женский'
+        deeplink = Misc.get_deeplink_with_name(response)
+        await callback.message.reply(
+            text= f'{deeplink}\nУстановлен пол: {s_gender}',
+        )
+        if data.get('card_type') == Misc.CARD_TYPE_MEET:
+            await Misc.show_edit_meet(
+                callback.from_user.id,
+                response,
+            )
     await state.clear()
     await callback.answer()
 
@@ -543,12 +568,26 @@ async def cbq_meet_do_or_revoke(callback: CallbackQuery, state: FSMContext):
     )), StateFilter(FSMmeet.ask_gender))
 
 async def cbq_meet_ask_gender(callback: CallbackQuery, state: FSMContext):
-    status_sender, response_sender = await Misc.post_tg_user(callback.from_user)
-    if status_sender != 200 and data.get('uuid') != response_sender['uuid']:
+    keyboard_type = Misc.callback_int_part(callback, 0)
+    if keyboard_type not in (KeyboardType.MEET_GENDER_MALE, KeyboardType.MEET_GENDER_FEMALE):
         await state.clear()
+        await Misc.answer_callback_notice(callback)
         return
-    code = callback.data.split(KeyboardType.SEP)
-    gender = 'm' if int(code[0]) == KeyboardType.MEET_GENDER_MALE else 'f'
+    status_sender, response_sender = await Misc.post_tg_user(callback.from_user)
+    if status_sender != 200:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    data = await state.get_data()
+    if not data.get('uuid'):
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    if data.get('uuid') != response_sender['uuid']:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    gender = 'm' if keyboard_type == KeyboardType.MEET_GENDER_MALE else 'f'
     status, response = await Misc.put_user_properties(
         uuid=response_sender['uuid'],
         gender=gender,
@@ -723,7 +762,9 @@ async def cbq_attitude(callback: CallbackQuery, state: FSMContext):
         <KeyboardType.SEP>
     """
     try:
-        code = callback.data.split(KeyboardType.SEP)
+        code = Misc.parse_callback_data(callback, KeyboardType.TRUST_THANK, min_parts=3)
+        if not code:
+            raise ValueError
         try:
             operation_type_id=int(code[1])
         except (ValueError, IndexError,):
@@ -1216,14 +1257,24 @@ async def put_dates(message, state, tg_user_sender):
         KeyboardType.SEP,
     )), StateFilter(FSMdates.dod))
 async def cbq_dates_dod_done_or_dead(callback: CallbackQuery, state: FSMContext):
-    if (uuid := Misc.get_uuid_from_callback(callback)) and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        code = callback.data.split(KeyboardType.SEP)
-        await state.update_data(
-            dod=None,
-            is_dead=code[0] == str(KeyboardType.DATES_DOD_DEAD)
-        )
-        await put_dates(callback.message, state, callback.from_user)
+    keyboard_type = Misc.callback_int_part(callback, 0)
+    if keyboard_type not in (KeyboardType.DATES_DOD_NONE, KeyboardType.DATES_DOD_DEAD):
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    if not await Misc.check_owner_by_uuid(callback.from_user, uuid):
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    await state.update_data(
+        dod=None,
+        is_dead=keyboard_type == KeyboardType.DATES_DOD_DEAD,
+    )
+    await put_dates(callback.message, state, callback.from_user)
     await callback.answer()
 
 
