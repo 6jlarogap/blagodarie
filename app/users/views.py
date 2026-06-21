@@ -4108,7 +4108,8 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
     )
 
     def check_bot_token(self, request):
-        if request.data.get('tg_token') != settings.TELEGRAM_BOT_TOKEN:
+        token = request.data.get('tg_token') or request.GET.get('tg_token')
+        if token != settings.TELEGRAM_BOT_TOKEN:
             raise ServiceException('Неверный токен телеграм бота')
 
     def clean_text(self, data, key, default=''):
@@ -4558,6 +4559,46 @@ class ApiRentalOffer(ApiRentalMixin, APIView):
         return Response(data=data, status=status_code)
 
     def get(self, request):
+        if request.GET.get('owner_uuid'):
+            try:
+                self.check_bot_token(request)
+                owner, profile = self.check_user_uuid(
+                    uuid=request.GET.get('owner_uuid'),
+                    related=('user',),
+                )
+                status_value = self.clean_text(request.GET, 'status')
+                if status_value and status_value not in dict(RentalOffer.STATUSES):
+                    raise ServiceException('Неверный статус объявления')
+                try:
+                    number = min(max(int(request.GET.get('number', 10)), 1), 50)
+                except ValueError:
+                    number = 10
+                qs = RentalOffer.objects.select_related(
+                    'owner',
+                    'owner__profile',
+                ).prefetch_related(
+                    'tgdesc',
+                    'equipment_types',
+                    'telegram_messages_set',
+                ).filter(owner=owner)
+                if status_value:
+                    qs = qs.filter(status=status_value)
+                data = dict(
+                    offers=[
+                        offer.data_dict(
+                            request=request,
+                            viewer_user=owner,
+                            include_payment=True,
+                        )
+                        for offer in qs[:number]
+                    ]
+                )
+                return Response(data=data, status=status.HTTP_200_OK)
+            except ServiceException as excpt:
+                return Response(
+                    data=dict(message=excpt.args[0]),
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         try:
             include_private_link = bool(request.GET.get('uuid'))
             qs, viewer_user = self.rental_offer_queryset(

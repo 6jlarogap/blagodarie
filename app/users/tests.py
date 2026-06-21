@@ -102,6 +102,84 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(response.data['offer']['price_text'], '500 руб/день')
 
     @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    def test_owner_listing_controls_include_paused_archived_and_status_updates(self):
+        active_offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Active tent',
+            description_text='Палатка',
+        )
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Paused tent',
+            status=RentalOffer.STATUS_PAUSED,
+        )
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Archived tent',
+            status=RentalOffer.STATUS_ARCHIVED,
+        )
+        RentalOffer.objects.create(owner=self.requester, title='Other tent')
+
+        response = self.client.get('/api/rental/offer/', data={
+            'tg_token': self.bot_token,
+            'owner_uuid': str(self.owner_profile.uuid),
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {offer['title'] for offer in response.data['offers']},
+            {'Active tent', 'Paused tent', 'Archived tent'},
+        )
+
+        response = self.client.get('/api/rental/offer/', data={
+            'tg_token': self.bot_token,
+            'owner_uuid': str(self.owner_profile.uuid),
+            'status': RentalOffer.STATUS_PAUSED,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [offer['title'] for offer in response.data['offers']],
+            ['Paused tent'],
+        )
+
+        response = self.client.get('/api/rental/offer/', data={
+            'owner_uuid': str(self.owner_profile.uuid),
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Неверный токен телеграм бота')
+
+        response = self.client.put('/api/rental/offer/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.owner_profile.uuid),
+            'offer_uuid': str(active_offer.uuid),
+            'status': RentalOffer.STATUS_PAUSED,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['offer']['status'], RentalOffer.STATUS_PAUSED)
+
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+            'query': 'Active',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['offers'], [])
+
+        response = self.client.put('/api/rental/offer/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.owner_profile.uuid),
+            'offer_uuid': str(active_offer.uuid),
+            'status': RentalOffer.STATUS_ACTIVE,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+            'query': 'Active',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['offers'][0]['title'], 'Active tent')
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
     def test_search_hides_private_and_explicit_mistrust(self):
         RentalOffer.objects.create(
             owner=self.owner,

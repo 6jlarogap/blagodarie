@@ -59,6 +59,100 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('rental=on', map_buttons[0].url)
         self.assertIn('rental_uuid=offer-uuid', map_buttons[0].url)
 
+    async def test_rent_hub_mentions_owner_listing_command(self):
+        message = FakeMessage(text='/rent')
+        state = FakeState()
+
+        await self.handler_rental.Rental.cmd_rent(message, state)
+
+        self.assertIn('/rent_my', message.replies[-1].text)
+
+    async def test_cmd_rent_my_lists_owner_offers_with_controls(self):
+        message = FakeMessage(text='/rent_my')
+        state = FakeState()
+        response = {
+            'offers': [{
+                'uuid': 'offer-uuid',
+                'title': 'Travel tent',
+                'status': 'active',
+                'price_text': '500 руб/день',
+                'latitude': 55.75,
+                'longitude': 37.61,
+                'owner': {'uuid': 'requester-uuid'},
+            }],
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'list_owner_offers',
+            mock.AsyncMock(return_value=(200, response)),
+        ) as list_owner_offers:
+            await self.handler_rental.Rental.cmd_rent_my(message, state)
+
+        list_owner_offers.assert_awaited_once_with(
+            {'uuid': 'requester-uuid', 'first_name': 'Requester'},
+            status_filter='all',
+        )
+        self.assertIn('Travel tent', message.replies[-1].text)
+        buttons = [
+            button
+            for row in message.replies[-1].reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertIn('Пауза', [button.text for button in buttons])
+        self.assertIn('В архив', [button.text for button in buttons])
+        self.assertIn('На карте', [button.text for button in buttons])
+
+    async def test_owner_pause_callback_updates_offer_and_renders_resume_controls(self):
+        callback = FakeCallback('84~pause~offer-uuid')
+        state = FakeState()
+        response = {
+            'offer': {
+                'uuid': 'offer-uuid',
+                'title': 'Travel tent',
+                'status': 'paused',
+                'owner': {'uuid': 'requester-uuid'},
+            },
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'set_owner_offer_status',
+            mock.AsyncMock(return_value=(200, response)),
+        ) as set_owner_offer_status:
+            await self.handler_rental.cbq_rental_owner_action(callback, state)
+
+        set_owner_offer_status.assert_awaited_once_with(
+            'offer-uuid',
+            {'uuid': 'requester-uuid', 'first_name': 'Requester'},
+            'paused',
+        )
+        self.assertTrue(callback.answered)
+        self.assertEqual(callback.answer_text, 'Статус обновлен')
+        self.assertIn('на паузе', callback.message.replies[-1].text)
+        buttons = [
+            button
+            for row in callback.message.replies[-1].reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertIn('Возобновить', [button.text for button in buttons])
+
+    async def test_stale_owner_callback_shows_notice_and_skips_api(self):
+        callback = FakeCallback('84~pause~')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'set_owner_offer_status',
+            mock.AsyncMock(),
+        ) as set_owner_offer_status:
+            await self.handler_rental.cbq_rental_owner_action(callback, state)
+
+        set_owner_offer_status.assert_not_awaited()
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
     async def test_process_rental_search_stops_on_command_interrupt(self):
         message = FakeMessage(text='/rent')
         state = FakeState()

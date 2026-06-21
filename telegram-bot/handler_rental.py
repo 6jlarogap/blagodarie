@@ -63,9 +63,32 @@ class Rental(object):
         ACTION_OWNER_CONFIRM,
         ACTION_CANCEL,
     }
+    ACTION_OWNER_LIST = 'list'
+    ACTION_OWNER_ACTIVATE = 'activate'
+    ACTION_OWNER_PAUSE = 'pause'
+    ACTION_OWNER_ARCHIVE = 'archive'
+    ACTIONS_OWNER = {
+        ACTION_OWNER_LIST,
+        ACTION_OWNER_ACTIVATE,
+        ACTION_OWNER_PAUSE,
+        ACTION_OWNER_ARCHIVE,
+    }
+    OWNER_ACTION_STATUS = {
+        ACTION_OWNER_ACTIVATE: 'active',
+        ACTION_OWNER_PAUSE: 'paused',
+        ACTION_OWNER_ARCHIVE: 'archived',
+    }
+    OWNER_LIST_STATUSES = {'all', 'active', 'paused', 'archived'}
 
     MSG_CALLBACK_STALE = 'Эта кнопка устарела. Откройте прокат заново через /rent_search или /rent.'
     MSG_CALLBACK_AUTH = 'Не удалось проверить ваш профиль. Откройте бота командой /start и попробуйте еще раз.'
+
+    OFFER_STATUS_LABELS = {
+        'draft': 'черновик',
+        'active': 'активно',
+        'paused': 'на паузе',
+        'archived': 'архив',
+    }
 
     STATUS_LABELS = {
         'sent': 'заявка отправлена',
@@ -243,7 +266,8 @@ class Rental(object):
         await message.reply(
             'Прокат снаряжения:\n'
             '/rent_offer - создать объявление\n'
-            '/rent_search - найти снаряжение'
+            '/rent_search - найти снаряжение\n'
+            '/rent_my - мои объявления'
         )
 
     @classmethod
@@ -268,6 +292,14 @@ class Rental(object):
             return
         await state.set_state(FSMRentalSearch.ask)
         await message.reply(cls.PROMPT_SEARCH, reply_markup=Misc.reply_markup_cancel_row())
+
+    @classmethod
+    async def cmd_rent_my(cls, message: Message, state: FSMContext):
+        status_sender, response_sender = await Misc.post_tg_user(message.from_user)
+        if status_sender != 200:
+            await message.reply(Misc.MSG_ERROR_API)
+            return
+        await cls.send_owner_offers(message, response_sender)
 
     @classmethod
     async def create_offer(cls, payload):
@@ -308,6 +340,30 @@ class Rental(object):
             params=params,
         )
         return status, response
+
+    @classmethod
+    async def list_owner_offers(cls, profile_from, status_filter='all'):
+        params = dict(
+            tg_token=settings.TOKEN,
+            owner_uuid=profile_from['uuid'],
+            number=20,
+        )
+        if status_filter and status_filter != 'all':
+            params.update(status=status_filter)
+        status, response = await Misc.api_request(
+            path='/api/rental/offer',
+            method='get',
+            params=params,
+        )
+        return status, response
+
+    @classmethod
+    async def set_owner_offer_status(cls, offer_uuid, profile_from, status_value):
+        return await cls.put_offer(dict(
+            user_uuid=profile_from['uuid'],
+            offer_uuid=offer_uuid,
+            status=status_value,
+        ))
 
     @classmethod
     async def search(cls, query, user_uuid):
@@ -481,6 +537,127 @@ class Rental(object):
                 )
             ]] if cls.get_map_url(offer) else []),
         ])
+
+    @classmethod
+    def offer_status_label(cls, offer):
+        return cls.OFFER_STATUS_LABELS.get(
+            offer.get('status'),
+            offer.get('status') or 'статус неизвестен',
+        )
+
+    @classmethod
+    def owner_action_callback_data(cls, action, value):
+        return '%s%s%s%s%s' % (
+            KeyboardType.RENTAL_OWNER_ACTION,
+            KeyboardType.SEP,
+            action,
+            KeyboardType.SEP,
+            value,
+        )
+
+    @classmethod
+    def parse_owner_action_callback_data(cls, callback):
+        parts = (callback.data or '').split(KeyboardType.SEP)
+        if (
+            len(parts) != 3 or
+            parts[0] != str(KeyboardType.RENTAL_OWNER_ACTION) or
+            parts[1] not in cls.ACTIONS_OWNER
+        ):
+            return '', ''
+        action, value = parts[1], parts[2]
+        if action == cls.ACTION_OWNER_LIST:
+            if value not in cls.OWNER_LIST_STATUSES:
+                return '', ''
+        elif not value:
+            return '', ''
+        return action, value
+
+    @classmethod
+    def text_owner_offer(cls, offer):
+        result = '<b>%s</b>\n' % html.quote(offer.get('title') or offer.get('item_text') or 'Прокат')
+        result += 'Статус: %s\n' % html.quote(cls.offer_status_label(offer))
+        if offer.get('price_text'):
+            result += 'Цена: %s\n' % html.quote(offer['price_text'])
+        elif offer.get('price_amount'):
+            result += 'Цена: %s %s %s\n' % (
+                html.quote(offer.get('price_amount') or ''),
+                html.quote(offer.get('price_currency') or ''),
+                html.quote(offer.get('price_period') or ''),
+            )
+        if offer.get('availability_text') or offer.get('available_from') or offer.get('available_to'):
+            availability = offer.get('availability_text') or ''
+            if offer.get('available_from') or offer.get('available_to'):
+                availability += ' %s - %s' % (offer.get('available_from') or '?', offer.get('available_to') or '?')
+            result += 'Доступность: %s\n' % html.quote(availability.strip())
+        if offer.get('address'):
+            result += 'Адрес: %s\n' % html.quote(offer['address'])
+        result += '\n%s' % Misc.get_html_a(cls.get_deeplink(offer['uuid']), 'Ссылка на объявление')
+        return result
+
+    @classmethod
+    def markup_owner_offer(cls, offer):
+        status = offer.get('status')
+        rows = []
+        if status == 'active':
+            rows.append([
+                InlineKeyboardButton(
+                    text='Пауза',
+                    callback_data=cls.owner_action_callback_data(
+                        cls.ACTION_OWNER_PAUSE,
+                        offer['uuid'],
+                    ),
+                )
+            ])
+        elif status in ('paused', 'archived', 'draft'):
+            rows.append([
+                InlineKeyboardButton(
+                    text='Возобновить',
+                    callback_data=cls.owner_action_callback_data(
+                        cls.ACTION_OWNER_ACTIVATE,
+                        offer['uuid'],
+                    ),
+                )
+            ])
+        if status != 'archived':
+            rows.append([
+                InlineKeyboardButton(
+                    text='В архив',
+                    callback_data=cls.owner_action_callback_data(
+                        cls.ACTION_OWNER_ARCHIVE,
+                        offer['uuid'],
+                    ),
+                )
+            ])
+        rows.append([
+            InlineKeyboardButton(
+                text='Открыть',
+                url=cls.get_deeplink(offer['uuid']),
+            )
+        ])
+        if cls.get_map_url(offer):
+            rows.append([
+                InlineKeyboardButton(
+                    text='На карте',
+                    url=cls.get_map_url(offer),
+                )
+            ])
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+
+    @classmethod
+    async def send_owner_offers(cls, message, profile_from, status_filter='all'):
+        status, response = await cls.list_owner_offers(profile_from, status_filter=status_filter)
+        if status != 200:
+            await message.reply((response or {}).get('message') or 'Не удалось получить объявления')
+            return
+        offers = (response or {}).get('offers') or []
+        if not offers:
+            await message.reply('У вас пока нет объявлений проката')
+            return
+        for offer in offers:
+            await message.reply(
+                cls.text_owner_offer(offer),
+                reply_markup=cls.markup_owner_offer(offer),
+            )
 
     @classmethod
     def reservation_status_label(cls, reservation):
@@ -1104,6 +1281,43 @@ async def cbq_rental_reservation_action(callback: CallbackQuery, state: FSMConte
     else:
         await callback.message.reply(Rental.text_reservation_status(response_action))
     await callback.answer()
+
+
+@router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
+        KeyboardType.RENTAL_OWNER_ACTION,
+        KeyboardType.SEP,
+    )), StateFilter(None))
+async def cbq_rental_owner_action(callback: CallbackQuery, state: FSMContext):
+    action, value = Rental.parse_owner_action_callback_data(callback)
+    if not action:
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_STALE)
+        return
+    status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if status_from != 200:
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_AUTH)
+        return
+    if action == Rental.ACTION_OWNER_LIST:
+        await Rental.send_owner_offers(callback.message, profile_from, status_filter=value)
+        await callback.answer()
+        return
+    status_value = Rental.OWNER_ACTION_STATUS[action]
+    status_action, response_action = await Rental.set_owner_offer_status(
+        value,
+        profile_from,
+        status_value,
+    )
+    if status_action != 200:
+        await callback.message.reply(
+            (response_action or {}).get('message') or 'Не удалось обновить объявление'
+        )
+        await callback.answer()
+        return
+    offer = response_action['offer']
+    await callback.message.reply(
+        Rental.text_owner_offer(offer),
+        reply_markup=Rental.markup_owner_offer(offer),
+    )
+    await callback.answer('Статус обновлен')
 
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMRentalPaymentProof.ask))

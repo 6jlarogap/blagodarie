@@ -402,6 +402,10 @@ class KeyboardType(object):
     #
     RENTAL_RESERVATION_ACTION = 83
 
+    # Действие владельца с объявлением проката
+    #
+    RENTAL_OWNER_ACTION = 84
+
     # Разделитель данных в call back data
     #
     SEP = '~'

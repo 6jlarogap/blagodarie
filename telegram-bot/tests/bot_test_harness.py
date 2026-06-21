@@ -322,6 +322,7 @@ def install_dependency_stubs(stub_common=True):
             RENTAL_CONTACT = 81
             RENTAL_BOOK = 82
             RENTAL_RESERVATION_ACTION = 83
+            RENTAL_OWNER_ACTION = 84
             SEP = '~'
 
         class RcacheStub:
