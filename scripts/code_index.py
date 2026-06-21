@@ -24,7 +24,9 @@ GENERATED_NOTE = "Auto-generated symbol index. Do not edit this section manually
 
 INDEXABLE_SUFFIXES = {".py", ".js", ".mjs", ".cjs", ".java", ".md", ".sh"}
 EXCLUDED_DIR_NAMES = {
+    ".agents",
     ".cache",
+    ".codex",
     ".git",
     ".mypy_cache",
     ".pytest_cache",
@@ -72,14 +74,19 @@ def repo_root() -> Path:
     return Path(os.environ.get("CODE_INDEX_ROOT", ".")).resolve()
 
 
-def is_excluded(rel: str) -> bool:
+def is_under_excluded_area(rel: str) -> bool:
     rel_posix = rel.replace(os.sep, "/")
-    if rel_posix == "CODE_INDEX.md" or rel_posix.endswith("/CODE_INDEX.md"):
-        return True
     if any(rel_posix.startswith(prefix) for prefix in EXCLUDED_PATH_PREFIXES):
         return True
     parts = set(Path(rel_posix).parts)
     return bool(parts & EXCLUDED_DIR_NAMES)
+
+
+def is_excluded(rel: str) -> bool:
+    rel_posix = rel.replace(os.sep, "/")
+    if rel_posix == "CODE_INDEX.md" or rel_posix.endswith("/CODE_INDEX.md"):
+        return True
+    return is_under_excluded_area(rel_posix)
 
 
 def is_indexable(path: Path, root: Path) -> bool:
@@ -403,6 +410,9 @@ def clean_obsolete_indexes(root: Path, scopes: set[Path]) -> None:
     expected = {root / "CODE_INDEX.md"}
     expected.update(root / scope / "CODE_INDEX.md" for scope in scopes if scope != Path("."))
     for path in root.rglob("CODE_INDEX.md"):
+        rel = path.relative_to(root).as_posix()
+        if is_under_excluded_area(rel):
+            continue
         if path in expected:
             continue
         try:
