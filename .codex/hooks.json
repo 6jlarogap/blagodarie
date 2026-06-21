@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/code-index-hook-check.sh"
+          },
+          {
+            "type": "command",
+            "command": "uvx --from graphifyy graphify hook-check"
+          }
+        ]
+      }
+    ]
+  }
+}
