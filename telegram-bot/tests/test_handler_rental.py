@@ -195,6 +195,66 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertIn('Принять', [button.text for button in buttons])
 
+    async def test_owner_markup_includes_reject_payment_proof_button(self):
+        markup = self.handler_rental.Rental.markup_reservation_owner({
+            'id': 44,
+            'status': 'payment_proof_submitted',
+        })
+
+        buttons = [
+            button
+            for row in markup.inline_keyboard
+            for button in row
+        ]
+        reject_buttons = [button for button in buttons if button.text == 'Отклонить чек']
+        self.assertEqual(len(reject_buttons), 1)
+        self.assertEqual(reject_buttons[0].callback_data, '83~payment_proof_rejected~44')
+
+    async def test_owner_reject_payment_proof_callback_notifies_requester(self):
+        callback = FakeCallback('83~payment_proof_rejected~44')
+        state = FakeState()
+        self.handler_rental.bot = FakeBot()
+        response = {
+            'reservation': {
+                'id': 44,
+                'sequence_number': 2,
+                'status': 'cancelled',
+                'recipient_kind': 'owner',
+            },
+            'event': {
+                'actor_role': 'owner',
+                'event_type': 'payment_proof_rejected',
+            },
+            'offer': {'uuid': 'offer-uuid', 'title': 'Travel tent'},
+            'owner': {'first_name': 'Owner'},
+            'requester': {
+                'first_name': 'Requester',
+                'tg_data': [{'tg_uid': 3003}],
+            },
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(200, {'uuid': 'owner-uuid', 'first_name': 'Owner'})),
+        ), mock.patch.object(
+            self.handler_rental.Rental,
+            'reservation_action',
+            mock.AsyncMock(return_value=(200, response)),
+        ) as reservation_action:
+            await self.handler_rental.cbq_rental_reservation_action(callback, state)
+
+        reservation_action.assert_awaited_once_with(
+            '44',
+            {'uuid': 'owner-uuid', 'first_name': 'Owner'},
+            'payment_proof_rejected',
+        )
+        self.assertTrue(callback.answered)
+        self.assertIn('Подтверждение оплаты отклонено', callback.message.replies[-1].text)
+        self.assertEqual(len(self.handler_rental.bot.sent_messages), 1)
+        self.assertIn('Владелец отклонил подтверждение оплаты', self.handler_rental.bot.sent_messages[0][1])
+        self.assertIn('Доверие и недоверие не меняются автоматически', self.handler_rental.bot.sent_messages[0][1])
+
     async def test_owner_pause_callback_updates_offer_and_renders_resume_controls(self):
         callback = FakeCallback('84~pause~offer-uuid')
         state = FakeState()

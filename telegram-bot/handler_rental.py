@@ -56,11 +56,13 @@ class Rental(object):
     ACTION_OWNER_ACCEPT = 'owner_accept'
     ACTION_PAYMENT_REPORTED = 'payment_reported'
     ACTION_OWNER_CONFIRM = 'owner_confirm'
+    ACTION_PAYMENT_PROOF_REJECTED = 'payment_proof_rejected'
     ACTION_CANCEL = 'cancel'
     ACTIONS_RESERVATION = {
         ACTION_OWNER_ACCEPT,
         ACTION_PAYMENT_REPORTED,
         ACTION_OWNER_CONFIRM,
+        ACTION_PAYMENT_PROOF_REJECTED,
         ACTION_CANCEL,
     }
     ACTION_OWNER_LIST = 'list'
@@ -105,6 +107,7 @@ class Rental(object):
         'owner_accept': 'принята владельцем',
         'payment_reported': 'оплата отмечена',
         'payment_proof_submitted': 'подтверждение оплаты отправлено',
+        'payment_proof_rejected': 'подтверждение оплаты отклонено',
         'owner_confirm': 'подтверждена владельцем',
         'cancel': 'отменена',
         'expire': 'истекла',
@@ -893,6 +896,16 @@ class Rental(object):
                     ),
                 )
             ])
+        if status == 'payment_proof_submitted':
+            rows.append([
+                InlineKeyboardButton(
+                    text='Отклонить чек',
+                    callback_data=cls.reservation_action_callback_data(
+                        cls.ACTION_PAYMENT_PROOF_REJECTED,
+                        reservation['id'],
+                    ),
+                )
+            ])
         if status in ('sent', 'awaiting_payment', 'owner_accepted', 'payment_reported', 'payment_proof_submitted'):
             rows.append([
                 InlineKeyboardButton(
@@ -1096,6 +1109,7 @@ class Rental(object):
     def text_consumer_reservation_update(cls, response):
         text = cls.text_reservation_status(response)
         reservation = response['reservation']
+        event = response.get('event') or {}
         if reservation.get('status') == 'owner_accepted':
             text += '\n\nВладелец принял заявку. Если условия подходят, сообщите об оплате кнопкой ниже.'
         elif reservation.get('status') == 'payment_proof_submitted':
@@ -1105,6 +1119,11 @@ class Rental(object):
                 text += '\n\nПодтверждение получено и передано владельцу.'
         elif reservation.get('status') == 'confirmed':
             text += '\n\nВладелец подтвердил бронь.'
+        elif event.get('event_type') == 'payment_proof_rejected':
+            text += (
+                '\n\nВладелец отклонил подтверждение оплаты. Бронь закрыта, даты освобождены. '
+                'Доверие и недоверие не меняются автоматически; профильные действия остаются отдельными.'
+            )
         elif reservation.get('status') == 'cancelled':
             text += '\n\nЗаявка закрыта.'
         elif reservation.get('status') == 'expired':
@@ -1123,6 +1142,11 @@ class Rental(object):
                 text += '\n\nКлиент прислал подтверждение системного платежа. Бронь создана под доверие; подтверждайте выдачу снаряжения, а не проверку платежа.'
             else:
                 text += '\n\nКлиент прислал подтверждение оплаты. Подтвердите бронь после проверки.'
+        elif (response.get('event') or {}).get('event_type') == 'payment_proof_rejected':
+            text += (
+                '\n\nПодтверждение оплаты отклонено. Бронь закрыта, даты освобождены. '
+                'Доверие/недоверие в профиле нужно менять отдельным действием, если это требуется.'
+            )
         elif reservation.get('status') == 'cancelled':
             text += '\n\nЗаявка закрыта.'
         elif profile_from:

@@ -555,6 +555,93 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(response.data['message'], 'Заявка уже закрыта')
 
     @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    def test_owner_can_reject_payment_proof_as_audited_terminal_dispute(self):
+        other = User.objects.create_user(username='other', first_name='Other')
+        other_profile = Profile.objects.create(user=other)
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Tent',
+            description_text='Палатка',
+        )
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-01',
+            'date_to': '2026-07-03',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        reservation_id = response.data['reservation']['id']
+
+        response = self.client.post('/api/rental/reservation/payment_proof/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'reservation_id': reservation_id,
+            'tgdesc': {
+                'message_id': 302,
+                'chat_id': 402,
+                'media_group_id': '',
+                'caption': 'paid',
+                'file_id': 'proof-file',
+                'file_type': 'photo',
+                'uuid_pack': '00000000-0000-0000-0000-000000000004',
+            },
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['reservation']['status'],
+            RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED,
+        )
+
+        response_forbidden = self.client.put('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'reservation_id': reservation_id,
+            'action': RentalReservationEvent.EVENT_PAYMENT_PROOF_REJECTED,
+        }, format='json')
+        self.assertEqual(response_forbidden.status_code, 403)
+
+        response = self.client.put('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.owner_profile.uuid),
+            'reservation_id': reservation_id,
+            'action': RentalReservationEvent.EVENT_PAYMENT_PROOF_REJECTED,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['reservation']['status'], RentalReservationIntent.STATUS_CANCELLED)
+        self.assertEqual(response.data['event']['event_type'], RentalReservationEvent.EVENT_PAYMENT_PROOF_REJECTED)
+        self.assertEqual(response.data['event']['status_to'], RentalReservationIntent.STATUS_CANCELLED)
+        self.assertEqual(response.data['event']['actor_role'], RentalReservationEvent.ROLE_OWNER)
+        self.assertIn(
+            RentalReservationEvent.EVENT_PAYMENT_PROOF_REJECTED,
+            [event['event_type'] for event in response.data['events']],
+        )
+        self.assertEqual(CurrentState.objects.count(), 0)
+
+        response = self.client.get('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'status_group': 'recent_closed',
+            'reservation_id': reservation_id,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['reservations'][0]['events'][-1]['event_type'],
+            RentalReservationEvent.EVENT_PAYMENT_PROOF_REJECTED,
+        )
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(other_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-01',
+            'date_to': '2026-07-03',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response.data['reservation']['id'], reservation_id)
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
     def test_reservation_history_filters_roles_and_terminal_status_groups(self):
         requester_owned_offer = RentalOffer.objects.create(
             owner=self.requester,

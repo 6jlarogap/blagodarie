@@ -1824,6 +1824,7 @@ class RentalReservationEvent(BaseModelInsertTimestamp):
     EVENT_OWNER_ACCEPT = 'owner_accept'
     EVENT_PAYMENT_REPORTED = 'payment_reported'
     EVENT_PAYMENT_PROOF_SUBMITTED = 'payment_proof_submitted'
+    EVENT_PAYMENT_PROOF_REJECTED = 'payment_proof_rejected'
     EVENT_OWNER_CONFIRM = 'owner_confirm'
     EVENT_CANCEL = 'cancel'
     EVENT_EXPIRE = 'expire'
@@ -1833,6 +1834,7 @@ class RentalReservationEvent(BaseModelInsertTimestamp):
         (EVENT_OWNER_ACCEPT, _("Принято владельцем")),
         (EVENT_PAYMENT_REPORTED, _("Оплата сообщена")),
         (EVENT_PAYMENT_PROOF_SUBMITTED, _("Подтверждение оплаты отправлено")),
+        (EVENT_PAYMENT_PROOF_REJECTED, _("Подтверждение оплаты отклонено")),
         (EVENT_OWNER_CONFIRM, _("Подтверждено владельцем")),
         (EVENT_CANCEL, _("Отменено")),
         (EVENT_EXPIRE, _("Истекло")),

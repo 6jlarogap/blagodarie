@@ -4413,6 +4413,12 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
             ):
                 raise ServiceException('Подтвердить можно только после сообщения об оплате')
             status_to = RentalReservationIntent.STATUS_CONFIRMED
+        elif action == RentalReservationEvent.EVENT_PAYMENT_PROOF_REJECTED:
+            if actor_role != RentalReservationEvent.ROLE_OWNER:
+                raise PermissionDenied()
+            if status_from != RentalReservationIntent.STATUS_PAYMENT_PROOF_SUBMITTED:
+                raise ServiceException('Отклонить подтверждение можно только после получения чека')
+            status_to = RentalReservationIntent.STATUS_CANCELLED
         elif action == RentalReservationEvent.EVENT_CANCEL:
             status_to = RentalReservationIntent.STATUS_CANCELLED
         else:
