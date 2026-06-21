@@ -18,6 +18,8 @@ Callback hardening chain: [../references/2026-06-21-doverabot-rental-callback-pa
 
 Runtime bot link cleanup chain: [../references/2026-06-21-doverabot-runtime-bot-link-cleanup-chain.md](../references/2026-06-21-doverabot-runtime-bot-link-cleanup-chain.md)
 
+Profile-edit callback feedback finish chain: [../references/2026-06-21-doverabot-profile-edit-callback-feedback-finish-chain.md](../references/2026-06-21-doverabot-profile-edit-callback-feedback-finish-chain.md)
+
 Current decision:
 
 - Keep one public Doverabot identity with modular feature flows: `/rent`, `/offer`, `/meet`, `rod`, `/trust`, and `/thank`.
@@ -37,6 +39,7 @@ Current implementation:
 - Rental booking/contact/reservation callbacks now have centralized payload parsing and user-visible stale/auth failure feedback.
 - The remaining runtime hard-coded Doverabot deep link in the sympathy contact handoff now uses the live bot username helper.
 - Profile-edit callbacks in `handler_callbacks.py` no longer use direct `callback.data.split(KeyboardType.SEP)` parsing, and the edited stale/auth exits now use shared visible callback notices.
+- Remaining parser-backed profile-edit callback failure exits now return visible stale/auth notices across IOF, DOB unknown, comments, delete/undelete, messaging/archive, user description, banking, meet edit-back, and archive deletion.
 
 Primary implementation areas:
 
@@ -57,9 +60,9 @@ Primary implementation areas:
 
 ## Next Implementation Slice
 
-Continue profile-edit callback cleanup for remaining parser-backed but silent stale/auth exits in `handler_callbacks.py`: IOF, DOB unknown, comment, delete/undelete, send-message/archive, user description, and banking.
+Continue with non-callback profile-edit/message-state failure feedback: replace silent clears/returns in profile edit message handlers with user-facing prompts/errors and add command-interruption/state-mismatch coverage.
 
-Suggested `/new-go-slug`: `doverabot-profile-edit-callback-feedback-finish`.
+Suggested `/new-go-slug`: `doverabot-profile-edit-state-feedback-finish`.
 
 Accepted prior-session decisions:
 
