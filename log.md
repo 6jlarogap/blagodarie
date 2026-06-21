@@ -8,8 +8,9 @@
   applied coordinates to offer creation or bounded search only after explicit
   callback confirmation; focused rental bot tests, full mocked bot discovery,
   Django check, compileall, diff check, reindex, and graphify update passed.
-  Runtime deploy remains blocked by the active wrapper/untracked-helper issue
-  recorded for `doverabot-rental-proof-dispute-controls`.
+  Runtime deploy remains blocked: `sudo -n /usr/local/sbin/blagodarie-admin
+  deploy-dry-run` still includes `>f+++++++++
+  scripts/unblock-django-test-db.sh`, so sync/migrate/deploy were not run.
 - Source-implemented `doverabot-rental-inventory-quantity-groundwork`: added
   `RentalOffer.quantity_total` defaulting to 1, API create/update validation,
   capacity-aware overlap checks that allow reservations up to listing quantity,

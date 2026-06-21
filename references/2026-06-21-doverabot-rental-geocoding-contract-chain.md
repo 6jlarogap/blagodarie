@@ -47,6 +47,9 @@ Source checks:
 
 Runtime handoff:
 
+- `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run` -> completed, but
+  the rsync plan still included unrelated untracked local state, specifically
+  `>f+++++++++ scripts/unblock-django-test-db.sh`.
 - Runtime `sync`, `migrate`, and `deploy` were not run for this slice because
   the active `/usr/local/sbin/blagodarie-admin` wrapper still has the blocker
   recorded in
