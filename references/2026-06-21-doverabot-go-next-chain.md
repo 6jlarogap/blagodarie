@@ -1,13 +1,13 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-6 implemented; slice 7 active
+Status: slices 1-7 implemented; slice 8 active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-next-decision-refresh-chain.md](2026-06-21-doverabot-next-decision-refresh-chain.md)
+Current completed chain: [2026-06-21-doverabot-rental-owner-listing-controls-chain.md](2026-06-21-doverabot-rental-owner-listing-controls-chain.md)
 
-Active next slice: Slice 7, Rental Owner Listing Controls
-Active next `/new-go-slug`: `doverabot-rental-owner-listing-controls`
-After active slice, print next `/new-go-slug`: `doverabot-rental-reservation-history-controls`
+Active next slice: Slice 8, Rental Reservation History Controls
+Active next `/new-go-slug`: `doverabot-rental-reservation-history-controls`
+After active slice, print next `/new-go-slug`: `doverabot-next-decision-refresh`
 
 ## Chain Purpose
 
@@ -189,7 +189,8 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-owner-listing-controls`
 
-Status: active next slice.
+Status: implemented and deployed in
+[2026-06-21-doverabot-rental-owner-listing-controls-chain.md](2026-06-21-doverabot-rental-owner-listing-controls-chain.md).
 
 Scope:
 
@@ -219,7 +220,7 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-reservation-history-controls`
 
-Status: planned after owner listing controls.
+Status: active next slice.
 
 Scope:
 

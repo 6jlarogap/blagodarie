@@ -73,6 +73,9 @@ Current implementation:
 - The next-decision refresh selected rental owner-listing management as the next
   product slice, because legacy hardening is covered and `/rent` still lacks a
   discoverable owner path to list, pause, resume, and archive rental offers.
+- Rental owners now have `/rent_my` plus `/rent` discoverability to list their
+  active, paused, and archived offers, pause/resume/archive them, and reopen
+  public bot/map links from owner listing cards.
 
 Primary implementation areas:
 
@@ -96,8 +99,6 @@ Covered by completed hardening slices:
 
 Remaining product backlog:
 
-- Add owner-facing rental listing controls for active, paused, and archived
-  rental offers.
 - Add requester/owner reservation history controls after listing management.
 - Improve rental map/frontend filters if the existing source path can support it
   without editing generated bundles directly.
@@ -108,10 +109,10 @@ Remaining product backlog:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-rental-owner-listing-controls`.
+Active next `/new-go-slug`: `doverabot-rental-reservation-history-controls`.
 
 After that slice, print next `/new-go-slug`:
-`doverabot-rental-reservation-history-controls`.
+`doverabot-next-decision-refresh`.
 
 After that, keep each completed chain pointing to the next slug in the go-next chain.
 
