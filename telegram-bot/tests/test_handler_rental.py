@@ -196,8 +196,14 @@ def install_dependency_stubs(stub_common=True):
 
     filters = types.ModuleType('aiogram.filters')
     filters.Command = lambda *_args, **_kwargs: None
+    filters.CommandStart = lambda *_args, **_kwargs: None
+    filters.CommandObject = object
     filters.StateFilter = lambda *_args, **_kwargs: None
     sys.modules['aiogram.filters'] = filters
+
+    filters_logic = types.ModuleType('aiogram.filters.logic')
+    filters_logic.or_f = lambda *_args, **_kwargs: None
+    sys.modules['aiogram.filters.logic'] = filters_logic
 
     types_mod = types.ModuleType('aiogram.types')
     types_mod.__path__ = []
@@ -381,6 +387,7 @@ def install_dependency_stubs(stub_common=True):
         return False
 
     handler_bot.is_it_command = is_it_command
+    handler_bot.MorphAnalyzer = object()
     sys.modules['handler_bot'] = handler_bot
 
 
@@ -410,9 +417,18 @@ class FakeMessage:
         self.text = text
         self.caption = ''
         self.content_type = content_type
-        self.from_user = types.SimpleNamespace(id=1001, username='requester')
+        self.from_user = types.SimpleNamespace(
+            id=1001,
+            username='requester',
+            first_name='Requester',
+            last_name='',
+        )
         self.chat = types.SimpleNamespace(id=2002, type=ChatTypeStub.PRIVATE)
         self.message_id = 3003
+        self.photo = None
+        self.audio = None
+        self.video = None
+        self.document = None
         self.voice = None
         self.location = None
         self.media_group_id = ''
@@ -525,6 +541,155 @@ class OfferCallbackFeedbackTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(callback.answered)
         self.assertTrue(callback.answer_show_alert)
         self.assertIn('профиль', callback.answer_text.lower())
+
+
+class LegacyRelativesCallbackFeedbackTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+        self.handler_relatives = import_fresh('handler_relatives')
+
+    async def test_malformed_parent_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.FATHER}{self.common.KeyboardType.SEP}'
+        )
+
+        with mock.patch.object(
+            self.handler_relatives.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(),
+        ) as check_owner:
+            await self.handler_relatives.cbq_papa_mama(callback, FakeState())
+
+        check_owner.assert_not_awaited()
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_parent_callback_auth_failure_shows_profile_notice(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.FATHER}{self.common.KeyboardType.SEP}person-uuid'
+        )
+
+        with mock.patch.object(
+            self.handler_relatives.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(return_value=False),
+        ):
+            await self.handler_relatives.cbq_papa_mama(callback, FakeState())
+
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('профиль', callback.answer_text.lower())
+
+    async def test_new_parent_command_interrupt_stops_profile_creation(self):
+        message = FakeMessage(text='/map')
+        state = FakeState({'uuid': 'person-uuid', 'is_father': True})
+
+        with mock.patch.object(
+            self.handler_relatives,
+            'is_it_command',
+            mock.AsyncMock(return_value=True),
+        ), mock.patch.object(
+            self.handler_relatives.Misc,
+            'api_request',
+            mock.AsyncMock(),
+        ) as api_request:
+            await self.handler_relatives.put_new_papa_mama(message, state)
+
+        api_request.assert_not_awaited()
+        self.assertEqual(message.replies, [])
+
+
+class LegacyProfileMediaCallbackFeedbackTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+        self.handler_callbacks = import_fresh('handler_callbacks')
+
+    async def test_malformed_photo_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.PHOTO}{self.common.KeyboardType.SEP}'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(),
+        ) as check_owner:
+            await self.handler_callbacks.cbq_photo(callback, FakeState())
+
+        check_owner.assert_not_awaited()
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_photo_callback_auth_failure_shows_profile_notice(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.PHOTO}{self.common.KeyboardType.SEP}person-uuid'
+            f'{self.common.KeyboardType.SEP}22{self.common.KeyboardType.SEP}0'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(return_value=False),
+        ):
+            await self.handler_callbacks.cbq_photo(callback, FakeState())
+
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('профиль', callback.answer_text.lower())
+
+
+class LegacyMediaPackTests(unittest.TestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+
+    def test_tgdesc_uses_largest_photo_from_media_pack(self):
+        message = types.SimpleNamespace(
+            message_id=11,
+            chat=types.SimpleNamespace(id=22),
+            media_group_id='pack-1',
+            caption='caption',
+            photo=[
+                types.SimpleNamespace(file_id='small-photo'),
+                types.SimpleNamespace(file_id='large-photo'),
+            ],
+            audio=None,
+            video=None,
+            document=None,
+            voice=None,
+        )
+
+        desc = self.common.TgDesc.from_message(message, 'uuid-pack')
+
+        self.assertEqual(desc['message_id'], 11)
+        self.assertEqual(desc['chat_id'], 22)
+        self.assertEqual(desc['media_group_id'], 'pack-1')
+        self.assertEqual(desc['caption'], 'caption')
+        self.assertEqual(desc['file_type'], 'photo')
+        self.assertEqual(desc['file_id'], 'large-photo')
+        self.assertEqual(desc['uuid_pack'], 'uuid-pack')
+
+    def test_tgdesc_records_voice_file_when_no_photo(self):
+        message = types.SimpleNamespace(
+            message_id=12,
+            chat=types.SimpleNamespace(id=23),
+            media_group_id='',
+            caption='',
+            photo=None,
+            audio=None,
+            video=None,
+            document=None,
+            voice=types.SimpleNamespace(file_id='voice-file'),
+        )
+
+        desc = self.common.TgDesc.from_message(message, 'uuid-pack')
+
+        self.assertEqual(desc['file_type'], 'voice')
+        self.assertEqual(desc['file_id'], 'voice-file')
 
 
 class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):

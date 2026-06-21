@@ -52,19 +52,15 @@ async def cbq_papa_mama(callback: CallbackQuery, state: FSMContext):
     """
     Действия по заданию папы, мамы
     """
-    code = callback.data.split(KeyboardType.SEP)
-    uuid = None
-    try:
-        uuid = code[1]
-    except IndexError:
-        pass
-    if not uuid:
-        await callback.answer()
+    code = Misc.parse_callback_data(callback, min_parts=2)
+    if not code or code[0] not in (str(KeyboardType.FATHER), str(KeyboardType.MOTHER)) or not code[1]:
+        await Misc.answer_callback_notice(callback)
         return
+    uuid = code[1]
     tg_user_sender = callback.from_user
     response_sender = await Misc.check_owner_by_uuid(owner_tg_user=tg_user_sender, uuid=uuid)
     if not response_sender:
-        await callback.answer()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     response_uuid = response_sender['response_uuid']
     is_father = code[0] == str(KeyboardType.FATHER)
@@ -143,18 +139,18 @@ async def cbq_callback_clear_parent(callback: CallbackQuery, state: FSMContext):
     Действия по обнулению папы, мамы
     """
     if not (uuid := Misc.get_uuid_from_callback(callback)):
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     response_sender = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid)
     if not response_sender:
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     data = await state.get_data()
     if not data.get('existing_parent_uuid') or \
         ('is_father' not in data) or \
         not data.get('existing_parent_name') or \
         data.get('uuid') != uuid:
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     existing_parent_name = data['existing_parent_name']
     is_father = data['is_father']
@@ -196,19 +192,19 @@ async def cbq_callback_clear_parent_confirmed(callback: CallbackQuery, state: FS
     Действия по обнулению папы, мамы
     """
     if not (uuid := Misc.get_uuid_from_callback(callback)):
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     message = callback.message
     response_sender = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid)
     if not response_sender:
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     data = await state.get_data()
     if not data.get('existing_parent_uuid') or \
        ('is_father' not in data) or \
        not data.get('existing_parent_name') or \
        data.get('uuid') != uuid:
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     existing_parent_uuid = data['existing_parent_uuid']
     is_father = data['is_father']
@@ -357,18 +353,14 @@ async def cbq_new_papa_mama(callback: CallbackQuery, state: FSMContext):
     Действия по заданию папы, мамы
     """
     tg_user_sender = callback.from_user
-    code = callback.data.split(KeyboardType.SEP)
-    uuid = None
-    try:
-        uuid = code[1]
-    except IndexError:
-        pass
-    if not uuid:
-        await state.clear(); await callback.answer()
+    code = Misc.parse_callback_data(callback, min_parts=2)
+    if not code or code[0] not in (str(KeyboardType.NEW_FATHER), str(KeyboardType.NEW_MOTHER)) or not code[1]:
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
+    uuid = code[1]
     response_sender = await Misc.check_owner_by_uuid(owner_tg_user=tg_user_sender, uuid=uuid)
     if not response_sender:
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     is_father = code[0] == str(KeyboardType.NEW_FATHER)
     response_uuid = response_sender['response_uuid']
@@ -467,9 +459,11 @@ async def cbq_callback_child(callback: CallbackQuery, state: FSMContext):
     Действия по заданию сына, дочери
     """
     if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await Misc.answer_callback_notice(callback)
         return
     response_sender = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid)
     if not response_sender:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     response_uuid = response_sender['response_uuid']
     reply_markup = None
@@ -583,20 +577,22 @@ async def cbq_clear_child(callback: CallbackQuery, state: FSMContext):
     Действия по вопросу об обнулении ребенка
     """
     if not (uuid := Misc.get_uuid_from_callback(callback)):
-        await state.clear()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     message = callback.message
     response_sender = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid)
-    if not response_sender or \
-       not response_sender.get('response_uuid') or \
+    if not response_sender:
+        await state.clear(); await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    if not response_sender.get('response_uuid') or \
        not response_sender['response_uuid'].get('children'):
-        await state.clear()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     data = await state.get_data()
     if not data or \
        not data.get('parent_gender') or \
        data.get('uuid') != uuid:
-        await state.clear()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     parent = response_sender['response_uuid']
     children = parent['children']
@@ -712,22 +708,24 @@ async def cbq_clear_child_confirmed(callback: CallbackQuery, state: FSMContext):
     Действия по вопросу об обнулении ребенка
     """
     if not (parent_uuid := Misc.get_uuid_from_callback(callback)):
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     message = callback.message
     tg_user_sender = callback.from_user
     response_sender = await Misc.check_owner_by_uuid(owner_tg_user=tg_user_sender, uuid=parent_uuid)
-    if not response_sender or \
-       not response_sender.get('response_uuid') or \
+    if not response_sender:
+        await state.clear(); await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    if not response_sender.get('response_uuid') or \
        not response_sender['response_uuid'].get('children'):
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     data = await state.get_data()
     if not data or \
        not data.get('parent_gender') or \
        data.get('uuid') != parent_uuid or \
        not data.get('child_uuid'):
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     is_father = data['parent_gender'] == 'm'
     post_op = dict(
@@ -874,15 +872,15 @@ async def put_child_by_sid(message: Message, state: FSMContext):
     )), StateFilter(FSMchild.ask))
 async def cbq_new_child_ask_fio(callback: CallbackQuery, state: FSMContext):
     if not (uuid := Misc.get_uuid_from_callback(callback)):
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     data = await state.get_data()
     for key in ('name', 'uuid', 'parent_gender',):
         if not data.get(key) or key == 'uuid' and data[key] != uuid:
-            await state.clear()
+            await state.clear(); await Misc.answer_callback_notice(callback)
             return
     new_child_gender = 'm' \
-        if callback.data.split(KeyboardType.SEP)[0] == str(KeyboardType.NEW_SON) \
+        if Misc.callback_part(callback, 0) == str(KeyboardType.NEW_SON) \
         else 'f'
     fio_new_child = 'Иван Иванович Иванов' if new_child_gender == 'm' else 'Марья Ивановна Иванова'
     await state.update_data(new_child_gender=new_child_gender)
@@ -969,15 +967,15 @@ async def cbq_callback_bro_sis(callback: CallbackQuery, state: FSMContext):
     Действия по заданию брата или сестры
     """
     if not (uuid := Misc.get_uuid_from_callback(callback)):
-        await callback.answer()
+        await Misc.answer_callback_notice(callback)
         return
     response_sender = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid)
     if not response_sender:
-        await callback.answer()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     response_uuid = response_sender['response_uuid']
     if not (response_uuid.get('father') or response_uuid.get('mother')):
-        await callback.answer()
+        await Misc.answer_callback_notice(callback)
         return
     await state.update_data(uuid = uuid)
     prompt_bro_sis = (
@@ -1153,25 +1151,20 @@ async def put_bro_sys_by_sid(message: Message, state: FSMContext):
     )), StateFilter(FSMbroSis.ask))
 async def cbq_new_bro_sis_gender(callback: CallbackQuery, state: FSMContext):
     if not (uuid := Misc.get_uuid_from_callback(callback)):
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     data = await state.get_data()
     if not data.get('uuid') or data['uuid'] != uuid:
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback)
         return
     gender = 'm' \
-        if callback.data.split(KeyboardType.SEP)[0] == str(KeyboardType.NEW_BRO) \
+        if Misc.callback_part(callback, 0) == str(KeyboardType.NEW_BRO) \
         else 'f'
     await state.update_data(gender=gender)
     brata_sestru = "брата" if gender == "m" else "сестру"
     response = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid)
     if not response:
-        await callback.message.reply((
-            f'Можно назначить {brata_sestru} только Вам '
-            f'или профилю, которым Вы владеете.\n\n'
-            f'Назначайте {brata_sestru} по новой'
-        ))
-        await state.clear(); await callback.answer()
+        await state.clear(); await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     data_whose = response['response_uuid']
     if not data_whose.get('father') and not data_whose.get('mother'):

@@ -918,37 +918,43 @@ async def process_existing_iof(message: Message, state: FSMContext):
     )), StateFilter(None))
 async def cbq_photo(callback: CallbackQuery, state: FSMContext):
     uuid, card_message_id, card_type = Misc.parse_uid_message_calback(callback)
-    if uuid and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        inline_button_cancel = Misc.inline_button_cancel()
-        await state.set_state(FSMphoto.ask)
-        await state.update_data(
+    if not uuid:
+        await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    inline_button_cancel = Misc.inline_button_cancel()
+    await state.set_state(FSMphoto.ask)
+    await state.update_data(
+        uuid=uuid,
+        card_message_id=card_message_id,
+        card_type=card_type,
+    )
+    prompt_photo = Misc.PROMPT_PHOTO
+    status, response = await Misc.get_user_by_uuid(uuid)
+    if status == 200 and Misc.is_photo_downloaded(response):
+        prompt_photo += '\n' + Misc.PROMPT_PHOTO_REMOVE
+        callback_data_remove = Misc.CALLBACK_DATA_UUID_TEMPLATE % dict(
+            keyboard_type=KeyboardType.PHOTO_REMOVE,
+            sep=KeyboardType.SEP,
             uuid=uuid,
-            card_message_id=card_message_id,
-            card_type=card_type,
         )
-        prompt_photo = Misc.PROMPT_PHOTO
-        status, response = await Misc.get_user_by_uuid(uuid)
-        if status == 200 and Misc.is_photo_downloaded(response):
-            prompt_photo += '\n' + Misc.PROMPT_PHOTO_REMOVE
-            callback_data_remove = Misc.CALLBACK_DATA_UUID_TEMPLATE % dict(
-                keyboard_type=KeyboardType.PHOTO_REMOVE,
-                sep=KeyboardType.SEP,
-                uuid=uuid,
-            )
-            inline_btn_remove = InlineKeyboardButton(
-                text='Удалить',
-                callback_data=callback_data_remove,
-            )
-            buttons = [[inline_button_cancel, inline_btn_remove]]
-        else:
-            buttons = [[inline_button_cancel]]
-        await callback.message.reply(prompt_photo, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+        inline_btn_remove = InlineKeyboardButton(
+            text='Удалить',
+            callback_data=callback_data_remove,
+        )
+        buttons = [[inline_button_cancel, inline_btn_remove]]
+    else:
+        buttons = [[inline_button_cancel]]
+    await callback.message.reply(prompt_photo, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
     await callback.answer()
 
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMphoto.ask))
 async def process_photo(message: Message, state: FSMContext):
+    msg_error = '<b>Ошибка</b>. Фото не внесено.\n'
     if message.content_type != ContentType.PHOTO or \
        message.photo[-1].file_size > settings.DOWNLOAD_PHOTO_MAX_SIZE * 1024 * 1024:
         await message.reply(
@@ -964,7 +970,6 @@ async def process_photo(message: Message, state: FSMContext):
             uuid=data['uuid'],
             photo=image,
         )
-        msg_error = '<b>Ошибка</b>. Фото не внесено.\n'
         if status_put == 200:
             card_message_id = data.get('card_message_id')
             if data.get('card_type') == Misc.CARD_TYPE_MEET:
@@ -995,26 +1000,29 @@ async def process_photo(message: Message, state: FSMContext):
         # KeyboardType.SEP,
     )), StateFilter(FSMphoto.ask))
 async def process_callback_photo_remove(callback: CallbackQuery, state: FSMContext):
-    if (uuid := Misc.get_uuid_from_callback(callback)) and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        inline_btn_remove = InlineKeyboardButton(
-            text='Да, удалить',
-            callback_data=Misc.CALLBACK_DATA_UUID_TEMPLATE % dict(
-                keyboard_type=KeyboardType.PHOTO_REMOVE_CONFIRMED,
-                sep=KeyboardType.SEP,
-                uuid=uuid,
-        ))
-        reply_markup = InlineKeyboardMarkup(
-            inline_keyboard=[[Misc.inline_button_cancel(), inline_btn_remove]]
-        )
-        prompt_photo_confirm = (
-            'Подтвердите <b>удаление фото</b> у:\n'
-            f'<b>{response_check["response_uuid"]["first_name"]}</b>\n'
-        )
-        await state.set_state(FSMphoto.remove)
-        await callback.message.reply(prompt_photo_confirm, reply_markup=reply_markup)
-    else:
-        await state.clear()
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await state.clear(); await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await state.clear(); await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    inline_btn_remove = InlineKeyboardButton(
+        text='Да, удалить',
+        callback_data=Misc.CALLBACK_DATA_UUID_TEMPLATE % dict(
+            keyboard_type=KeyboardType.PHOTO_REMOVE_CONFIRMED,
+            sep=KeyboardType.SEP,
+            uuid=uuid,
+    ))
+    reply_markup = InlineKeyboardMarkup(
+        inline_keyboard=[[Misc.inline_button_cancel(), inline_btn_remove]]
+    )
+    prompt_photo_confirm = (
+        'Подтвердите <b>удаление фото</b> у:\n'
+        f'<b>{response_check["response_uuid"]["first_name"]}</b>\n'
+    )
+    await state.set_state(FSMphoto.remove)
+    await callback.message.reply(prompt_photo_confirm, reply_markup=reply_markup)
     await callback.answer()
 
 
@@ -1025,31 +1033,37 @@ async def process_callback_photo_remove(callback: CallbackQuery, state: FSMConte
         # KeyboardType.SEP,
     )), StateFilter(FSMphoto.remove))
 async def cbq_photo_remove_confirmed(callback: CallbackQuery, state: FSMContext):
-    if (uuid := Misc.get_uuid_from_callback(callback)) and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        logging.debug('put (remove) photo: post tg_user data')
-        status_put, response_put = await Misc.put_user_properties(
-            photo='',
-            uuid=uuid,
-        )
-        if status_put == 200:
-            data = await state.get_data()
-            if data.get('card_type') == Misc.CARD_TYPE_MEET:
-                await callback.message.reply(f'{html.quote(response_check["first_name"])} : фото удалено')
-                await Misc.show_edit_meet(
-                    callback.from_user.id,
-                    response_put,
-                )
-            else:
-                await callback.message.reply(f'{Misc.get_deeplink_with_name(response_put)} : фото удалено')
-                await Misc.show_card(response_put, response_check, callback.from_user)
-        elif status_put == 400:
-            if response_put.get('message'):
-                await message.reply(msg_error + response_put['message'])
-            else:
-                await message.reply(msg_error + Misc.MSG_ERROR_API)
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await state.clear(); await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await state.clear(); await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    logging.debug('put (remove) photo: post tg_user data')
+    status_put, response_put = await Misc.put_user_properties(
+        photo='',
+        uuid=uuid,
+    )
+    msg_error = '<b>Ошибка</b>. Фото не удалено.\n'
+    if status_put == 200:
+        data = await state.get_data()
+        if data.get('card_type') == Misc.CARD_TYPE_MEET:
+            await callback.message.reply(f'{html.quote(response_check["response_uuid"]["first_name"])} : фото удалено')
+            await Misc.show_edit_meet(
+                callback.from_user.id,
+                response_put,
+            )
         else:
-            await message.reply(msg_error + Misc.MSG_ERROR_API)
+            await callback.message.reply(f'{Misc.get_deeplink_with_name(response_put)} : фото удалено')
+            await Misc.show_card(response_put, response_check, callback.from_user)
+    elif status_put == 400:
+        if response_put.get('message'):
+            await callback.message.reply(msg_error + response_put['message'])
+        else:
+            await callback.message.reply(msg_error + Misc.MSG_ERROR_API)
+    else:
+        await callback.message.reply(msg_error + Misc.MSG_ERROR_API)
     await state.clear()
     await callback.answer()
 
