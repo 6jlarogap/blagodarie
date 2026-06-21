@@ -36,6 +36,8 @@ Go-next chain: [../references/2026-06-21-doverabot-go-next-chain.md](../referenc
 
 Next decision refresh chain: [../references/2026-06-21-doverabot-next-decision-refresh-chain.md](../references/2026-06-21-doverabot-next-decision-refresh-chain.md)
 
+Post-reservation decision refresh chain: [../references/2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md](../references/2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md)
+
 Current decision:
 
 - Keep one public Doverabot identity with modular feature flows: `/rent`, `/offer`, `/meet`, `rod`, `/trust`, and `/thank`.
@@ -65,7 +67,8 @@ Current implementation:
   for profile, meet card/QR, offer, and rental paths while preserving existing
   deep-link payloads and runtime bot usernames.
 - The mocked Telegram bot tests now share one harness module and are split by
-  handler domain while preserving the existing 68-test discovery surface.
+  handler domain; the current discovery surface is 77 tests after rental owner
+  and reservation-history controls.
 - Rental V1 now has source-level smoke coverage for search, booking callback
   registration/owner notification, and payment-proof pack forwarding, plus
   repeatable public curl checks for rental search, map exposure, and offer
@@ -76,6 +79,11 @@ Current implementation:
 - Rental owners now have `/rent_my` plus `/rent` discoverability to list their
   active, paused, and archived offers, pause/resume/archive them, and reopen
   public bot/map links from owner listing cards.
+- Owners and requesters now have `/rent_history` to recover open and recently
+  closed reservation cards with role-aware controls plus event/proof audit text.
+- The post-reservation decision refresh selected proof-dispute controls as the
+  next product slice, because payment proof can be stored and forwarded but
+  owners do not yet have an explicit audited rejection/dispute path.
 
 Primary implementation areas:
 
@@ -99,17 +107,18 @@ Covered by completed hardening slices:
 
 Remaining product backlog:
 
-- Add requester/owner reservation history controls after listing management.
-- Improve rental map/frontend filters if the existing source path can support it
-  without editing generated bundles directly.
-- Decide later on inventory quantities, fake-proof consequences, configurable
-  hold duration, geocoding, and vector search.
+- Add owner-side proof-dispute controls for unacceptable or fake payment proof
+  without automatically creating mistrust.
+- Improve rental map/frontend filters only when editable frontend source is
+  available or a generated-bundle deployment slice is explicitly accepted.
+- Decide later on inventory quantities, configurable hold duration, geocoding,
+  and vector search.
 
 ## Next Implementation Slice
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-rental-reservation-history-controls`.
+Active next `/new-go-slug`: `doverabot-rental-proof-dispute-controls`.
 
 After that slice, print next `/new-go-slug`:
 `doverabot-next-decision-refresh`.

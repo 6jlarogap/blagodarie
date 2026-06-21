@@ -2,6 +2,14 @@
 
 ## 2026-06-21
 
+- Implemented `doverabot-next-decision-refresh` after reservation history:
+  re-read the Doverabot project note, go-next chain, completed rental owner
+  listing and reservation history references, and current rental map/proof
+  source state; marked reservation history consumed; deferred map UI because
+  only generated map bundles are present in this workspace; selected
+  `doverabot-rental-proof-dispute-controls` as the next active implementation
+  slice; bot tests, compileall, Django check, reindex, diff check, and graphify
+  update passed; skipped deploy because only handoff documentation changed.
 - Implemented and deployed `doverabot-rental-reservation-history-controls`: added bot-authenticated reservation history on `/api/rental/reservation` with requester/owner role filters and open/recent-closed status groups, added `/rent_history` cards with recovered action buttons plus concise event/proof audit text, fixed expired accepted holds moving into closed history, committed source as `3b75b0c`, deployed through the wrapper with no migrations to apply, confirmed nginx/web/bot active, smoked reservation-history token guard HTTP 400 plus rental search and rental map HTTP 200. Focused bot tests and Django source checks passed; DB-backed `manage.py test users` remains blocked by local PostgreSQL peer authentication for user `postgres`.
 - Implemented and deployed `doverabot-rental-owner-listing-controls`: added bot-authenticated owner listing on `/api/rental/offer`, `/rent_my` owner cards with pause/resume/archive/public-link/map-link controls, command interruption support for rental commands, and focused backend/mocked bot tests; committed source as `ae72341`; deployed through the wrapper with no migrations to apply; confirmed nginx/web/bot active; public rental search and map smokes returned HTTP 200, and bare rental offer lookup returned expected HTTP 404.
 - Implemented `doverabot-next-decision-refresh`: re-read the Doverabot project note, completed chain references, and rental/bot source-test state; marked the prior decision-refresh slug consumed; selected `doverabot-rental-owner-listing-controls` as the next active implementation slice and `doverabot-rental-reservation-history-controls` as its follow-up; skipped deploy because only handoff documentation changed.

@@ -1,12 +1,12 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-8 implemented; decision refresh active
+Status: slices 1-9 implemented; rental proof dispute controls active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-rental-reservation-history-controls-chain.md](2026-06-21-doverabot-rental-reservation-history-controls-chain.md)
+Current completed chain: [2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md](2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md)
 
-Active next slice: Decision Refresh
-Active next `/new-go-slug`: `doverabot-next-decision-refresh`
+Active next slice: Rental Proof Dispute Controls
+Active next `/new-go-slug`: `doverabot-rental-proof-dispute-controls`
 After active slice, choose and print the next `/new-go-slug`.
 
 ## Chain Purpose
@@ -238,6 +238,59 @@ Completion criteria:
 - Owners and requesters can recover active reservation controls after losing
   the original bot message.
 - Tests cover authorization boundaries and terminal reservation statuses.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-next-decision-refresh`
+
+## Slice 9: Next Decision Refresh After Reservation History
+
+Suggested `/new-go-slug`: `doverabot-next-decision-refresh`
+
+Status: implemented in
+[2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md](2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md).
+
+Scope:
+
+- Re-read the active Doverabot project note, completed owner-listing and
+  reservation-history references, and current source/test state.
+- Decide the next small source-owned product slice after owner listing and
+  reservation history are done.
+- Update this go-next chain and the parent project note so the latest completed
+  chain again suggests a concrete next slug.
+
+Completion criteria:
+
+- The project note names the active next implementation slice.
+- The latest completed chain points to that slug.
+- Any obsolete slice suggestions are marked done, superseded, or deferred.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-proof-dispute-controls`
+
+## Slice 10: Rental Proof Dispute Controls
+
+Suggested `/new-go-slug`: `doverabot-rental-proof-dispute-controls`
+
+Status: active
+
+Scope:
+
+- Add an owner-only reservation action for unacceptable or fake payment proof
+  after a requester submits proof.
+- Record a distinct audited event so `/rent_history` can tell proof disputes
+  apart from generic cancellations.
+- Release the reserved date interval by moving the reservation to a terminal
+  state, without auto-creating mistrust or reputation penalties.
+- Update owner/requester bot text and action markup so the owner can reject
+  proof, and users understand trust/mistrust remains a separate profile action.
+
+Completion criteria:
+
+- Backend tests cover owner authorization, requester denial, event history, and
+  terminal status behavior.
+- Mocked bot tests cover owner markup, callback handling, and notification text.
+- Local bot tests, backend checks, reindex, and graph update pass.
 - Runtime code changes are committed, deployed, and logged.
 
 Print after completion, suggested next `/new-go-slug`:
