@@ -966,6 +966,29 @@ class OfferSympaFeedbackCoverageTests(unittest.IsolatedAsyncioTestCase):
         remove_n_send_message.assert_not_awaited()
         self.assert_api_notice(callback)
 
+    async def test_sympa_missing_journal_shows_stale_notice_and_skips_profile_lookup(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.SYMPA_HIDE}'
+            f'{self.common.KeyboardType.SEP}manuser123'
+            f'{self.common.KeyboardType.SEP}woman12345'
+            f'{self.common.KeyboardType.SEP}'
+        )
+
+        with mock.patch.object(
+            self.handler_sympas.Misc,
+            'check_owner_by_sid',
+            mock.AsyncMock(),
+        ) as check_owner, mock.patch.object(
+            self.handler_sympas.Misc,
+            'get_user_by_sid',
+            mock.AsyncMock(),
+        ) as get_user:
+            await self.handler_sympas.cbq_sympa_hide(callback, FakeState())
+
+        check_owner.assert_not_awaited()
+        get_user.assert_not_awaited()
+        self.assert_stale_notice(callback)
+
 
 class LegacyRelativesCallbackFeedbackTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -1191,6 +1214,62 @@ class LegacyProfileEditCallbackParserTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(callback.answered)
         self.assertTrue(callback.answer_show_alert)
         self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_malformed_meet_action_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.MEET_DO}{self.common.KeyboardType.SEP}'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(),
+        ) as post_tg_user:
+            await self.handler_callbacks.cbq_meet_do_or_revoke(callback, FakeState())
+
+        post_tg_user.assert_not_awaited()
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_meet_action_callback_preserves_inviter_sid(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.MEET_DO}'
+            f'{self.common.KeyboardType.SEP}abcdefghij'
+            f'{self.common.KeyboardType.SEP}invite0001'
+            f'{self.common.KeyboardType.SEP}'
+        )
+        profile = {
+            'uuid': 'profile-uuid',
+            'username': 'abcdefghij',
+            'first_name': 'Person',
+            'is_active': True,
+            'did_meet': False,
+            'gender': 'm',
+            'dob': '2000-01-01',
+            'latitude': None,
+            'longitude': None,
+            'has_bank': False,
+            'has_tgdesc': True,
+        }
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(200, profile)),
+        ), mock.patch.object(
+            self.handler_callbacks,
+            'meet_do_or_revoke',
+            mock.AsyncMock(),
+        ) as meet_do_or_revoke:
+            await self.handler_callbacks.cbq_meet_do_or_revoke(callback, FakeState())
+
+        meet_do_or_revoke.assert_awaited_once()
+        data = meet_do_or_revoke.await_args.args[0]
+        self.assertEqual(data['what'], self.common.KeyboardType.MEET_DO)
+        self.assertEqual(data['username_from'], 'abcdefghij')
+        self.assertEqual(data['username_inviter'], 'invite0001')
+        self.assertTrue(callback.answered)
 
 
 class LegacyProfileEditCallbackFeedbackFinishTests(unittest.IsolatedAsyncioTestCase):

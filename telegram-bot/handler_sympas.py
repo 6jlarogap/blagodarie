@@ -85,12 +85,43 @@ class Common(object):
     @classmethod
     async def check_common_callback(cls, callback):
         profile_from = profile_to = journal_id = None
-        profile_from, profile_to = await Misc.check_sids_from_callback(callback, answer_errors=True)
-        if profile_from and profile_to:
-            if not (journal_id := cls.check_journal_id(callback)):
-                await Misc.answer_callback_notice(callback)
-                profile_from = profile_to = journal_id = None
+        username_from, username_to, journal_id = cls.parse_common_callback_data(callback)
+        if not username_from:
+            await Misc.answer_callback_notice(callback)
+            return None, None, None
+        profile_from = await Misc.check_owner_by_sid(
+            callback.from_user,
+            username_from,
+            check_own_only=True,
+        )
+        if not profile_from:
+            await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+            return None, None, None
+        status, response = await Misc.get_user_by_sid(username_to)
+        if status == 200:
+            profile_to = response
+        else:
+            await Misc.answer_callback_notice(callback)
+            profile_from = journal_id = None
         return profile_from, profile_to, journal_id
+
+
+    @classmethod
+    def parse_common_callback_data(cls, callback):
+        code = Misc.parse_callback_data(callback, min_parts=4)
+        if not code:
+            return None, None, None
+        username_from, username_to = code[1], code[2]
+        if not re.search(Misc.RE_SID, username_from or '') or \
+           not re.search(Misc.RE_SID, username_to or ''):
+            return None, None, None
+        try:
+            journal_id = int(code[3])
+        except (TypeError, ValueError):
+            return None, None, None
+        if not journal_id:
+            return None, None, None
+        return username_from, username_to, journal_id
 
 
     @classmethod
@@ -316,13 +347,6 @@ class Common(object):
                 inline_keyboard=[ buttons ]
             )
         return text, reply_markup
-
-    @classmethod
-    def check_journal_id(cls, callback):
-        journal_id = 0
-        if parsed := Misc.callback_int_part(callback, 3):
-            journal_id = parsed
-        return journal_id
 
 # --- end of class Common ---
 

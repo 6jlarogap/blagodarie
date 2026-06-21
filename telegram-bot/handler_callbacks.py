@@ -509,6 +509,19 @@ async def process_message_meet_dob(message: Message, state: FSMContext):
         await reply_and_clear_state(message, state, Misc.MSG_ERROR_API)
 
 
+def _parse_meet_action_callback(callback):
+    code = Misc.parse_callback_data(callback, min_parts=2)
+    if not code or code[0] not in (str(KeyboardType.MEET_DO), str(KeyboardType.MEET_REVOKE)):
+        return None
+    username_from = code[1]
+    if not re.search(Misc.RE_SID, username_from or ''):
+        return None
+    username_inviter = code[2] if len(code) > 2 else ''
+    if username_inviter and not re.search(Misc.RE_SID, username_inviter):
+        return None
+    return int(code[0]), username_from, username_inviter
+
+
 @router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
         f'{KeyboardType.MEET_DO}|{KeyboardType.MEET_REVOKE}',
         KeyboardType.SEP,
@@ -517,11 +530,11 @@ async def process_message_meet_dob(message: Message, state: FSMContext):
         # sid_to           # 2
     )), StateFilter(None))
 async def cbq_meet_do_or_revoke(callback: CallbackQuery, state: FSMContext):
-    if not (username_from := Misc.get_sid_from_callback(callback)):
+    parsed = _parse_meet_action_callback(callback)
+    if not parsed:
         await Misc.answer_callback_notice(callback)
         return
-    code = Misc.callback_parts(callback)
-    what = int(code[0])
+    what, username_from, username_inviter = parsed
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
     if status_from != 200 or profile_from.get('username') != username_from:
         await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
@@ -538,11 +551,6 @@ async def cbq_meet_do_or_revoke(callback: CallbackQuery, state: FSMContext):
     if text_scram:
         await callback.message.reply(text=text_scram)
         return
-    username_inviter = ''
-    try:
-        username_inviter = code[2]
-    except IndexError:
-        pass
     data = dict(
         what=what,
         uuid=profile_from['uuid'],
