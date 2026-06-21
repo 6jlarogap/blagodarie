@@ -1,13 +1,13 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-3 implemented; remaining slices planned
+Status: slices 1-4 implemented; remaining slices planned
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-runtime-deeplink-consistency-chain.md](2026-06-21-doverabot-runtime-deeplink-consistency-chain.md)
+Current completed chain: [2026-06-21-doverabot-handler-test-harness-split-chain.md](2026-06-21-doverabot-handler-test-harness-split-chain.md)
 
-Active next slice: Slice 4, Handler Test Harness Split
-Active next `/new-go-slug`: `doverabot-handler-test-harness-split`
-After active slice, print next `/new-go-slug`: `doverabot-rental-v1-smoke-observability`
+Active next slice: Slice 5, Rental V1 Smoke Observability
+Active next `/new-go-slug`: `doverabot-rental-v1-smoke-observability`
+After active slice, print next `/new-go-slug`: `doverabot-next-decision-refresh`
 
 ## Chain Purpose
 
@@ -113,6 +113,9 @@ Print after completion, suggested next `/new-go-slug`:
 ## Slice 4: Handler Test Harness Split
 
 Suggested `/new-go-slug`: `doverabot-handler-test-harness-split`
+
+Status: implemented; runtime deploy not required in
+[2026-06-21-doverabot-handler-test-harness-split-chain.md](2026-06-21-doverabot-handler-test-harness-split-chain.md).
 
 Scope:
 

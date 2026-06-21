@@ -28,6 +28,8 @@ Legacy callback parser audit chain: [../references/2026-06-21-doverabot-legacy-c
 
 Runtime deeplink consistency chain: [../references/2026-06-21-doverabot-runtime-deeplink-consistency-chain.md](../references/2026-06-21-doverabot-runtime-deeplink-consistency-chain.md)
 
+Handler test harness split chain: [../references/2026-06-21-doverabot-handler-test-harness-split-chain.md](../references/2026-06-21-doverabot-handler-test-harness-split-chain.md)
+
 Go-next chain: [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md)
 
 Current decision:
@@ -58,6 +60,8 @@ Current implementation:
 - Runtime bot start-link construction now goes through `Misc.get_start_deeplink`
   for profile, meet card/QR, offer, and rental paths while preserving existing
   deep-link payloads and runtime bot usernames.
+- The mocked Telegram bot tests now share one harness module and are split by
+  handler domain while preserving the existing 68-test discovery surface.
 
 Primary implementation areas:
 
@@ -67,6 +71,7 @@ Primary implementation areas:
 - `telegram-bot/common.py`
 - `telegram-bot/handler_rental.py`
 - `telegram-bot/main.py`
+- `telegram-bot/tests/`
 
 ## Doverabot Backlog Captured
 
@@ -80,10 +85,10 @@ Primary implementation areas:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-handler-test-harness-split`.
+Active next `/new-go-slug`: `doverabot-rental-v1-smoke-observability`.
 
 After that slice, print next `/new-go-slug`:
-`doverabot-rental-v1-smoke-observability`.
+`doverabot-next-decision-refresh`.
 
 After that, keep each completed chain pointing to the next slug in the go-next chain.
 
