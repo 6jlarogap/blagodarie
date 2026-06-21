@@ -1,9 +1,9 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slice 1 implemented; remaining slices planned
+Status: slices 1-2 implemented; remaining slices planned
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-offer-sympa-feedback-coverage-chain.md](2026-06-21-doverabot-offer-sympa-feedback-coverage-chain.md)
+Current completed chain: [2026-06-21-doverabot-legacy-callback-parser-audit-chain.md](2026-06-21-doverabot-legacy-callback-parser-audit-chain.md)
 
 ## Chain Purpose
 
@@ -44,6 +44,9 @@ Suggested next `/new-go-slug`: `doverabot-legacy-callback-parser-audit`
 ## Slice 2: Legacy Callback Parser Audit
 
 Suggested `/new-go-slug`: `doverabot-legacy-callback-parser-audit`
+
+Status: implemented and deployed in
+[2026-06-21-doverabot-legacy-callback-parser-audit-chain.md](2026-06-21-doverabot-legacy-callback-parser-audit-chain.md).
 
 Scope:
 
