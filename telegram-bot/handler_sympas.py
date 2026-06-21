@@ -735,7 +735,7 @@ async def cbq_get_sympa_send_profile(callback: CallbackQuery, state: FSMContext)
     )
     
     # Формируем ссылку на профиль женщины
-    profile_link = f't.me/doverabot?start={profile_from["username"]}'
+    profile_link = Misc.get_deeplink(profile_from)
     text_to = (
         f'Поздравляем! {html.quote(profile_from["first_name"])} '
         f'ждёт Вашего сообщения! Вы покидаете игру знакомств для личного общения. Удачи!\n'

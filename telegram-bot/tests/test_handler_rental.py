@@ -642,6 +642,55 @@ class LegacyProfileMediaCallbackFeedbackTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('профиль', callback.answer_text.lower())
 
 
+class LegacySympaLinkTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.handler_sympas = import_fresh('handler_sympas')
+
+    async def test_contact_handoff_profile_link_uses_runtime_bot_username(self):
+        callback = FakeCallback('73~woman~man~123')
+        state = FakeState()
+        profile_from = {
+            'username': 'woman',
+            'first_name': 'Woman',
+            'r_sympa_username': 'man',
+            'is_active': True,
+            'did_meet': True,
+            'gender': 'f',
+            'photo': 'https://example.invalid/photo.jpg',
+        }
+        profile_to = {
+            'username': 'man',
+            'first_name': 'Man',
+            'is_active': True,
+            'did_meet': True,
+            'gender': 'm',
+            'tg_data': [{'tg_uid': 3003}],
+        }
+        fake_bot = FakeBot()
+        self.handler_sympas.bot = fake_bot
+
+        with mock.patch.object(
+            self.handler_sympas.Common,
+            'check_common_callback',
+            mock.AsyncMock(return_value=(profile_from, profile_to, 123)),
+        ), mock.patch.object(
+            self.handler_sympas.Misc,
+            'get_photo_buffered',
+            mock.AsyncMock(return_value=None),
+        ), mock.patch.object(
+            self.handler_sympas.Misc,
+            'remove_n_send_message',
+            mock.AsyncMock(),
+        ) as remove_n_send_message:
+            await self.handler_sympas.cbq_get_sympa_send_profile(callback, state)
+
+        self.assertTrue(callback.answered)
+        self.assertEqual(len(fake_bot.sent_messages), 1)
+        self.assertIn('t.me/DoveraBot?start=woman', fake_bot.sent_messages[0][1])
+        remove_n_send_message.assert_awaited_once()
+
+
 class LegacyMediaPackTests(unittest.TestCase):
     def setUp(self):
         install_dependency_stubs(stub_common=False)
