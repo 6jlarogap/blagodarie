@@ -20,6 +20,8 @@ Runtime bot link cleanup chain: [../references/2026-06-21-doverabot-runtime-bot-
 
 Profile-edit callback feedback finish chain: [../references/2026-06-21-doverabot-profile-edit-callback-feedback-finish-chain.md](../references/2026-06-21-doverabot-profile-edit-callback-feedback-finish-chain.md)
 
+Profile-edit state feedback finish chain: [../references/2026-06-21-doverabot-profile-edit-state-feedback-finish-chain.md](../references/2026-06-21-doverabot-profile-edit-state-feedback-finish-chain.md)
+
 Current decision:
 
 - Keep one public Doverabot identity with modular feature flows: `/rent`, `/offer`, `/meet`, `rod`, `/trust`, and `/thank`.
@@ -40,6 +42,7 @@ Current implementation:
 - The remaining runtime hard-coded Doverabot deep link in the sympathy contact handoff now uses the live bot username helper.
 - Profile-edit callbacks in `handler_callbacks.py` no longer use direct `callback.data.split(KeyboardType.SEP)` parsing, and the edited stale/auth exits now use shared visible callback notices.
 - Remaining parser-backed profile-edit callback failure exits now return visible stale/auth notices across IOF, DOB unknown, comments, delete/undelete, messaging/archive, user description, banking, meet edit-back, and archive deletion.
+- Profile-edit message-state handlers now give visible feedback for stale FSM data, profile auth failure, and API failure across IOF, meet DOB/description, date/comment/message/user-desc/banking, and thank-bank states.
 
 Primary implementation areas:
 
@@ -60,9 +63,9 @@ Primary implementation areas:
 
 ## Next Implementation Slice
 
-Continue with non-callback profile-edit/message-state failure feedback: replace silent clears/returns in profile edit message handlers with user-facing prompts/errors and add command-interruption/state-mismatch coverage.
+No immediate next `/new-go-slug` is selected after `doverabot-profile-edit-state-feedback-finish`.
 
-Suggested `/new-go-slug`: `doverabot-profile-edit-state-feedback-finish`.
+Remaining backlog stays focused on callback/parser cleanup, handler coverage, duplicate handler names, and bot/deep-link consistency in newly touched flows.
 
 Accepted prior-session decisions:
 
