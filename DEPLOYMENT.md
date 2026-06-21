@@ -26,6 +26,13 @@ the host account:
 sudo bash /home/vdrzd/projects/blagodarie/deploy/install-blagodarie-admin-workflow.sh
 ```
 
+For a repeatable agent bootstrap that also verifies noninteractive access and
+the local helper exclusion:
+
+```bash
+sudo bash /home/vdrzd/projects/blagodarie/scripts/enable-agent-deploy-permissions.sh
+```
+
 Nginx site configs are tracked under `deploy/nginx/sites-available/`. After
 editing them, install only those site configs with:
 
