@@ -1,13 +1,13 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-5 implemented; remaining slices planned
+Status: slices 1-6 implemented; slice 7 active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-rental-v1-smoke-observability-chain.md](2026-06-21-doverabot-rental-v1-smoke-observability-chain.md)
+Current completed chain: [2026-06-21-doverabot-next-decision-refresh-chain.md](2026-06-21-doverabot-next-decision-refresh-chain.md)
 
-Active next slice: Slice 6, Next Decision Refresh
-Active next `/new-go-slug`: `doverabot-next-decision-refresh`
-After active slice, print next `/new-go-slug`: to be chosen during refresh
+Active next slice: Slice 7, Rental Owner Listing Controls
+Active next `/new-go-slug`: `doverabot-rental-owner-listing-controls`
+After active slice, print next `/new-go-slug`: `doverabot-rental-reservation-history-controls`
 
 ## Chain Purpose
 
@@ -164,6 +164,9 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-next-decision-refresh`
 
+Status: implemented in
+[2026-06-21-doverabot-next-decision-refresh-chain.md](2026-06-21-doverabot-next-decision-refresh-chain.md).
+
 Scope:
 
 - Re-read the active Doverabot project note, completed chain references, and
@@ -179,5 +182,61 @@ Completion criteria:
 - The latest completed chain points to that slug.
 - Any obsolete slice suggestions are marked done, superseded, or deferred.
 
-Print after completion, suggested next `/new-go-slug`: to be chosen during this
-refresh.
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-owner-listing-controls`
+
+## Slice 7: Rental Owner Listing Controls
+
+Suggested `/new-go-slug`: `doverabot-rental-owner-listing-controls`
+
+Status: active next slice.
+
+Scope:
+
+- Add an owner-facing rental listing path under `/rent` so owners can see their
+  active, paused, and archived rental offers without searching as a renter.
+- Expose a small owner-safe API/listing path if the bot needs it; keep owner
+  authorization on `user_uuid` plus bot token and preserve existing
+  `/api/rental/offer` create/get/update semantics.
+- Add bot controls for pause, resume, archive, show public link, and show on
+  map when coordinates exist.
+- Keep this slice to listing controls only: no inventory quantities, escrow,
+  geocoding, vector search, or broad reservation history UI.
+
+Completion criteria:
+
+- `/rent` makes own-listing management discoverable while preserving create and
+  search commands.
+- Owner list and status-change paths are covered by focused backend and mocked
+  bot tests.
+- Local bot tests, backend checks, reindex, and graph update pass.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-reservation-history-controls`
+
+## Slice 8: Rental Reservation History Controls
+
+Suggested `/new-go-slug`: `doverabot-rental-reservation-history-controls`
+
+Status: planned after owner listing controls.
+
+Scope:
+
+- Add requester/owner reservation history views for open and recently closed
+  rental reservations.
+- Let users reopen status cards and available action buttons from history
+  instead of relying only on the original Telegram notification message.
+- Surface reservation event/proof audit history in concise bot text.
+- Keep fake-proof consequences as an explicit later policy decision; do not
+  auto-create mistrust in this slice.
+
+Completion criteria:
+
+- Owners and requesters can recover active reservation controls after losing
+  the original bot message.
+- Tests cover authorization boundaries and terminal reservation statuses.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-next-decision-refresh`

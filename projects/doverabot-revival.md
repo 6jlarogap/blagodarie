@@ -34,6 +34,8 @@ Rental V1 smoke observability chain: [../references/2026-06-21-doverabot-rental-
 
 Go-next chain: [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md)
 
+Next decision refresh chain: [../references/2026-06-21-doverabot-next-decision-refresh-chain.md](../references/2026-06-21-doverabot-next-decision-refresh-chain.md)
+
 Current decision:
 
 - Keep one public Doverabot identity with modular feature flows: `/rent`, `/offer`, `/meet`, `rod`, `/trust`, and `/thank`.
@@ -68,6 +70,9 @@ Current implementation:
   registration/owner notification, and payment-proof pack forwarding, plus
   repeatable public curl checks for rental search, map exposure, and offer
   lookup.
+- The next-decision refresh selected rental owner-listing management as the next
+  product slice, because legacy hardening is covered and `/rent` still lacks a
+  discoverable owner path to list, pause, resume, and archive rental offers.
 
 Primary implementation areas:
 
@@ -81,20 +86,32 @@ Primary implementation areas:
 
 ## Doverabot Backlog Captured
 
+Covered by completed hardening slices:
+
 - Centralize remaining non-rental callback payload parsing.
 - Add handler tests around offers, callbacks, media packs, and command interruption.
 - Fix duplicate callback function names and known bug backlog from the interaction map.
 - Keep hard-coded bot/deep-link cleanup enforced in newly touched bot flows.
 - Improve user feedback on unauthorized or expired callbacks.
 
+Remaining product backlog:
+
+- Add owner-facing rental listing controls for active, paused, and archived
+  rental offers.
+- Add requester/owner reservation history controls after listing management.
+- Improve rental map/frontend filters if the existing source path can support it
+  without editing generated bundles directly.
+- Decide later on inventory quantities, fake-proof consequences, configurable
+  hold duration, geocoding, and vector search.
+
 ## Next Implementation Slice
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-next-decision-refresh`.
+Active next `/new-go-slug`: `doverabot-rental-owner-listing-controls`.
 
 After that slice, print next `/new-go-slug`:
-to be chosen during the refresh.
+`doverabot-rental-reservation-history-controls`.
 
 After that, keep each completed chain pointing to the next slug in the go-next chain.
 

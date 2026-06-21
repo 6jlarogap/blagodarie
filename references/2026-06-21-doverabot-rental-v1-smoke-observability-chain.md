@@ -111,5 +111,10 @@ Checks run:
 
 ## Follow-Up Basket
 
-Next suggested `/new-go-slug`:
+Next suggested `/new-go-slug` from this completed slice:
 `doverabot-next-decision-refresh`
+
+Refresh result:
+[2026-06-21-doverabot-next-decision-refresh-chain.md](2026-06-21-doverabot-next-decision-refresh-chain.md)
+selected the next implementation slug:
+`doverabot-rental-owner-listing-controls`
