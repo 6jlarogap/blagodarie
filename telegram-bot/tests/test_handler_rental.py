@@ -769,6 +769,252 @@ class LegacyProfileEditCallbackParserTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('кнопка устарела', callback.answer_text.lower())
 
 
+class LegacyProfileEditCallbackFeedbackFinishTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+        self.handler_callbacks = import_fresh('handler_callbacks')
+
+    def assert_stale_notice(self, callback):
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    def assert_profile_notice(self, callback):
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('профиль', callback.answer_text.lower())
+
+    async def test_malformed_iof_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.IOF}{self.common.KeyboardType.SEP}'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(),
+        ) as check_owner:
+            await self.handler_callbacks.cbq_existing_iof(callback, FakeState())
+
+        check_owner.assert_not_awaited()
+        self.assert_stale_notice(callback)
+
+    async def test_comment_auth_failure_shows_profile_notice_and_skips_prompt(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.COMMENT}{self.common.KeyboardType.SEP}person-uuid'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(return_value=False),
+        ):
+            await self.handler_callbacks.cbq_comment(callback, FakeState())
+
+        self.assert_profile_notice(callback)
+        self.assertEqual(callback.message.replies, [])
+
+    async def test_dob_unknown_auth_failure_clears_state_and_shows_profile_notice(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.DATES_DOB_UNKNOWN}{self.common.KeyboardType.SEP}person-uuid'
+        )
+        state = FakeState({'uuid': 'person-uuid'})
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(return_value=False),
+        ):
+            await self.handler_callbacks.cbq_dates_dob_unknown(callback, state)
+
+        self.assertTrue(state.cleared)
+        self.assert_profile_notice(callback)
+
+    async def test_delete_confirmed_state_mismatch_shows_notice_and_skips_delete_api(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.DELETE_USER_CONFIRMED}{self.common.KeyboardType.SEP}person-uuid'
+        )
+        state = FakeState({'uuid': 'other-uuid', 'owner_id': 42})
+        response_check = {
+            'uuid': 'owner-uuid',
+            'user_id': 42,
+            'response_uuid': {'uuid': 'person-uuid'},
+        }
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(return_value=response_check),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'api_request',
+            mock.AsyncMock(),
+        ) as api_request:
+            await self.handler_callbacks.cbq_delete_user_confirmed(callback, state)
+
+        api_request.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assert_stale_notice(callback)
+
+    async def test_delete_confirmed_api_validation_uses_delete_response_message(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.DELETE_USER_CONFIRMED}{self.common.KeyboardType.SEP}person-uuid'
+        )
+        state = FakeState({'uuid': 'person-uuid', 'owner_id': 42})
+        response_check = {
+            'uuid': 'owner-uuid',
+            'user_id': 42,
+            'response_uuid': {
+                'uuid': 'person-uuid',
+                'first_name': 'Person',
+                'owner': {'uuid': 'owner-uuid'},
+                'r_sympa_username': '',
+            },
+        }
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(return_value=response_check),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'api_request',
+            mock.AsyncMock(return_value=(400, {'message': 'cannot delete'})),
+        ):
+            await self.handler_callbacks.cbq_delete_user_confirmed(callback, state)
+
+        self.assertTrue(state.cleared)
+        self.assertTrue(callback.answered)
+        self.assertFalse(callback.answer_show_alert)
+        self.assertIn('cannot delete', callback.message.replies[0].text)
+
+    async def test_undelete_confirmed_auth_failure_clears_state_and_shows_profile_notice(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.UNDELETE_USER_CONFIRMED}{self.common.KeyboardType.SEP}person-uuid'
+        )
+        state = FakeState({'uuid': 'person-uuid'})
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(return_value=False),
+        ):
+            await self.handler_callbacks.cbq_udelete_user_confirmed(callback, state)
+
+        self.assertTrue(state.cleared)
+        self.assert_profile_notice(callback)
+
+    async def test_send_message_auth_failure_shows_profile_notice(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.SEND_MESSAGE}{self.common.KeyboardType.SEP}person-uuid'
+        )
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'get_user_by_uuid',
+            mock.AsyncMock(return_value=(200, {'uuid': 'person-uuid', 'first_name': 'Person'})),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(500, {})),
+        ):
+            await self.handler_callbacks.cbq_send_message(callback, state)
+
+        self.assertIsNone(state.state)
+        self.assert_profile_notice(callback)
+
+    async def test_show_messages_malformed_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.SHOW_MESSAGES}{self.common.KeyboardType.SEP}'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(),
+        ) as post_tg_user:
+            await self.handler_callbacks.cbq_show_messages(callback, FakeState())
+
+        post_tg_user.assert_not_awaited()
+        self.assert_stale_notice(callback)
+
+    async def test_user_desc_auth_failure_shows_profile_notice_and_skips_profile_lookup(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.USER_DESC}{self.common.KeyboardType.SEP}person-uuid'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(200, {'uuid': 'other-uuid'})),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'get_user_by_uuid',
+            mock.AsyncMock(),
+        ) as get_user_by_uuid:
+            await self.handler_callbacks.cbq_get_user_desc(callback, FakeState())
+
+        get_user_by_uuid.assert_not_awaited()
+        self.assert_profile_notice(callback)
+
+    async def test_banking_auth_failure_shows_profile_notice_and_skips_bank_lookup(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.BANKING}{self.common.KeyboardType.SEP}person-uuid'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(200, {'uuid': 'other-uuid'})),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'get_bank_details',
+            mock.AsyncMock(),
+        ) as get_bank_details:
+            await self.handler_callbacks.cbq_get_banking(callback, FakeState())
+
+        get_bank_details.assert_not_awaited()
+        self.assert_profile_notice(callback)
+
+    async def test_meet_edit_back_auth_failure_shows_profile_notice(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.MEET_EDIT_BACK}{self.common.KeyboardType.SEP}'
+            f'person-uuid{self.common.KeyboardType.SEP}3003{self.common.KeyboardType.SEP}'
+            f'{self.common.Misc.CARD_TYPE_MEET}{self.common.KeyboardType.SEP}'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(500, {})),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'show_edit_meet',
+            mock.AsyncMock(),
+        ) as show_edit_meet:
+            await self.handler_callbacks.cbq_meet_edit_back(callback, FakeState())
+
+        show_edit_meet.assert_not_awaited()
+        self.assert_profile_notice(callback)
+
+    async def test_message_delete_malformed_callback_shows_notice_and_skips_auth(self):
+        callback = FakeCallback(
+            f'{self.common.KeyboardType.MESSAGE_DELETE}{self.common.KeyboardType.SEP}'
+        )
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(),
+        ) as post_tg_user:
+            await self.handler_callbacks.cbq_message_delete(callback, FakeState())
+
+        post_tg_user.assert_not_awaited()
+        self.assert_stale_notice(callback)
+
+
 class LegacySympaLinkTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         install_dependency_stubs(stub_common=False)

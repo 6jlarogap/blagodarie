@@ -888,7 +888,12 @@ async def cbq_existing_iof(callback: CallbackQuery, state: FSMContext):
     Заменить имя, фамилию, отчество или название организации
     """
     uuid, card_message_id, card_type = Misc.parse_uid_message_calback(callback)
-    if not (response_sender := await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid)):
+    if not uuid:
+        await Misc.answer_callback_notice(callback)
+        return
+    response_sender = await Misc.check_owner_by_uuid(owner_tg_user=callback.from_user, uuid=uuid)
+    if not response_sender:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
         return
     response_uuid = response_sender['response_uuid']
     await state.set_state(FSMexistingIOF.ask)
@@ -1117,42 +1122,47 @@ async def cbq_photo_remove_confirmed(callback: CallbackQuery, state: FSMContext)
     )), StateFilter(None))
 async def cbq_dates(callback: CallbackQuery, state: FSMContext):
     uuid, card_message_id, card_type = Misc.parse_uid_message_calback(callback)
-    if uuid and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        response_uuid = response_check['response_uuid']
-        his_her = Misc.his_her(response_uuid) if response_uuid['owner'] else 'Ваш'
-        title_dob_unknown = 'Не знаю'
-        buttons = []
-        prompt_dob = (
-            f'<b>{response_uuid["first_name"]}</b>\n\n'
-            f'Укажите {his_her} день рождения '
-        ) + Misc.PROMPT_DATE_FORMAT
-        if not card_message_id:
-            if not response_uuid['owner']:
-                prompt_dob += (
-                    f'\n\nЕсли хотите скрыть дату своего рождения '
-                    f'или в самом деле не знаете, когда Ваш день рождения, нажмите <u>{title_dob_unknown}</u>'
-                )
-            inline_button_dob_unknown = InlineKeyboardButton(
-                text=title_dob_unknown, callback_data=Misc.CALLBACK_DATA_UUID_TEMPLATE % dict(
-                keyboard_type=KeyboardType.DATES_DOB_UNKNOWN,
-                sep=KeyboardType.SEP,
-                uuid=uuid,
-            ))
-            buttons = [inline_button_dob_unknown]
-        reply_markup = InlineKeyboardMarkup(
-            inline_keyboard=[ buttons + [Misc.inline_button_cancel()]]
-        )
-        await state.set_state(FSMdates.dob)
-        await state.update_data(
+    if not uuid:
+        await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    response_uuid = response_check['response_uuid']
+    his_her = Misc.his_her(response_uuid) if response_uuid['owner'] else 'Ваш'
+    title_dob_unknown = 'Не знаю'
+    buttons = []
+    prompt_dob = (
+        f'<b>{response_uuid["first_name"]}</b>\n\n'
+        f'Укажите {his_her} день рождения '
+    ) + Misc.PROMPT_DATE_FORMAT
+    if not card_message_id:
+        if not response_uuid['owner']:
+            prompt_dob += (
+                f'\n\nЕсли хотите скрыть дату своего рождения '
+                f'или в самом деле не знаете, когда Ваш день рождения, нажмите <u>{title_dob_unknown}</u>'
+            )
+        inline_button_dob_unknown = InlineKeyboardButton(
+            text=title_dob_unknown, callback_data=Misc.CALLBACK_DATA_UUID_TEMPLATE % dict(
+            keyboard_type=KeyboardType.DATES_DOB_UNKNOWN,
+            sep=KeyboardType.SEP,
             uuid=uuid,
-            card_message_id=card_message_id,
-            card_type=card_type,
-        )
-        await callback.message.reply(
-            prompt_dob,
-            reply_markup=reply_markup,
-        )
+        ))
+        buttons = [inline_button_dob_unknown]
+    reply_markup = InlineKeyboardMarkup(
+        inline_keyboard=[ buttons + [Misc.inline_button_cancel()]]
+    )
+    await state.set_state(FSMdates.dob)
+    await state.update_data(
+        uuid=uuid,
+        card_message_id=card_message_id,
+        card_type=card_type,
+    )
+    await callback.message.reply(
+        prompt_dob,
+        reply_markup=reply_markup,
+    )
     await callback.answer()
 
 
@@ -1161,13 +1171,20 @@ async def cbq_dates(callback: CallbackQuery, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(FSMdates.dob))
 async def cbq_dates_dob_unknown(callback: CallbackQuery, state: FSMContext):
-    if (uuid := Misc.get_uuid_from_callback(callback)) and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        await state.update_data(dob=None)
-        if (profile := response_check['response_uuid'])['owner']:
-            await draw_dod(profile, callback.message, state)
-        else:
-            await put_dates(callback.message, state, callback.from_user)
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    await state.update_data(dob=None)
+    if (profile := response_check['response_uuid'])['owner']:
+        await draw_dod(profile, callback.message, state)
+    else:
+        await put_dates(callback.message, state, callback.from_user)
     await callback.answer()
 
 
@@ -1322,10 +1339,15 @@ async def process_dod(message: Message, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_comment(callback: CallbackQuery, state: FSMContext):
-    if (uuid := Misc.get_uuid_from_callback(callback)) and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        await state.set_state(FSMcomment.ask)
-        await state.update_data(uuid=uuid)
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    await state.set_state(FSMcomment.ask)
+    await state.update_data(uuid=uuid)
     await callback.message.reply(
         f'Введите комментарий для:\n{response_check["response_uuid"]["first_name"]}',
         reply_markup=Misc.reply_markup_cancel_row(),
@@ -1364,17 +1386,22 @@ async def process_comment(message: Message, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_delete_user(callback: CallbackQuery, state: FSMContext):
-    if (uuid := Misc.get_uuid_from_callback(callback)) and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        profile = response_check['response_uuid']
-        owner = response_check
-        if profile['is_active'] or profile['owner']:
-            prompt, reply_markup = Misc.message_delete_user(profile, owner)
-            await state.set_state(FSMdelete.ask)
-            await state.update_data(uuid=uuid, owner_id=owner['user_id'])
-            await callback.message.reply(prompt, reply_markup=reply_markup)
-        else:
-            await callback.message.reply('Профиль уже обезличен')
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    profile = response_check['response_uuid']
+    owner = response_check
+    if profile['is_active'] or profile['owner']:
+        prompt, reply_markup = Misc.message_delete_user(profile, owner)
+        await state.set_state(FSMdelete.ask)
+        await state.update_data(uuid=uuid, owner_id=owner['user_id'])
+        await callback.message.reply(prompt, reply_markup=reply_markup)
+    else:
+        await callback.message.reply('Профиль уже обезличен')
     await callback.answer()
 
 
@@ -1385,56 +1412,68 @@ async def cbq_delete_user(callback: CallbackQuery, state: FSMContext):
 async def cbq_delete_user_confirmed(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     # Удаление! Доп. проверки!
-    if (uuid := Misc.get_uuid_from_callback(callback)) and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)) and \
-       data.get('uuid') and data.get('owner_id') and \
-       response_check['user_id'] == data['owner_id'] and \
-       response_check['response_uuid']['uuid'] == data['uuid'] and \
-       uuid == data['uuid']:
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    if not data.get('uuid') or not data.get('owner_id') or \
+       response_check['response_uuid']['uuid'] != data['uuid'] or uuid != data['uuid']:
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    if response_check['user_id'] != data['owner_id']:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
 
-        profile = response_check['response_uuid']; 
-        profile_sympa = None
-        if profile['r_sympa_username']:
-            status_r_sympa, profile_sympa = await Misc.get_user_by_sid(profile['r_sympa_username'])
-            if status_r_sympa != 200:
-                profile_sympa = None
-        if profile['owner']:
-            msg_debug = 'delete owned user, '
-            msg_deleted = f'Профиль <u>{response_check["response_uuid"]["first_name"]}</u> удалён'
-        else:
-            msg_debug = 'depersonalize user, '
-            msg_deleted = 'Ваш профиль обезличен.'
+    profile = response_check['response_uuid']
+    profile_sympa = None
+    if profile['r_sympa_username']:
+        status_r_sympa, profile_sympa = await Misc.get_user_by_sid(profile['r_sympa_username'])
+        if status_r_sympa != 200:
+            profile_sympa = None
+    if profile['owner']:
+        msg_debug = 'delete owned user, '
+        msg_deleted = f'Профиль <u>{response_check["response_uuid"]["first_name"]}</u> удалён'
+    else:
+        msg_debug = 'depersonalize user, '
+        msg_deleted = 'Ваш профиль обезличен.'
 
-        payload = dict(tg_token=settings.TOKEN, uuid=uuid, owner_id=data['owner_id'])
-        logging.debug(msg_debug + 'payload: %s' % Misc.secret(payload))
-        status_delete, response_delete = await Misc.api_request(
-            path='/api/profile',
-            method='delete',
-            data=payload,
-        )
-        logging.debug(msg_debug + 'status: %s' % status_delete)
-        logging.debug(msg_debug + 'response: %s' % response_delete)
-        if status_delete == 400:
-            await callback.message.reply('Ошибка: %s' % response['message'])
-        elif status_delete != 200:
-            await callback.message.reply('Неизвестная ошибка')
-        else:
-            await callback.message.reply(msg_deleted)
-            if not profile['owner']:
-                await Misc.show_card(response_delete, response_check, callback.from_user)
-                if profile_sympa:
-                    for tgd in profile_sympa['tg_data']:
-                        try:
-                            await bot.send_message(
-                                tgd['tg_uid'],
-                                text=(
-                                    f'Симпатия к Вам отменена. Приглашайте новых игроков '
-                                    f'и ставьте больше интересов на '
-                                    f'<a href="{settings.MEET_HOST}">карте</a> - '
-                                    f'чтобы скорее найти совпадения!'
-                            ))
-                        except (TelegramBadRequest, TelegramForbiddenError):
-                            pass
+    payload = dict(tg_token=settings.TOKEN, uuid=uuid, owner_id=data['owner_id'])
+    logging.debug(msg_debug + 'payload: %s' % Misc.secret(payload))
+    status_delete, response_delete = await Misc.api_request(
+        path='/api/profile',
+        method='delete',
+        data=payload,
+    )
+    logging.debug(msg_debug + 'status: %s' % status_delete)
+    logging.debug(msg_debug + 'response: %s' % response_delete)
+    if status_delete == 400:
+        await callback.message.reply('Ошибка: %s' % response_delete['message'])
+    elif status_delete != 200:
+        await callback.message.reply('Неизвестная ошибка')
+    else:
+        await callback.message.reply(msg_deleted)
+        if not profile['owner']:
+            await Misc.show_card(response_delete, response_check, callback.from_user)
+            if profile_sympa:
+                for tgd in profile_sympa['tg_data']:
+                    try:
+                        await bot.send_message(
+                            tgd['tg_uid'],
+                            text=(
+                                f'Симпатия к Вам отменена. Приглашайте новых игроков '
+                                f'и ставьте больше интересов на '
+                                f'<a href="{settings.MEET_HOST}">карте</a> - '
+                                f'чтобы скорее найти совпадения!'
+                        ))
+                    except (TelegramBadRequest, TelegramForbiddenError):
+                        pass
     await state.clear()
     await callback.answer()
 
@@ -1444,31 +1483,38 @@ async def cbq_delete_user_confirmed(callback: CallbackQuery, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_undelete_user(callback: CallbackQuery, state: FSMContext):
-    if (uuid := Misc.get_uuid_from_callback(callback)) and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        profile = response_check['response_uuid']
-        owner = response_check
-        if profile['uuid'] == owner['uuid']:
-            if profile['is_active']:
-                await callback.message.reply('Вы уже восстановлены')
-            else:
-                prompt = (
-                    f'<b>{profile["first_name"]}</b>\n'
-                    '\n'
-                    'Вы собираетесь <u>восстановить</u> себя и свои данные в системе.\n'
-                    '\n'
-                    'Если подтверждаете, то нажмите <u>Продолжить</u>. Иначе <u>Отмена</u>\n'
-                )
-                inline_btn_go = InlineKeyboardButton(
-                    text='Продолжить',
-                    callback_data=Misc.CALLBACK_DATA_UUID_TEMPLATE % dict(
-                        keyboard_type=KeyboardType.UNDELETE_USER_CONFIRMED,
-                        uuid=profile['uuid'],
-                        sep=KeyboardType.SEP,
-                ))
-                reply_markup = InlineKeyboardMarkup(inline_keyboard=[[inline_btn_go, Misc.inline_button_cancel()]])
-                await state.set_state(FSMundelete.ask)
-                await callback.message.reply(prompt, reply_markup=reply_markup)
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    profile = response_check['response_uuid']
+    owner = response_check
+    if profile['uuid'] != owner['uuid']:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    if profile['is_active']:
+        await callback.message.reply('Вы уже восстановлены')
+    else:
+        prompt = (
+            f'<b>{profile["first_name"]}</b>\n'
+            '\n'
+            'Вы собираетесь <u>восстановить</u> себя и свои данные в системе.\n'
+            '\n'
+            'Если подтверждаете, то нажмите <u>Продолжить</u>. Иначе <u>Отмена</u>\n'
+        )
+        inline_btn_go = InlineKeyboardButton(
+            text='Продолжить',
+            callback_data=Misc.CALLBACK_DATA_UUID_TEMPLATE % dict(
+                keyboard_type=KeyboardType.UNDELETE_USER_CONFIRMED,
+                uuid=profile['uuid'],
+                sep=KeyboardType.SEP,
+        ))
+        reply_markup = InlineKeyboardMarkup(inline_keyboard=[[inline_btn_go, Misc.inline_button_cancel()]])
+        await state.set_state(FSMundelete.ask)
+        await callback.message.reply(prompt, reply_markup=reply_markup)
     await callback.answer()
 
 @router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
@@ -1476,25 +1522,39 @@ async def cbq_undelete_user(callback: CallbackQuery, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(FSMundelete.ask))
 async def cbq_udelete_user_confirmed(callback: CallbackQuery, state: FSMContext):
-    if (uuid := Misc.get_uuid_from_callback(callback)) and \
-       (response_check := await Misc.check_owner_by_uuid(callback.from_user, uuid)):
-        profile = response_check['response_uuid']
-        owner = response_check
-        if profile['uuid'] == owner['uuid'] and not profile['is_active']:
-            logging.debug('un-depersonalize user')
-            status, response = await Misc.post_tg_user(callback.from_user, activate=True)
-            if status == 400:
-                await callback.message.reply('Ошибка: %s' % response['message'])
-            elif status != 200:
-                await callback.message.reply('Неизвестная ошибка')
-            else:
-                await callback.message.reply(
-                    "Ваш профиль восстановлен."
-                )
-                status_photo, response_photo = await Misc.update_user_photo(callback.from_user, response)
-                if status_photo == 200:
-                    response = response_photo
-                await Misc.show_card(response, response, callback.from_user)
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    response_check = await Misc.check_owner_by_uuid(callback.from_user, uuid)
+    if not response_check:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    profile = response_check['response_uuid']
+    owner = response_check
+    if profile['uuid'] != owner['uuid']:
+        await state.clear()
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    if profile['is_active']:
+        await state.clear()
+        await Misc.answer_callback_notice(callback)
+        return
+    logging.debug('un-depersonalize user')
+    status, response = await Misc.post_tg_user(callback.from_user, activate=True)
+    if status == 400:
+        await callback.message.reply('Ошибка: %s' % response['message'])
+    elif status != 200:
+        await callback.message.reply('Неизвестная ошибка')
+    else:
+        await callback.message.reply(
+            "Ваш профиль восстановлен."
+        )
+        status_photo, response_photo = await Misc.update_user_photo(callback.from_user, response)
+        if status_photo == 200:
+            response = response_photo
+        await Misc.show_card(response, response, callback.from_user)
     await state.clear()
     await callback.answer()
 
@@ -1505,27 +1565,33 @@ async def cbq_udelete_user_confirmed(callback: CallbackQuery, state: FSMContext)
     )), StateFilter(None))
 async def cbq_send_message(callback: CallbackQuery, state: FSMContext):
     uuid, card_message_id, card_type = Misc.parse_uid_message_calback(callback)
-    if uuid:
-        status_to, profile_to = await Misc.get_user_by_uuid(uuid, with_owner_tg_data=True)
-        if status_to == 200:
-            status_from, profile_from = await Misc.post_tg_user(callback.from_user)
-            if status_from == 200:
-                await state.set_state(FSMsendMessage.ask)
-                await state.update_data(
-                    uuid_pack=str(uuid4()),
-                    card_message_id=card_message_id,
-                    card_type=card_type,
-                    profile_from=profile_from,
-                    profile_to=profile_to,
-                )
-                if card_type == Misc.CARD_TYPE_MEET:
-                    iof_link = html.quote(profile_to['first_name'])
-                else:
-                    iof_link = Misc.get_deeplink_with_name(profile_to)
-                await callback.message.reply(
-                    f'Напишите мне сообщение для передачи <b>{iof_link}</b>',
-                    reply_markup=Misc.reply_markup_cancel_row(),
-                )
+    if not uuid:
+        await Misc.answer_callback_notice(callback)
+        return
+    status_to, profile_to = await Misc.get_user_by_uuid(uuid, with_owner_tg_data=True)
+    if status_to != 200:
+        await Misc.answer_callback_notice(callback)
+        return
+    status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if status_from != 200:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    await state.set_state(FSMsendMessage.ask)
+    await state.update_data(
+        uuid_pack=str(uuid4()),
+        card_message_id=card_message_id,
+        card_type=card_type,
+        profile_from=profile_from,
+        profile_to=profile_to,
+    )
+    if card_type == Misc.CARD_TYPE_MEET:
+        iof_link = html.quote(profile_to['first_name'])
+    else:
+        iof_link = Misc.get_deeplink_with_name(profile_to)
+    await callback.message.reply(
+        f'Напишите мне сообщение для передачи <b>{iof_link}</b>',
+        reply_markup=Misc.reply_markup_cancel_row(),
+    )
     await callback.answer()
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMsendMessage.ask))
@@ -1641,27 +1707,34 @@ async def process_message_to_send(message: Message, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_show_messages(callback: CallbackQuery, state: FSMContext):
-    if user_to_uuid := Misc.get_uuid_from_callback(callback):
-        status_from, profile_from = await Misc.post_tg_user(callback.from_user)
-        if status_from == 200:
-            status_to, profile_to = await Misc.get_user_by_uuid(user_to_uuid)
-            if status_to == 200:
-                tg_user_sender = callback.from_user
-                payload = dict(
-                    tg_token=settings.TOKEN,
-                    user_from_uuid=profile_from['uuid'],
-                    user_to_uuid=user_to_uuid,
-                )
-                logging.debug('get_user_messages, payload: %s' % Misc.secret(payload))
-                status, response = await Misc.api_request(
-                    path='/api/tg_message/list',
-                    method='post',
-                    json=payload,
-                )
-                logging.debug('get_user_messages, status: %s' % status)
-                logging.debug('get_user_messages, response: %s' % response)
-                if status != 200:
-                    await bot.send_message(tg_user_sender.id, text='Проблема с получением архива сообщений')
+    user_to_uuid = Misc.get_uuid_from_callback(callback)
+    if not user_to_uuid:
+        await Misc.answer_callback_notice(callback)
+        return
+    status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if status_from != 200:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    status_to, profile_to = await Misc.get_user_by_uuid(user_to_uuid)
+    if status_to != 200:
+        await Misc.answer_callback_notice(callback)
+        return
+    tg_user_sender = callback.from_user
+    payload = dict(
+        tg_token=settings.TOKEN,
+        user_from_uuid=profile_from['uuid'],
+        user_to_uuid=user_to_uuid,
+    )
+    logging.debug('get_user_messages, payload: %s' % Misc.secret(payload))
+    status, response = await Misc.api_request(
+        path='/api/tg_message/list',
+        method='post',
+        json=payload,
+    )
+    logging.debug('get_user_messages, status: %s' % status)
+    logging.debug('get_user_messages, response: %s' % response)
+    if status != 200:
+        await bot.send_message(tg_user_sender.id, text='Проблема с получением архива сообщений')
     await callback.answer()
 
 @router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
@@ -1670,20 +1743,28 @@ async def cbq_show_messages(callback: CallbackQuery, state: FSMContext):
     )), StateFilter(None))
 async def cbq_get_user_desc(callback: CallbackQuery, state: FSMContext):
     uuid, card_message_id, card_type = Misc.parse_uid_message_calback(callback)
-    if uuid:
-        status, profile = await Misc.get_user_by_uuid(uuid)
-        if status == 200:
-            await state.set_state(FSMpersonDesc.ask)
-            await state.update_data(
-                uuid=uuid,
-                uuid_pack=str(uuid4()),
-                card_message_id=card_message_id,
-                card_type=card_type,
-            )
-            await callback.message.reply(
-                Misc.PROMPT_USER_DESC,
-                reply_markup=Misc.reply_markup_cancel_row(),
-            )
+    if not uuid:
+        await Misc.answer_callback_notice(callback)
+        return
+    status_sender, profile_sender = await Misc.post_tg_user(callback.from_user)
+    if status_sender != 200 or profile_sender.get('uuid') != uuid:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    status, profile = await Misc.get_user_by_uuid(uuid)
+    if status != 200:
+        await Misc.answer_callback_notice(callback)
+        return
+    await state.set_state(FSMpersonDesc.ask)
+    await state.update_data(
+        uuid=uuid,
+        uuid_pack=str(uuid4()),
+        card_message_id=card_message_id,
+        card_type=card_type,
+    )
+    await callback.message.reply(
+        Misc.PROMPT_USER_DESC,
+        reply_markup=Misc.reply_markup_cancel_row(),
+    )
     await callback.answer()
 
 
@@ -1742,24 +1823,27 @@ async def process_get_user_desc(message: Message, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_get_banking(callback: CallbackQuery, state: FSMContext):
-    if uuid := Misc.get_uuid_from_callback(callback):
-        status_sender, response_sender = await Misc.post_tg_user(callback.from_user)
-        if status_sender != 200 or response_sender['uuid'] != uuid:
-            return
-        text = (
-            'Напишите мне сообщение с реквизитами для получения '
-            'благодарственных пожертвований от других пользователей'
+    if not (uuid := Misc.get_uuid_from_callback(callback)):
+        await Misc.answer_callback_notice(callback)
+        return
+    status_sender, response_sender = await Misc.post_tg_user(callback.from_user)
+    if status_sender != 200 or response_sender.get('uuid') != uuid:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    text = (
+        'Напишите мне сообщение с реквизитами для получения '
+        'благодарственных пожертвований от других пользователей'
+    )
+    if bank_details := await Misc.get_bank_details(uuid):
+        text += (
+            '.\n\n'
+            '<b>Ваши Реквизиты платежей:</b>\n\n'
+            f'{html.quote(bank_details)}\n\n'
+            '<b>будут заменены</b>'
         )
-        if bank_details := await Misc.get_bank_details(uuid):
-            text += (
-                '.\n\n'
-                '<b>Ваши Реквизиты платежей:</b>\n\n'
-                f'{html.quote(bank_details)}\n\n'
-                '<b>будут заменены</b>'
-            )
-        await state.set_state(FSMbanking.ask)
-        await state.update_data(uuid=uuid)
-        await callback.message.reply(text, reply_markup=Misc.reply_markup_cancel_row())
+    await state.set_state(FSMbanking.ask)
+    await state.update_data(uuid=uuid)
+    await callback.message.reply(text, reply_markup=Misc.reply_markup_cancel_row())
     await callback.answer()
 
 
@@ -1914,12 +1998,19 @@ async def cbq_meet_edit(callback: CallbackQuery, state: FSMContext):
     )), StateFilter(None))
 async def cbq_meet_edit_back(callback: CallbackQuery, state: FSMContext):
     uuid, card_message_id, card_type = Misc.parse_uid_message_calback(callback)
+    if not uuid:
+        await Misc.answer_callback_notice(callback)
+        return
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if status_from != 200:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
     if not profile_from['is_active']:
         await callback.message.reply(Misc.MSG_NOT_SENDER_NOT_ACTIVE)
         await callback.answer(); return
-    if status_from != 200 or profile_from['uuid'] != uuid:
-        await callback.answer(); return
+    if profile_from['uuid'] != uuid:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
     await Misc.show_edit_meet(
         callback.from_user.id,
         profile_from,
@@ -1934,26 +2025,34 @@ async def cbq_meet_edit_back(callback: CallbackQuery, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_message_delete(callback: CallbackQuery, state: FSMContext):
-    if uuid_pack := Misc.get_uuid_from_callback(callback):
-        status_from, profile_from = await Misc.post_tg_user(callback.from_user)
-        payload = dict(
-            tg_token=settings.TOKEN,
-            uuid_pack=uuid_pack,
-            user_from_uuid=profile_from['uuid'],
+    if not (uuid_pack := Misc.get_uuid_from_callback(callback)):
+        await Misc.answer_callback_notice(callback)
+        return
+    status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if status_from != 200:
+        await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)
+        return
+    payload = dict(
+        tg_token=settings.TOKEN,
+        uuid_pack=uuid_pack,
+        user_from_uuid=profile_from['uuid'],
+    )
+    logging.debug('delete message in archive, payload: %s' % Misc.secret(payload))
+    status, response = await Misc.api_request(
+        path='/api/tg_message',
+        method='delete',
+        json=payload,
+    )
+    logging.debug('delete message in archive, status: %s' % status)
+    logging.debug('delete message in archive, response: %s' % response)
+    if status in (200, 404):
+        await bot.edit_message_text(
+            chat_id=callback.from_user.id,
+            message_id=callback.message.message_id,
+            text=callback.message.text + '\n\n(удалено из архива)',
+            reply_markup=None,
         )
-        logging.debug('delete message in archive, payload: %s' % Misc.secret(payload))
-        status, response = await Misc.api_request(
-            path='/api/tg_message',
-            method='delete',
-            json=payload,
-        )
-        logging.debug('delete message in archive, status: %s' % status)
-        logging.debug('delete message in archive, response: %s' % response)
-        if status in (200, 404):
-            await bot.edit_message_text(
-                chat_id=callback.from_user.id,
-                message_id=callback.message.message_id,
-                text=callback.message.text + '\n\n(удалено из архива)',
-                reply_markup=None,
-            )
+    else:
+        await Misc.answer_callback_notice(callback)
+        return
     await callback.answer()
