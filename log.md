@@ -2,6 +2,13 @@
 
 ## 2026-06-21
 
+- Source-implemented `doverabot-rental-hold-duration-config`: replaced the
+  rental reservation hold constant with `RENTAL_RESERVATION_HOLD_SECONDS`
+  defaulting to 600 seconds, exposed `reservation.hold_seconds` in API
+  payloads, and made bot reservation text use that configured value; focused
+  backend and mocked bot tests plus full rental/backend checks passed. Runtime
+  deploy remains blocked by the active wrapper/untracked-helper issue recorded
+  for `doverabot-rental-proof-dispute-controls`.
 - Source-implemented `doverabot-rental-proof-dispute-controls`: added owner-only
   payment-proof rejection as a distinct audited event that terminally cancels
   the reservation without writing trust/mistrust state, added owner/requester

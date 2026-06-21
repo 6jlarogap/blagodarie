@@ -1038,7 +1038,7 @@ class Rental(object):
         reservation = response['reservation']
         offer = response['offer']
         payment = reservation.get('recipient_payment_info_snapshot') or ''
-        hold_seconds = reservation.get('hold_seconds_remaining') or 0
+        hold_seconds = reservation.get('hold_seconds') or reservation.get('hold_seconds_remaining') or 0
         if reservation.get('recipient_kind') == 'system':
             recipient_text = (
                 'Получатель платежа: команда проекта. Это каждая 10-я бронь; '

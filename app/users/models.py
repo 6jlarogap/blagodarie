@@ -1779,6 +1779,9 @@ class RentalReservationIntent(BaseModelInsertUpdateTimestamp):
         ordering = ('-insert_timestamp', '-pk')
 
     def data_dict(self):
+        hold_seconds = 0
+        if self.hold_expires_at and self.insert_timestamp:
+            hold_seconds = max(0, self.hold_expires_at - self.insert_timestamp)
         return dict(
             id=self.pk,
             offer_uuid=self.offer.uuid,
@@ -1796,6 +1799,7 @@ class RentalReservationIntent(BaseModelInsertUpdateTimestamp):
             recipient_payment_info_snapshot=self.recipient_payment_info_snapshot,
             sequence_number=self.sequence_number,
             hold_expires_at=self.hold_expires_at,
+            hold_seconds=hold_seconds,
             hold_seconds_remaining=max(0, self.hold_expires_at - int(time.time()))
                 if self.hold_expires_at else 0,
             status=self.status,

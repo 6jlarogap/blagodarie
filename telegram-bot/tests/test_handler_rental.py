@@ -439,6 +439,21 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(callback.answered)
         self.assertTrue(any('владельцу не удалось' in reply.text for reply in callback.message.replies))
 
+    async def test_reservation_text_uses_hold_seconds_from_api_payload(self):
+        text = self.handler_rental.Rental.text_reservation({
+            'reservation': {
+                'id': 11,
+                'sequence_number': 1,
+                'status': 'awaiting_payment',
+                'recipient_kind': 'owner',
+                'hold_seconds': 1800,
+                'hold_seconds_remaining': 60,
+            },
+            'offer': {'uuid': 'offer-uuid', 'title': 'Travel tent'},
+        })
+
+        self.assertIn('Интервал удерживается 30 мин.', text)
+
     async def test_booking_success_registers_prompt_and_notifies_owner(self):
         callback = FakeCallback('82~offer-uuid')
         state = FakeState()

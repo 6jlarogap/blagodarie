@@ -395,6 +395,8 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(response.status_code, 200)
         first_reservation = RentalReservationIntent.objects.get()
         self.assertEqual(first_reservation.status, RentalReservationIntent.STATUS_AWAITING_PAYMENT)
+        self.assertEqual(response.data['reservation']['hold_seconds'], 600)
+        self.assertEqual(response.data['event']['payload']['hold_seconds'], 600)
 
         response = self.client.post('/api/rental/reservation/', data={
             'tg_token': self.bot_token,
@@ -419,6 +421,34 @@ class ApiRentalOfferTests(TestCase):
         first_reservation.refresh_from_db()
         self.assertEqual(first_reservation.status, RentalReservationIntent.STATUS_EXPIRED)
         self.assertEqual(RentalReservationIntent.objects.count(), 2)
+
+    @override_settings(
+        TELEGRAM_BOT_TOKEN=bot_token,
+        RENTAL_RESERVATION_HOLD_SECONDS=1800,
+    )
+    def test_reservation_hold_duration_uses_runtime_setting(self):
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Tent',
+            description_text='Палатка',
+        )
+        before = int(time.time())
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-01',
+            'date_to': '2026-07-03',
+        }, format='json')
+
+        after = int(time.time())
+        self.assertEqual(response.status_code, 200)
+        reservation = RentalReservationIntent.objects.get()
+        self.assertGreaterEqual(reservation.hold_expires_at, before + 1800)
+        self.assertLessEqual(reservation.hold_expires_at, after + 1800)
+        self.assertEqual(response.data['reservation']['hold_seconds'], 1800)
+        self.assertEqual(response.data['event']['payload']['hold_seconds'], 1800)
 
     @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
     def test_payment_proof_rechecks_mistrust(self):

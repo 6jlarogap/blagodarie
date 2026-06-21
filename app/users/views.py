@@ -4094,7 +4094,7 @@ api_bot_poll_results = ApiBotPollResults.as_view()
 
 class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
 
-    RESERVATION_HOLD_SECONDS = 10 * 60
+    DEFAULT_RESERVATION_HOLD_SECONDS = 10 * 60
 
     OPEN_RESERVATION_STATUSES = (
         RentalReservationIntent.STATUS_DRAFT,
@@ -4249,6 +4249,17 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
 
     def now_timestamp(self):
         return int(time.time())
+
+    def reservation_hold_seconds(self):
+        try:
+            hold_seconds = int(getattr(
+                settings,
+                'RENTAL_RESERVATION_HOLD_SECONDS',
+                self.DEFAULT_RESERVATION_HOLD_SECONDS,
+            ))
+        except (TypeError, ValueError):
+            hold_seconds = self.DEFAULT_RESERVATION_HOLD_SECONDS
+        return max(1, hold_seconds)
 
     def normalize_reservation_dates(self, offer, date_from, date_to):
         date_from = date_from or offer.available_from
@@ -4523,8 +4534,13 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
             reservation.recipient_kind == RentalReservationIntent.RECIPIENT_SYSTEM else \
             reservation.offer.owner
         recipient_profile = self.rental_user_payload(payment_user) if payment_user else None
+        reservation_payload = reservation.data_dict()
+        if event and event.event_type == RentalReservationEvent.EVENT_CREATED:
+            event_hold_seconds = event.payload.get('hold_seconds')
+            if event_hold_seconds is not None:
+                reservation_payload['hold_seconds'] = event_hold_seconds
         return dict(
-            reservation=reservation.data_dict(),
+            reservation=reservation_payload,
             created=created,
             event=event.data_dict() if event else None,
             events=[
@@ -5030,6 +5046,7 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
             created = reservation is None
             if created:
                 self.ensure_no_reservation_overlap(offer, date_from, date_to, now=now)
+                hold_seconds = self.reservation_hold_seconds()
                 reservation = RentalReservationIntent.objects.create(
                     offer=offer,
                     requester=requester,
@@ -5038,7 +5055,7 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                     date_to=date_to,
                     amount_suggested=amount_suggested,
                     currency=currency,
-                    hold_expires_at=now + self.RESERVATION_HOLD_SECONDS,
+                    hold_expires_at=now + hold_seconds,
                     status=RentalReservationIntent.STATUS_AWAITING_PAYMENT,
                 )
                 reservation.sequence_number = reservation.pk
@@ -5070,7 +5087,7 @@ class ApiRentalReservation(ApiRentalMixin, APIView):
                     status_to=reservation.status,
                     payload=dict(
                         hold_expires_at=reservation.hold_expires_at,
-                        hold_seconds=self.RESERVATION_HOLD_SECONDS,
+                        hold_seconds=hold_seconds,
                     ),
                 )
             else:
