@@ -1,12 +1,12 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-16 source-implemented; runtime deploy blocked since slice 10; slice 17 planned; rental semantic search ranking active
+Status: slices 1-17 source-implemented; runtime deploy blocked since slice 10; saved sequence exhausted; next decision refresh active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-rental-geocoding-contract-chain.md](2026-06-21-doverabot-rental-geocoding-contract-chain.md)
+Current completed chain: [2026-06-21-doverabot-rental-semantic-search-ranking-chain.md](2026-06-21-doverabot-rental-semantic-search-ranking-chain.md)
 
-Active next slice: Rental Semantic Search Ranking
-Active next `/new-go-slug`: `doverabot-rental-semantic-search-ranking`
+Active next slice: Next Decision Refresh
+Active next `/new-go-slug`: `doverabot-next-decision-refresh`
 After active slice, advance to the next planned slice and print its
 `/new-go-slug`; do not run another decision refresh until this saved sequence is
 exhausted or new production facts invalidate it.
@@ -474,7 +474,8 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-semantic-search-ranking`
 
-Status: planned
+Status: source implemented; runtime deploy blocked in
+[2026-06-21-doverabot-rental-semantic-search-ranking-chain.md](2026-06-21-doverabot-rental-semantic-search-ranking-chain.md).
 
 Scope:
 

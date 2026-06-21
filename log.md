@@ -2,6 +2,16 @@
 
 ## 2026-06-21
 
+- Source-implemented `doverabot-rental-semantic-search-ranking`: changed
+  `/api/rental/search` to apply status/visibility/mistrust/trusted/date/price/
+  coordinate filters before a bounded deterministic ranking pass, preserving
+  ambiguous equipment clarification while adding taxonomy-only, text fallback,
+  and local semantic-token matches; committed source as `8f9fda8`. Rental
+  backend tests, full mocked bot discovery, Django check, migration drift check,
+  compileall, diff check, reindex, and graphify update passed. Runtime deploy
+  remains blocked: `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run`
+  still includes `>f+++++++++ scripts/unblock-django-test-db.sh`, so
+  sync/migrate/deploy were not run.
 - Source-implemented `doverabot-rental-geocoding-contract`: added optional
   `doverabot_rental_geocoding_v1` bot settings and adapter parsing, prompted
   listing/search users with provider suggestions only when configured, and
