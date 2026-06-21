@@ -1,12 +1,12 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-17 source-implemented; runtime deploy blocked since slice 10; saved sequence exhausted; next decision refresh active
+Status: slices 1-17 source-implemented; runtime deploy blocked since slice 10; decision refresh selected runtime deploy unblock
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-rental-semantic-search-ranking-chain.md](2026-06-21-doverabot-rental-semantic-search-ranking-chain.md)
+Current completed chain: [2026-06-21-doverabot-next-decision-refresh-after-rental-future-slices-chain.md](2026-06-21-doverabot-next-decision-refresh-after-rental-future-slices-chain.md)
 
-Active next slice: Next Decision Refresh
-Active next `/new-go-slug`: `doverabot-next-decision-refresh`
+Active next slice: Rental Runtime Deploy Unblock
+Active next `/new-go-slug`: `doverabot-rental-runtime-deploy-unblock`
 After active slice, advance to the next planned slice and print its
 `/new-go-slug`; do not run another decision refresh until this saved sequence is
 exhausted or new production facts invalidate it.
@@ -493,6 +493,35 @@ Completion criteria:
 - Search tests cover taxonomy-only, text fallback, and semantic/ranking-enabled
   cases with deterministic fixtures.
 - Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-next-decision-refresh`
+
+## Slice 18: Rental Runtime Deploy Unblock
+
+Suggested `/new-go-slug`: `doverabot-rental-runtime-deploy-unblock`
+
+Status: planned
+
+Scope:
+
+- Resolve the current operational deploy blocker without removing or staging
+  the unrelated untracked `scripts/unblock-django-test-db.sh` helper.
+- Activate the repo wrapper exclusion or another explicit wrapper-safe path so
+  deploy dry-run no longer syncs unrelated untracked local state.
+- Sync, migrate, deploy, and status-check the accumulated rental runtime source
+  once the wrapper plan is clean.
+- Run post-deploy rental smokes for search, map exposure, reservation/history
+  controls, and migration state.
+
+Completion criteria:
+
+- `blagodarie-admin deploy-dry-run` no longer includes the untracked helper.
+- Pending rental migrations are applied or an exact environment blocker is
+  recorded.
+- Runtime deploy/status checks and representative rental smokes are recorded in
+  `log.md` or a chain reference.
+- No unrelated untracked files are removed, staged, or deployed.
 
 Print after completion, suggested next `/new-go-slug`:
 `doverabot-next-decision-refresh`

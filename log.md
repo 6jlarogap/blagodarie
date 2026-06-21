@@ -2,6 +2,14 @@
 
 ## 2026-06-21
 
+- Implemented `doverabot-next-decision-refresh` after the saved rental future
+  slices: re-read the project note, go-next chain, completed geocoding and
+  semantic-ranking references, and source/test state; selected
+  `doverabot-rental-runtime-deploy-unblock` as the next active slice because
+  accumulated rental runtime source and migrations are committed but not
+  deployed while the active wrapper dry-run still includes the unrelated
+  untracked `scripts/unblock-django-test-db.sh` helper. Runtime deploy not
+  required for this docs-only refresh.
 - Source-implemented `doverabot-rental-semantic-search-ranking`: changed
   `/api/rental/search` to apply status/visibility/mistrust/trusted/date/price/
   coordinate filters before a bounded deterministic ranking pass, preserving

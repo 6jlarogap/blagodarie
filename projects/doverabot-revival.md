@@ -38,13 +38,17 @@ Next decision refresh chain: [../references/2026-06-21-doverabot-next-decision-r
 
 Post-reservation decision refresh chain: [../references/2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md](../references/2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md)
 
+Rental future-slice decision refresh chain: [../references/2026-06-21-doverabot-next-decision-refresh-after-rental-future-slices-chain.md](../references/2026-06-21-doverabot-next-decision-refresh-after-rental-future-slices-chain.md)
+
 Current decision:
 
 - Keep one public Doverabot identity with modular feature flows: `/rent`, `/offer`, `/meet`, `rod`, `/trust`, and `/thank`.
 - Build travel-equipment rental as a new `/rent` surface.
 - Keep poll-style `/offer` and `/offer_multi` unchanged.
-- V1 is listing, search, map exposure, contact, reservation intent, and payment handoff only.
-- Do not add escrow, reservation conflict tracking, geocoding, or vector search in V1.
+- V1 core is listing, search, map exposure, contact, reservation intent, payment
+  handoff, and bounded source-owned refinements only.
+- Do not add escrow or broad reservation conflict tracking until the current
+  runtime deployment backlog is cleared.
 - Treat dedicated public service bots as a future exception only for separate branding, moderation/compliance boundaries, traffic isolation, or a materially different user journey.
 
 Current implementation:
@@ -67,8 +71,8 @@ Current implementation:
   for profile, meet card/QR, offer, and rental paths while preserving existing
   deep-link payloads and runtime bot usernames.
 - The mocked Telegram bot tests now share one harness module and are split by
-  handler domain; the current discovery surface is 77 tests after rental owner
-  and reservation-history controls.
+  handler domain; the current discovery surface is 95 tests after the saved
+  rental future slices.
 - Rental V1 now has source-level smoke coverage for search, booking callback
   registration/owner notification, and payment-proof pack forwarding, plus
   repeatable public curl checks for rental search, map exposure, and offer
@@ -84,6 +88,15 @@ Current implementation:
 - The post-reservation decision refresh selected proof-dispute controls as the
   next product slice, because payment proof can be stored and forwarded but
   owners do not yet have an explicit audited rejection/dispute path.
+- The saved rental future slices are source-implemented through proof-dispute
+  controls, configurable hold duration, voice listing/search clarification,
+  map query/link polish, inventory quantity groundwork, geocoding, and semantic
+  search ranking.
+- Runtime deployment is blocked by the active wrapper dry-run including the
+  unrelated untracked `scripts/unblock-django-test-db.sh` helper; migrations
+  `users.0061_rental_payment_proof_rejected_event` and
+  `users.0062_rentaloffer_quantity_total` are committed in source but not yet
+  applied at runtime.
 
 Primary implementation areas:
 
@@ -105,33 +118,29 @@ Covered by completed hardening slices:
 - Keep hard-coded bot/deep-link cleanup enforced in newly touched bot flows.
 - Improve user feedback on unauthorized or expired callbacks.
 
+Immediate operational backlog:
+
+- Unblock wrapper-safe runtime deploy without deleting or staging the unrelated
+  untracked `scripts/unblock-django-test-db.sh` helper.
+- Apply pending rental migrations, deploy accumulated rental runtime source, and
+  smoke rental search, map, booking, history, geocoding-assisted search, and
+  semantic ranking surfaces.
+
 Remaining product backlog:
 
-- Add owner-side proof-dispute controls for unacceptable or fake payment proof
-  without automatically creating mistrust.
-- Make the reservation hold duration configurable at runtime while preserving
-  the current 10 minute default.
-- Improve voice-first listing and search conversations using the existing
-  Organizm/Hermes STT adapter and durable FSM state.
-- Polish source-owned rental map query links and map-point filters without
-  editing generated frontend bundles.
-- Add inventory quantity groundwork for multiple identical rentable items.
-- Add configurable geocoding and semantic/ranked search only after the smaller
-  rental flow slices above.
+- Decide whether generated frontend map UI changes are acceptable or whether
+  editable map source must be restored first.
+- Keep escrow, deposits, richer conflict tracking, moderation dashboards, and
+  automatic reputation penalties deferred until after runtime is caught up.
 
 ## Next Implementation Slice
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-rental-proof-dispute-controls`.
+Active next `/new-go-slug`: `doverabot-rental-runtime-deploy-unblock`.
 
 After that slice, print next `/new-go-slug`:
-`doverabot-rental-hold-duration-config`.
-
-After that, continue the saved slices in the go-next chain through
-`doverabot-rental-semantic-search-ranking`, then run
-`doverabot-next-decision-refresh` only when the saved sequence is exhausted or
-new production facts invalidate it.
+`doverabot-next-decision-refresh`.
 
 Accepted prior-session decisions:
 
