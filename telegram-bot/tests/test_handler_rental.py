@@ -341,6 +341,11 @@ def install_dependency_stubs(stub_common=True):
                 return '<a href="%s">%s</a>' % (href, text)
 
             @staticmethod
+            def get_start_deeplink(start_payload, https=False):
+                prefix = 'https://' if https else ''
+                return f'{prefix}t.me/{me.bot_data.username}?start={start_payload}'
+
+            @staticmethod
             def get_deeplink_with_name(profile):
                 return profile.get('first_name') or profile.get('username') or str(profile.get('uuid', ''))
 
@@ -495,6 +500,26 @@ class FakeBot:
 def import_fresh(module_name):
     sys.modules.pop(module_name, None)
     return importlib.import_module(module_name)
+
+
+class CommonRuntimeDeeplinkTests(unittest.TestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+
+    def test_start_deeplink_uses_runtime_username_and_preserves_payload(self):
+        self.assertEqual(
+            self.common.Misc.get_start_deeplink('meet'),
+            't.me/DoveraBot?start=meet',
+        )
+        self.assertEqual(
+            self.common.Misc.get_start_deeplink('m-meet-token', https=True),
+            'https://t.me/DoveraBot?start=m-meet-token',
+        )
+        self.assertEqual(
+            self.common.Misc.get_deeplink({'username': 'woman'}),
+            't.me/DoveraBot?start=woman',
+        )
 
 
 class CommonCallbackParserTests(unittest.IsolatedAsyncioTestCase):
@@ -1689,6 +1714,48 @@ class LegacySympaLinkTests(unittest.IsolatedAsyncioTestCase):
         remove_n_send_message.assert_awaited_once()
 
 
+class LegacyMeetDeeplinkTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.handler_callbacks = import_fresh('handler_callbacks')
+
+    async def test_send_qr_uses_runtime_bot_username(self):
+        fake_bot = FakeBot()
+        self.handler_callbacks.bot = fake_bot
+        profile = {'uuid': 'profile-uuid'}
+        tg_user = types.SimpleNamespace(id=5454)
+        qr_buffer = types.SimpleNamespace(getvalue=lambda: b'qr', name='qr.png')
+        expected_url = 'https://t.me/DoveraBot?start=m-meet-token'
+
+        with mock.patch.object(
+            self.handler_callbacks.MeetId,
+            'meetId_by_profile',
+            mock.AsyncMock(return_value='meet-token'),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'get_qrcode',
+            mock.AsyncMock(return_value=qr_buffer),
+        ) as get_qrcode:
+            await self.handler_callbacks.send_qr(profile, tg_user)
+
+        get_qrcode.assert_awaited_once_with(profile, expected_url)
+        self.assertEqual(len(fake_bot.sent_photos), 1)
+        self.assertEqual(fake_bot.sent_photos[0][0], 5454)
+        self.assertIn(expected_url, fake_bot.sent_photos[0][2])
+
+
+class OfferRuntimeDeeplinkTests(unittest.TestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.handler_offer = import_fresh('handler_offer')
+
+    def test_offer_deeplink_uses_runtime_bot_username_and_preserves_ref_payload(self):
+        self.assertEqual(
+            self.handler_offer.Offer.get_deeplink('offer-uuid', 'sender-ref'),
+            't.me/DoveraBot?start=offer-offer-uuid-userId-sender-ref',
+        )
+
+
 class LegacyMediaPackTests(unittest.TestCase):
     def setUp(self):
         install_dependency_stubs(stub_common=False)
@@ -1743,6 +1810,12 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         install_dependency_stubs()
         self.handler_rental = import_fresh('handler_rental')
+
+    async def test_rental_deeplink_uses_runtime_bot_username(self):
+        self.assertEqual(
+            self.handler_rental.Rental.get_deeplink('offer-uuid'),
+            'https://t.me/DoveraBot?start=rent-offer-uuid',
+        )
 
     async def test_stt_file_id_contract_payload_and_parser(self):
         voice = types.SimpleNamespace(file_id='voice-file-id', duration=7, mime_type='audio/ogg')

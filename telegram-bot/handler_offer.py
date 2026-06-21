@@ -368,7 +368,7 @@ class Offer(object):
 
     @classmethod
     def get_deeplink(cls, offer_uuid, username_href=None):
-        href = f't.me/{bot_data.username}?start=offer-{offer_uuid}'
+        href = Misc.get_start_deeplink(f'offer-{offer_uuid}')
         if username_href:
             href += f'-userId-{username_href}'
         return href

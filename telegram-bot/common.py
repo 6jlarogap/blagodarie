@@ -778,7 +778,11 @@ class Misc(object):
             response_id = response['uuid']
         else:
             response_id = '-'
-        deeplink = f't.me/{bot_data.username}?start={response_id}'
+        return cls.get_start_deeplink(response_id, https=https)
+
+    @classmethod
+    def get_start_deeplink(cls, start_payload, https=False):
+        deeplink = f't.me/{bot_data.username}?start={start_payload}'
         if https:
             deeplink = 'https://' + deeplink
         return deeplink
@@ -856,7 +860,10 @@ class Misc(object):
             f'Знакомств: {response_to["acq_count"]}\n'
         )
         if response_from['did_meet'] and response_to['did_meet']:
-            reply += f'Приглашений <a href=\'https://t.me/{bot_data.username}?start=meet\'>в игру</a>: {response_to["invite_meet_count"]}\n'
+            reply += (
+                f'Приглашений <a href=\'{cls.get_start_deeplink("meet", https=True)}\'>'
+                f'в игру</a>: {response_to["invite_meet_count"]}\n'
+            )
         reply += '\n'
 
         if is_power and (response_to['is_active'] or response_to.get('owner')):
@@ -906,7 +913,7 @@ class Misc(object):
             ) if keys else 'не задано'
             reply += (('Контакты:' if len(keys) > 1 else 'Контакт:') + ' %s' % keys_text)
         else:
-            igre = cls.get_html_a(f"t.me/{bot_data.username}?start=meet", "игре знакомств")
+            igre = cls.get_html_a(cls.get_start_deeplink("meet"), "игре знакомств")
             reply += f'Контакты профиля можно получить в {igre}'
         reply += '\n\n'
         return reply

@@ -675,7 +675,7 @@ async def meet_do_or_revoke(data):
 async def send_qr(profile, tg_user):
     meet_id = await MeetId.meetId_by_profile(profile)
     if meet_id:
-        url = f'https://t.me/{bot_data.username}?start=m-{meet_id}'
+        url = Misc.get_start_deeplink(f'm-{meet_id}', https=True)
         link = Misc.get_html_a(url, 'Вход...')
         caption = f'Приглашение в игру знакомств! Перешлите знакомым без пары! {link}'
         bytes_io = await Misc.get_qrcode(profile, url)

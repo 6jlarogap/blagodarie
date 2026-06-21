@@ -84,7 +84,7 @@ class Rental(object):
 
     @classmethod
     def get_deeplink(cls, offer_uuid):
-        return f'https://t.me/{bot_data.username}?start=rent-{offer_uuid}'
+        return Misc.get_start_deeplink(f'rent-{offer_uuid}', https=True)
 
     @classmethod
     def get_map_url(cls, offer):
