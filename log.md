@@ -1,5 +1,9 @@
 # Log
 
+## 2026-06-21
+
+- Implemented `doverabot-rental-durable-fsm-hermes-map-marker-tests`: durable Redis FSM selection for the bot, explicit Organizm/Hermes rental STT helpers, rental map links/markers/filter forwarding, backend rental map assertions, and mocked rental handler tests. DB-backed `manage.py test users` remains blocked by local PostgreSQL peer authentication for user `postgres`.
+
 ## 2026-06-20
 
 - Added `doverabot-rental-go-rent-baskets-chain`: saved the `/new go rent` one-session-shot chain for timed rental holds, payment-proof reuse, trust-based exclusions, 10th/system trust-first booking, voice-only listing/search, map UX improvements, and operational handoff.

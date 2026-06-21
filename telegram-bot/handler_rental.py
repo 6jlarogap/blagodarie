@@ -4,6 +4,7 @@
 
 import re
 import datetime
+from urllib.parse import urlencode
 from uuid import uuid4
 
 import aiohttp
@@ -77,33 +78,77 @@ class Rental(object):
         return f'https://t.me/{bot_data.username}?start=rent-{offer_uuid}'
 
     @classmethod
+    def get_map_url(cls, offer):
+        if offer.get('latitude') is None or offer.get('longitude') is None:
+            return ''
+        params = dict(
+            rental='on',
+            rental_uuid=offer['uuid'],
+        )
+        title = offer.get('title') or offer.get('item_text') or ''
+        if title:
+            params.update(rental_query=title)
+        return '%s/?%s' % (settings.MAP_HOST.rstrip('/'), urlencode(params))
+
+    @classmethod
+    def stt_headers(cls):
+        headers = {}
+        if getattr(settings, 'RENTAL_STT_TOKEN', ''):
+            headers['Authorization'] = 'Bearer %s' % settings.RENTAL_STT_TOKEN
+        return headers
+
+    @classmethod
+    async def stt_request_kwargs(cls, message):
+        mode = getattr(settings, 'RENTAL_STT_MODE', 'file_id')
+        contract = getattr(settings, 'RENTAL_STT_CONTRACT', 'organizm_hermes_v1')
+        if mode == 'download':
+            form = aiohttp.FormData()
+            form.add_field('contract', contract)
+            form.add_field('file_id', message.voice.file_id)
+            form.add_field('telegram_user_id', str(message.from_user.id))
+            form.add_field('language', getattr(settings, 'RENTAL_STT_LANGUAGE', 'ru'))
+            form.add_field(
+                'voice',
+                await Misc.get_file_bytes(message.voice),
+                filename='voice.ogg',
+                content_type=message.voice.mime_type or 'audio/ogg',
+            )
+            return dict(data=form)
+        return dict(json=dict(
+            contract=contract,
+            source='telegram_voice',
+            file_id=message.voice.file_id,
+            duration=message.voice.duration,
+            mime_type=message.voice.mime_type or '',
+            telegram_user_id=message.from_user.id,
+            language=getattr(settings, 'RENTAL_STT_LANGUAGE', 'ru'),
+        ))
+
+    @classmethod
+    def stt_transcript_from_response(cls, data):
+        if isinstance(data, str):
+            return data.strip()
+        if not isinstance(data, dict):
+            return ''
+        result = data.get('transcript') or data.get('text') or ''
+        for key in ('result', 'data'):
+            if result:
+                break
+            nested = data.get(key)
+            if isinstance(nested, dict):
+                result = nested.get('transcript') or nested.get('text') or ''
+        return str(result).strip()
+
+    @classmethod
     async def voice_transcript(cls, message):
         url = getattr(settings, 'RENTAL_STT_URL', '')
         if not url or not message.voice:
             return ''
-        headers = {}
-        if getattr(settings, 'RENTAL_STT_TOKEN', ''):
-            headers['Authorization'] = 'Bearer %s' % settings.RENTAL_STT_TOKEN
         timeout = aiohttp.ClientTimeout(total=getattr(settings, 'HTTP_TIMEOUT', 60))
-        mode = getattr(settings, 'RENTAL_STT_MODE', 'file_id')
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                if mode == 'download':
-                    form = aiohttp.FormData()
-                    form.add_field('file_id', message.voice.file_id)
-                    form.add_field('telegram_user_id', str(message.from_user.id))
-                    form.add_field('voice', await Misc.get_file_bytes(message.voice),
-                                   filename='voice.ogg',
-                                   content_type=message.voice.mime_type or 'audio/ogg')
-                    request_kwargs = dict(data=form)
-                else:
-                    request_kwargs = dict(json=dict(
-                        file_id=message.voice.file_id,
-                        duration=message.voice.duration,
-                        mime_type=message.voice.mime_type or '',
-                        telegram_user_id=message.from_user.id,
-                    ))
-                async with session.post(url, headers=headers, **request_kwargs) as resp:
+                request_kwargs = await cls.stt_request_kwargs(message)
+                async with session.post(url, headers=cls.stt_headers(), **request_kwargs) as resp:
                     if resp.status >= 400:
                         logging.warning('rental STT failed with status %s', resp.status)
                         return ''
@@ -114,12 +159,7 @@ class Rental(object):
         except Exception:
             logging.exception('rental STT request failed')
             return ''
-        if isinstance(data, dict):
-            result = data.get('transcript') or data.get('text') or ''
-            if not result and isinstance(data.get('result'), dict):
-                result = data['result'].get('transcript') or data['result'].get('text') or ''
-            return str(result).strip()
-        return ''
+        return cls.stt_transcript_from_response(data)
 
     @classmethod
     async def message_or_voice_text(cls, message, allow_voice_placeholder=False):
@@ -425,6 +465,12 @@ class Rental(object):
                     ),
                 )
             ],
+            *([[
+                InlineKeyboardButton(
+                    text='На карте',
+                    url=cls.get_map_url(offer),
+                )
+            ]] if cls.get_map_url(offer) else []),
         ])
 
     @classmethod

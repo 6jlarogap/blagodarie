@@ -16,6 +16,79 @@
     -->
     <script type="text/javascript" src="/js/local_settings.js?v=20260617T025615Z"></script>
     <script type="text/javascript" src="/js/funcs.f0cb25c0e5bd3999.js?v=20260617T025615Z"></script>
+    <script type="text/javascript">
+    (function() {
+        var rentalKeys = [
+            'rental', 'rental_uuid', 'rental_offer_uuid', 'rental_query', 'rental_q',
+            'rental_equipment_type', 'equipment_type', 'rental_date_from', 'date_from',
+            'rental_date_to', 'date_to', 'rental_price_max', 'price_max',
+            'rental_trusted_only', 'trusted_only'
+        ];
+        function paramsFromUrl() {
+            return new URLSearchParams(window.location.search);
+        }
+        function hasRentalParams(params) {
+            return rentalKeys.some(function(key) { return params.has(key); });
+        }
+        function patchApiRequest() {
+            if (typeof window.api_request !== 'function' || window.api_request.__rentalPatched) {
+                return;
+            }
+            var originalApiRequest = window.api_request;
+            window.api_request = async function(url, options) {
+                var params = paramsFromUrl();
+                if (String(url).indexOf('/api/user/points/') !== -1 && hasRentalParams(params)) {
+                    options = options || {};
+                    options.params = Object.assign({}, options.params || {});
+                    options.params.rental = 'on';
+                    rentalKeys.forEach(function(key) {
+                        if (params.has(key) && key !== 'rental') {
+                            options.params[key] = params.get(key);
+                        }
+                    });
+                }
+                return originalApiRequest.call(this, url, options);
+            };
+            window.api_request.__rentalPatched = true;
+        }
+        function setupRentalFilters() {
+            var params = paramsFromUrl();
+            if (!hasRentalParams(params)) {
+                return;
+            }
+            var filters = document.getElementById('id_rental_filters');
+            if (filters) {
+                filters.style.display = 'block';
+                ['rental_query', 'rental_equipment_type', 'rental_date_from', 'rental_date_to', 'rental_price_max'].forEach(function(key) {
+                    var input = document.getElementById('id_' + key);
+                    if (input && params.has(key)) {
+                        input.value = params.get(key);
+                    }
+                });
+                var trusted = document.getElementById('id_rental_trusted_only');
+                if (trusted) {
+                    trusted.checked = params.has('rental_trusted_only') || params.has('trusted_only');
+                }
+                ['rental_uuid', 'rental_offer_uuid'].forEach(function(key) {
+                    if (params.has(key)) {
+                        var input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = key;
+                        input.value = params.get(key);
+                        filters.querySelector('form').appendChild(input);
+                    }
+                });
+            }
+            document.title = 'Карта проката | Доверие';
+            var subtitle = document.getElementById('id_subtitle_');
+            if (subtitle) {
+                subtitle.innerHTML = '<h3><a href="' + document.URL + '"><big>Прокат снаряжения</big></a></h3>';
+            }
+        }
+        patchApiRequest();
+        document.addEventListener('DOMContentLoaded', setupRentalFilters);
+    })();
+    </script>
     <!-- Для авторизации страницы через телеграм бот: js, css (конец) -->
 
 
@@ -101,6 +174,27 @@
                 </td>
             </tr>
         </table>
+    </div>
+
+    <div id="id_rental_filters" style="margin:auto; width:90%;text-align:center; display: none;">
+        <hr />
+        <form action="" method="get">
+            <input type="hidden" name="rental" value="on" />
+            <label for="id_rental_query">Прокат:</label>
+            <input type="text" name="rental_query" id="id_rental_query" size="18" />
+            <label for="id_rental_equipment_type">Тип:</label>
+            <input type="text" name="rental_equipment_type" id="id_rental_equipment_type" size="12" />
+            <label for="id_rental_date_from">C:</label>
+            <input type="date" name="rental_date_from" id="id_rental_date_from" />
+            <label for="id_rental_date_to">До:</label>
+            <input type="date" name="rental_date_to" id="id_rental_date_to" />
+            <label for="id_rental_price_max">Цена до:</label>
+            <input type="number" name="rental_price_max" id="id_rental_price_max" min="0" step="1" style="width:7em" />
+            <label for="id_rental_trusted_only">Доверенные:</label>
+            <input type="checkbox" name="rental_trusted_only" id="id_rental_trusted_only" />
+            <input type="submit" value="обновить" />
+        </form>
+        <hr />
     </div>
 
     <div style="margin:auto;width: 100%" id="progress"><div id="progress-bar"></div></div>

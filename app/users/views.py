@@ -2239,6 +2239,16 @@ class RentalVisibilityMixin(object):
         return None
 
     def apply_rental_map_filters(self, request, qs, viewer_user=None):
+        offer_uuid = (
+            request.GET.get('rental_uuid') or
+            request.GET.get('rental_offer_uuid') or
+            ''
+        )
+        if offer_uuid:
+            try:
+                qs = qs.filter(uuid=UUID(str(offer_uuid)))
+            except (TypeError, ValueError, ValidationError):
+                return qs.none()
         query_text = (
             request.GET.get('rental_query') or
             request.GET.get('rental_q') or
@@ -2506,6 +2516,16 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
             link_on_map=link_on_map,
         )
 
+    def rental_marker_icon(self):
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">'
+            '<circle cx="20" cy="20" r="18" fill="#0f766e" stroke="#ffffff" stroke-width="3"/>'
+            '<path d="M9 28h22L20 10z" fill="#f8fafc"/>'
+            '<path d="M20 10v18M15 28l5-18 5 18" fill="none" stroke="#0f766e" stroke-width="2"/>'
+            '</svg>'
+        )
+        return 'data:image/svg+xml;charset=UTF-8,%s' % urllib.parse.quote(svg)
+
     def append_rental_points(self, request, points, q_rectangle=None):
         qs, viewer_user = self.rental_offer_queryset(request)
         qs = qs.filter(latitude__isnull=False, longitude__isnull=False)
@@ -2575,12 +2595,14 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                 longitude=rental.longitude,
                 title=title,
                 popup=popup_rental % offerer,
-                icon=offerer['url_photo_icon'],
+                icon=self.rental_marker_icon(),
+                rental_owner_icon=offerer['url_photo_icon'],
                 is_of_found_user=False,
-                size_icon=offerer['thumb_size_icon'],
+                size_icon=34,
                 is_rental=True,
                 marker_kind='rental',
                 marker_color='darkgreen',
+                marker_label='Прокат',
                 rental_offer_id=rental.pk,
                 rental_uuid=str(rental.uuid),
                 rental_url=rental_url,

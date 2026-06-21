@@ -57,10 +57,13 @@ MULTI_MESSAGE_TIMEOUT = 2
 API_HOST = 'https://api.doverabot.ru'
 
 # Optional external STT adapter for rental voice search.
+# Contract `organizm_hermes_v1` sends Telegram file metadata as JSON by default.
 # settings_local.py can set RENTAL_STT_URL plus mode 'file_id' or 'download'.
+RENTAL_STT_CONTRACT = 'organizm_hermes_v1'
 RENTAL_STT_URL = ''
 RENTAL_STT_TOKEN = ''
 RENTAL_STT_MODE = 'file_id'
+RENTAL_STT_LANGUAGE = 'ru'
 
 # - домен, прописанный в боте
 #
@@ -132,6 +135,14 @@ REDIS_CONNECT =dict(
     db=2,
     decode_responses=True,
 )
+
+# Durable aiogram FSM storage. Redis keeps long rental conversations alive
+# across bot restarts; settings_local.py may set BOT_FSM_STORAGE = 'memory'
+# for local-only development.
+BOT_FSM_STORAGE = 'redis'
+BOT_FSM_REDIS_CONNECT = REDIS_CONNECT.copy()
+BOT_FSM_REDIS_PREFIX = 'doverabot:fsm'
+BOT_FSM_REDIS_FALLBACK_TO_MEMORY = False
 
 # Время, после которого можно еще раз ставить симпатию
 #

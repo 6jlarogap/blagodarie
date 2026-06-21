@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import time
+from decimal import Decimal
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -134,6 +135,71 @@ class ApiRentalOfferTests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['offers'], [])
+
+    @override_settings(TELEGRAM_BOT_USERNAME='DoveraBot')
+    def test_rental_map_points_have_marker_payload_and_filters(self):
+        equipment_type, created = RentalEquipmentType.objects.get_or_create(
+            slug='tent',
+            defaults=dict(canonical_name='Tent', labels={'en': ['tent']}),
+        )
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Travel tent',
+            description_text='Легкая палатка рядом с метро',
+            price_text='500 руб/день',
+            price_amount=Decimal('500.00'),
+            price_currency='RUB',
+            available_from='2026-07-01',
+            available_to='2026-07-10',
+            latitude=55.75,
+            longitude=37.61,
+        )
+        offer.equipment_types.add(equipment_type)
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Hidden tent',
+            visibility=RentalOffer.VISIBILITY_PRIVATE,
+            latitude=55.76,
+            longitude=37.62,
+        )
+
+        response = self.client.get('/api/user/points/', data={
+            'rental': 'on',
+            'user_uuid': str(self.requester_profile.uuid),
+            'rental_uuid': str(offer.uuid),
+            'rental_equipment_type': 'tent',
+            'rental_date_from': '2026-07-02',
+            'rental_date_to': '2026-07-03',
+            'rental_price_max': '600',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['points']), 1)
+        point = response.data['points'][0]
+        self.assertTrue(point['is_rental'])
+        self.assertEqual(point['marker_kind'], 'rental')
+        self.assertEqual(point['marker_label'], 'Прокат')
+        self.assertTrue(point['icon'].startswith('data:image/svg+xml'))
+        self.assertIn('rental_owner_icon', point)
+        self.assertIn('https://t.me/DoveraBot?start=rent-', point['rental_url'])
+        self.assertEqual(point['equipment_types'][0]['slug'], 'tent')
+
+        response = self.client.get('/api/user/points/', data={
+            'rental': 'on',
+            'user_uuid': str(self.requester_profile.uuid),
+            'rental_uuid': str(offer.uuid),
+            'rental_price_max': '100',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['points'], [])
+
+        response = self.client.get('/api/user/points/', data={
+            'rental': 'on',
+            'user_uuid': str(self.requester_profile.uuid),
+            'rental_uuid': 'not-a-uuid',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['points'], [])
 
     @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
     def test_taxonomy_tags_offer_and_asks_for_ambiguous_board(self):

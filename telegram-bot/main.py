@@ -12,7 +12,41 @@ import logging
 import settings
 import me
 
-storage = MemoryStorage()
+
+def _redis_key_builder(prefix):
+    from aiogram.fsm.storage.redis import DefaultKeyBuilder
+
+    try:
+        return DefaultKeyBuilder(prefix=prefix, with_bot_id=True)
+    except TypeError:
+        return DefaultKeyBuilder(prefix=prefix)
+
+
+def build_fsm_storage():
+    storage_name = getattr(settings, 'BOT_FSM_STORAGE', 'redis')
+    if storage_name == 'memory':
+        logging.warning('Using volatile MemoryStorage for bot FSM')
+        return MemoryStorage()
+    if storage_name != 'redis':
+        raise RuntimeError('Unsupported BOT_FSM_STORAGE: %s' % storage_name)
+
+    try:
+        import redis.asyncio as aioredis
+        from aiogram.fsm.storage.redis import RedisStorage
+    except Exception:
+        if getattr(settings, 'BOT_FSM_REDIS_FALLBACK_TO_MEMORY', False):
+            logging.exception('Redis FSM storage unavailable, falling back to MemoryStorage')
+            return MemoryStorage()
+        raise
+
+    redis_connect = dict(getattr(settings, 'BOT_FSM_REDIS_CONNECT', settings.REDIS_CONNECT))
+    redis_client = aioredis.Redis(**redis_connect)
+    key_builder = _redis_key_builder(getattr(settings, 'BOT_FSM_REDIS_PREFIX', 'doverabot:fsm'))
+    try:
+        return RedisStorage(redis=redis_client, key_builder=key_builder)
+    except TypeError:
+        return RedisStorage(redis_client, key_builder=key_builder)
+
 
 async def main_():
     kwargs_bot = dict(
@@ -31,7 +65,7 @@ async def main_():
             session = AiohttpSession(proxy=settings.PROXY),
         )
     bot = Bot(**kwargs_bot)
-    dp = Dispatcher(storage=storage)
+    dp = Dispatcher(storage=build_fsm_storage())
 
     me.bot = bot
     me.dp = dp
@@ -74,4 +108,5 @@ async def main_():
         polling_timeout=20,
     )
 
-asyncio.run(main_())
+if __name__ == '__main__':
+    asyncio.run(main_())
