@@ -1,13 +1,13 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-2 implemented; remaining slices planned
+Status: slices 1-3 implemented; remaining slices planned
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-legacy-callback-parser-audit-chain.md](2026-06-21-doverabot-legacy-callback-parser-audit-chain.md)
+Current completed chain: [2026-06-21-doverabot-runtime-deeplink-consistency-chain.md](2026-06-21-doverabot-runtime-deeplink-consistency-chain.md)
 
-Active next slice: Slice 3, Runtime Deeplink Consistency
-Active next `/new-go-slug`: `doverabot-runtime-deeplink-consistency`
-After active slice, print next `/new-go-slug`: `doverabot-handler-test-harness-split`
+Active next slice: Slice 4, Handler Test Harness Split
+Active next `/new-go-slug`: `doverabot-handler-test-harness-split`
+After active slice, print next `/new-go-slug`: `doverabot-rental-v1-smoke-observability`
 
 ## Chain Purpose
 
@@ -87,6 +87,9 @@ Print after completion, suggested next `/new-go-slug`:
 ## Slice 3: Runtime Deeplink Consistency
 
 Suggested `/new-go-slug`: `doverabot-runtime-deeplink-consistency`
+
+Status: implemented and deployed in
+[2026-06-21-doverabot-runtime-deeplink-consistency-chain.md](2026-06-21-doverabot-runtime-deeplink-consistency-chain.md).
 
 Scope:
 

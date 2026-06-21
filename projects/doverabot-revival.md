@@ -26,6 +26,8 @@ Offer/sympathy feedback coverage chain: [../references/2026-06-21-doverabot-offe
 
 Legacy callback parser audit chain: [../references/2026-06-21-doverabot-legacy-callback-parser-audit-chain.md](../references/2026-06-21-doverabot-legacy-callback-parser-audit-chain.md)
 
+Runtime deeplink consistency chain: [../references/2026-06-21-doverabot-runtime-deeplink-consistency-chain.md](../references/2026-06-21-doverabot-runtime-deeplink-consistency-chain.md)
+
 Go-next chain: [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md)
 
 Current decision:
@@ -53,6 +55,9 @@ Current implementation:
 - The legacy callback parser audit confirmed no duplicate non-rental handler names
   and no direct non-rental callback-data splits, then centralized the edited
   sympathy and meet action callback parsing behind typed local parsers.
+- Runtime bot start-link construction now goes through `Misc.get_start_deeplink`
+  for profile, meet card/QR, offer, and rental paths while preserving existing
+  deep-link payloads and runtime bot usernames.
 
 Primary implementation areas:
 
@@ -75,10 +80,10 @@ Primary implementation areas:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-runtime-deeplink-consistency`.
+Active next `/new-go-slug`: `doverabot-handler-test-harness-split`.
 
 After that slice, print next `/new-go-slug`:
-`doverabot-handler-test-harness-split`.
+`doverabot-rental-v1-smoke-observability`.
 
 After that, keep each completed chain pointing to the next slug in the go-next chain.
 
