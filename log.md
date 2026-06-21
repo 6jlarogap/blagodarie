@@ -2,6 +2,17 @@
 
 ## 2026-06-21
 
+- Implemented and deployed `doverabot-rental-runtime-deploy-unblock`: added the
+  repeatable `scripts/enable-agent-deploy-permissions.sh` bootstrap and
+  documented it, confirmed dry-run no longer includes the unrelated untracked
+  `scripts/unblock-django-test-db.sh`, synced source, applied
+  `users.0061_rental_payment_proof_rejected_event` and
+  `users.0062_rentaloffer_quantity_total`, deployed/restarted web and bot,
+  confirmed nginx/web/bot active, and smoked rental search HTTP 200, map points
+  HTTP 200, map page HTTP 200, bare offer lookup expected HTTP 404, and
+  reservation-history bad-token guard expected HTTP 400. Existing Django
+  `security.W002` warning remains; the untracked test-DB helper was not
+  deployed.
 - Attempted `doverabot-rental-runtime-deploy-unblock`: confirmed
   `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run` still includes the
   unrelated untracked `scripts/unblock-django-test-db.sh` helper, while the

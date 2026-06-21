@@ -1,16 +1,14 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-17 source-implemented; slice 18 blocked by sudo authentication before wrapper reinstall
+Status: slices 1-18 implemented; runtime deployment caught up
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-next-decision-refresh-after-rental-future-slices-chain.md](2026-06-21-doverabot-next-decision-refresh-after-rental-future-slices-chain.md)
-Current blocked chain: [2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md](2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md)
+Current completed chain: [2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md](2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md)
 
-Active next slice: Rental Runtime Deploy Unblock
-Active next `/new-go-slug`: `doverabot-rental-runtime-deploy-unblock`
-After active slice, advance to the next planned slice and print its
-`/new-go-slug`; do not run another decision refresh until this saved sequence is
-exhausted or new production facts invalidate it.
+Active next slice: Next Decision Refresh
+Active next `/new-go-slug`: `doverabot-next-decision-refresh`
+The saved runtime-catchup sequence is exhausted; run the decision refresh to
+choose the next small product or hardening slice from current production state.
 
 ## Chain Purpose
 
@@ -502,7 +500,7 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-runtime-deploy-unblock`
 
-Status: blocked by sudo authentication before wrapper reinstall in
+Status: implemented and deployed in
 [2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md](2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md).
 
 Scope:

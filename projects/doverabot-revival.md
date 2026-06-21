@@ -92,11 +92,11 @@ Current implementation:
   controls, configurable hold duration, voice listing/search clarification,
   map query/link polish, inventory quantity groundwork, geocoding, and semantic
   search ranking.
-- Runtime deployment is blocked by the active wrapper dry-run including the
-  unrelated untracked `scripts/unblock-django-test-db.sh` helper; migrations
-  `users.0061_rental_payment_proof_rejected_event` and
-  `users.0062_rentaloffer_quantity_total` are committed in source but not yet
-  applied at runtime.
+- Runtime deployment was unblocked after the wrapper exclusion was installed.
+  Migrations `users.0061_rental_payment_proof_rejected_event` and
+  `users.0062_rentaloffer_quantity_total` are applied, web/bot services are
+  restarted, and live rental search, map, offer lookup, and reservation-history
+  guard smokes pass.
 
 Primary implementation areas:
 
@@ -120,11 +120,8 @@ Covered by completed hardening slices:
 
 Immediate operational backlog:
 
-- Unblock wrapper-safe runtime deploy without deleting or staging the unrelated
-  untracked `scripts/unblock-django-test-db.sh` helper.
-- Apply pending rental migrations, deploy accumulated rental runtime source, and
-  smoke rental search, map, booking, history, geocoding-assisted search, and
-  semantic ranking surfaces.
+- Run the next decision refresh from current production state before adding
+  more rental product scope.
 
 Remaining product backlog:
 
@@ -137,10 +134,9 @@ Remaining product backlog:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-rental-runtime-deploy-unblock`.
+Active next `/new-go-slug`: `doverabot-next-decision-refresh`.
 
-After that slice, print next `/new-go-slug`:
-`doverabot-next-decision-refresh`.
+After that slice, print the selected next `/new-go-slug`.
 
 Accepted prior-session decisions:
 
