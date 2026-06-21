@@ -54,5 +54,6 @@ Deploy checks:
 
 ## Follow-Up Basket
 
-- No immediate follow-up `/new-go-slug` was selected in this slice.
+- Continue the ordered go-next chain in [2026-06-21-doverabot-go-next-chain.md](2026-06-21-doverabot-go-next-chain.md).
+- Suggested next `/new-go-slug`: `doverabot-offer-sympa-feedback-coverage`.
 - Keep future Doverabot hardening scoped to the remaining general backlog: callback/parser cleanup, handler coverage, duplicate handler names, and bot/deep-link consistency in newly touched flows.

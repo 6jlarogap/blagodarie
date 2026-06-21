@@ -22,6 +22,8 @@ Profile-edit callback feedback finish chain: [../references/2026-06-21-doverabot
 
 Profile-edit state feedback finish chain: [../references/2026-06-21-doverabot-profile-edit-state-feedback-finish-chain.md](../references/2026-06-21-doverabot-profile-edit-state-feedback-finish-chain.md)
 
+Go-next chain: [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md)
+
 Current decision:
 
 - Keep one public Doverabot identity with modular feature flows: `/rent`, `/offer`, `/meet`, `rod`, `/trust`, and `/thank`.
@@ -63,9 +65,11 @@ Primary implementation areas:
 
 ## Next Implementation Slice
 
-No immediate next `/new-go-slug` is selected after `doverabot-profile-edit-state-feedback-finish`.
+Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Remaining backlog stays focused on callback/parser cleanup, handler coverage, duplicate handler names, and bot/deep-link consistency in newly touched flows.
+Suggested `/new-go-slug`: `doverabot-offer-sympa-feedback-coverage`.
+
+After that, keep each completed chain pointing to the next slug in the go-next chain.
 
 Accepted prior-session decisions:
 
