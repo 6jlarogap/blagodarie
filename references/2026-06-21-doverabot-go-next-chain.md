@@ -1,12 +1,12 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-12 source-implemented; runtime deploy blocked since slice 10; slices 13-17 planned; rental voice search refinement active
+Status: slices 1-13 source-implemented; runtime deploy blocked since slice 10; slices 14-17 planned; rental map query link polish active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-rental-voice-listing-clarifications-chain.md](2026-06-21-doverabot-rental-voice-listing-clarifications-chain.md)
+Current completed chain: [2026-06-21-doverabot-rental-voice-search-refinement-chain.md](2026-06-21-doverabot-rental-voice-search-refinement-chain.md)
 
-Active next slice: Rental Voice Search Refinement
-Active next `/new-go-slug`: `doverabot-rental-voice-search-refinement`
+Active next slice: Rental Map Query Link Polish
+Active next `/new-go-slug`: `doverabot-rental-map-query-link-polish`
 After active slice, advance to the next planned slice and print its
 `/new-go-slug`; do not run another decision refresh until this saved sequence is
 exhausted or new production facts invalidate it.
@@ -360,7 +360,8 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-voice-search-refinement`
 
-Status: planned
+Status: source implemented; runtime deploy blocked in
+[2026-06-21-doverabot-rental-voice-search-refinement-chain.md](2026-06-21-doverabot-rental-voice-search-refinement-chain.md).
 
 Scope:
 

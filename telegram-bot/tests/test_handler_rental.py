@@ -399,6 +399,61 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         message_or_voice_text.assert_not_awaited()
 
+    async def test_search_slots_parse_price_trusted_and_map_intent(self):
+        slots = self.handler_rental.Rental.extract_search_slots(
+            'палатка до 500 руб доверенные на карте москва 2026-07-01'
+        )
+
+        self.assertEqual(slots['date_from'], '2026-07-01')
+        self.assertEqual(slots['price_max'], '500')
+        self.assertTrue(slots['trusted_only'])
+        self.assertTrue(slots['map_intent'])
+        self.assertTrue(slots['has_context'])
+
+    async def test_inline_rental_search_uses_structured_refinement_params(self):
+        message = FakeMessage(text='/rent_search палатка до 500 руб доверенные на карте москва')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'search_with_params',
+            mock.AsyncMock(return_value=(200, {'offers': []})),
+        ) as search_with_params:
+            await self.handler_rental.Rental.cmd_rent_search(message, state)
+
+        search_with_params.assert_awaited_once_with(
+            'палатка до 500 руб доверенные на карте москва',
+            'requester-uuid',
+            date_from='',
+            date_to='',
+            price_max='500',
+            trusted_only=True,
+            map_intent=True,
+        )
+        self.assertTrue(state.cleared)
+        self.assertEqual(message.replies[-1].text, 'Ничего не найдено')
+
+    async def test_inline_rental_search_reports_equipment_clarification(self):
+        message = FakeMessage(text='/rent_search доска москва')
+        state = FakeState()
+        clarification = {
+            'message': 'Уточните тип доски',
+            'choices': [
+                {'canonical_name': 'Сноуборд', 'slug': 'snowboard'},
+                {'canonical_name': 'SUP', 'slug': 'sup'},
+            ],
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'search_with_params',
+            mock.AsyncMock(return_value=(200, {'offers': [], 'clarification': clarification})),
+        ):
+            await self.handler_rental.Rental.cmd_rent_search(message, state)
+
+        self.assertIn('Уточните тип доски', message.replies[-1].text)
+        self.assertIn('Сноуборд', message.replies[-1].text)
+
     async def test_process_rental_offer_stops_on_command_interrupt(self):
         message = FakeMessage(text='/rent')
         state = FakeState({
@@ -437,6 +492,9 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             'requester-uuid',
             date_from='2026-07-01',
             date_to='',
+            price_max='',
+            trusted_only=False,
+            map_intent=False,
         )
         self.assertTrue(state.cleared)
         self.assertEqual(message.replies[-1].text, 'Ничего не найдено')

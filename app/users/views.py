@@ -4770,6 +4770,16 @@ class ApiRentalSearch(ApiRentalMixin, APIView):
                 qs = qs.filter(Q(available_to__isnull=True) | Q(available_to__gte=date_from))
             if date_to:
                 qs = qs.filter(Q(available_from__isnull=True) | Q(available_from__lte=date_to))
+            price_max = request.GET.get('price_max') or request.GET.get('rental_price_max')
+            if price_max not in (None, ''):
+                qs = qs.filter(
+                    price_amount__isnull=False,
+                    price_amount__lte=self.parse_decimal(price_max, 'price_max'),
+                )
+            trusted_only = (request.GET.get('trusted_only') or '').lower()
+            if trusted_only and trusted_only not in ('0', 'false', 'off', 'no', 'нет'):
+                trusted_owner_ids = self.rental_trusted_owner_ids(viewer_user)
+                qs = qs.filter(Q(owner=viewer_user) | Q(owner_id__in=trusted_owner_ids))
             for input_name, lookup in (
                 ('lat_south', 'latitude__gte'),
                 ('lat_north', 'latitude__lte'),

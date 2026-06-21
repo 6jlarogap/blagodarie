@@ -215,6 +215,60 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['offers'], [])
 
+    def test_search_filters_price_and_trusted_only(self):
+        other = User.objects.create_user(username='other', first_name='Other')
+        Profile.objects.create(user=other)
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Trusted tent',
+            description_text='Легкая палатка',
+            price_amount=Decimal('500.00'),
+            price_currency='RUB',
+            visibility=RentalOffer.VISIBILITY_AUTHENTICATED,
+        )
+        RentalOffer.objects.create(
+            owner=other,
+            title='Other tent',
+            description_text='Легкая палатка',
+            price_amount=Decimal('400.00'),
+            price_currency='RUB',
+            visibility=RentalOffer.VISIBILITY_AUTHENTICATED,
+        )
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Expensive tent',
+            description_text='Легкая палатка',
+            price_amount=Decimal('900.00'),
+            price_currency='RUB',
+            visibility=RentalOffer.VISIBILITY_AUTHENTICATED,
+        )
+        CurrentState.objects.create(
+            user_from=self.requester,
+            user_to=self.owner,
+            attitude=CurrentState.TRUST,
+        )
+
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+            'query': 'tent',
+            'price_max': '600',
+            'trusted_only': 'on',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [offer['title'] for offer in response.data['offers']],
+            ['Trusted tent'],
+        )
+
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+            'query': 'tent',
+            'price_max': '100',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['offers'], [])
+
     @override_settings(TELEGRAM_BOT_USERNAME='DoveraBot')
     def test_rental_map_points_have_marker_payload_and_filters(self):
         equipment_type, created = RentalEquipmentType.objects.get_or_create(

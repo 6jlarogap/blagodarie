@@ -320,7 +320,16 @@ class Rental(object):
         ]
         date_values = [value for value in date_values if value]
         latitude, longitude = Misc.check_location_str(text)
-        has_context = bool(date_values or latitude is not None or re.search(
+        price_max = ''
+        if m := re.search(
+                r'(?:до|<=|не дороже|макс(?:имум)?)\s*(\d[\d\s\.,]*)\s*(?:руб\.?|р\.?|₽|usd|eur|byn|долл\.?)?',
+                text,
+                flags=re.I,
+        ):
+            price_max = re.sub(r'\s+', '', m.group(1)).replace(',', '.')
+        trusted_only = bool(re.search(r'\b(доверенн\w*|trusted|своих|свои)\b', text, flags=re.I))
+        map_intent = bool(re.search(r'\b(карта|карте|map)\b', text, flags=re.I))
+        has_context = bool(date_values or latitude is not None or price_max or trusted_only or re.search(
             r'\b(адрес|где|место|город|метро|улица|рядом|москва|минск|сочи|спб|санкт-петербург)\b',
             text,
             flags=re.I,
@@ -329,6 +338,9 @@ class Rental(object):
             query=text.strip(),
             date_from=date_values[0] if date_values else '',
             date_to=date_values[-1] if len(date_values) > 1 else '',
+            price_max=price_max,
+            trusted_only=trusted_only,
+            map_intent=map_intent,
             has_context=has_context,
         )
 
@@ -472,12 +484,19 @@ class Rental(object):
         return status, response
 
     @classmethod
-    async def search_with_params(cls, query, user_uuid, date_from='', date_to=''):
+    async def search_with_params(cls, query, user_uuid, date_from='', date_to='',
+                                 price_max='', trusted_only=False, map_intent=False):
         params = dict(query=query, user_uuid=user_uuid, number=5)
         if date_from:
             params.update(date_from=date_from)
         if date_to:
             params.update(date_to=date_to)
+        if price_max:
+            params.update(price_max=price_max)
+        if trusted_only:
+            params.update(trusted_only='on')
+        if map_intent:
+            params.update(map_intent='on')
         status, response = await Misc.api_request(
             path='/api/rental/search',
             method='get',
@@ -1025,7 +1044,8 @@ class Rental(object):
             await message.reply('Объявление показать не удалось')
 
     @classmethod
-    async def send_search_results(cls, message, query, date_from='', date_to=''):
+    async def send_search_results(cls, message, query, date_from='', date_to='',
+                                  price_max='', trusted_only=False, map_intent=False):
         status_sender, response_sender = await Misc.post_tg_user(message.from_user)
         if status_sender != 200:
             await message.reply(Misc.MSG_ERROR_API)
@@ -1035,6 +1055,9 @@ class Rental(object):
             response_sender['uuid'],
             date_from=date_from,
             date_to=date_to,
+            price_max=price_max,
+            trusted_only=trusted_only,
+            map_intent=map_intent,
         )
         if status != 200:
             await message.reply('Поиск временно недоступен')
@@ -1067,6 +1090,9 @@ class Rental(object):
         context_text = data.get('context_text') or ''
         date_from = data.get('date_from') or slots['date_from']
         date_to = data.get('date_to') or slots['date_to']
+        price_max = data.get('price_max') or slots['price_max']
+        trusted_only = bool(data.get('trusted_only') or slots['trusted_only'])
+        map_intent = bool(data.get('map_intent') or slots['map_intent'])
         has_context = bool(data.get('has_context') or slots['has_context'])
         if data.get('query') and slots['query']:
             context_text = ('%s %s' % (context_text, slots['query'])).strip()
@@ -1079,6 +1105,9 @@ class Rental(object):
                 query=query,
                 date_from=date_from,
                 date_to=date_to,
+                price_max=price_max,
+                trusted_only=trusted_only,
+                map_intent=map_intent,
                 has_context=False,
             )
             await message.reply(cls.PROMPT_SEARCH_CONTEXT, reply_markup=Misc.reply_markup_cancel_row())
@@ -1090,6 +1119,9 @@ class Rental(object):
             search_query,
             date_from=date_from,
             date_to=date_to,
+            price_max=price_max,
+            trusted_only=trusted_only,
+            map_intent=map_intent,
         )
 
     @classmethod

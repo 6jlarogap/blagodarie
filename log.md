@@ -2,6 +2,13 @@
 
 ## 2026-06-21
 
+- Source-implemented `doverabot-rental-voice-search-refinement`: rental search
+  parsing now carries date, price ceiling, trusted-only, and map-intent slots
+  through the bot FSM/API call; `/api/rental/search` now honors `price_max` and
+  `trusted_only` under existing visibility/trust filters; ambiguous equipment
+  clarification and result cards remain compatible. Full mocked bot discovery,
+  full rental backend tests, Django check, and migration drift check passed;
+  runtime deploy remains blocked by the active wrapper/untracked-helper issue.
 - Source-implemented `doverabot-rental-voice-listing-clarifications`: rental
   offer voice/text slot extraction now parses dates/availability, accumulates
   partial listing fields in FSM state, prompts for missing item/place/dates/price
