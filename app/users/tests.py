@@ -291,6 +291,106 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['offers'], [])
 
+    def test_search_ranking_supports_taxonomy_only_match(self):
+        equipment_type = RentalEquipmentType.objects.create(
+            slug='packraft-test',
+            canonical_name='Packraft Test',
+            labels={'en': ['packraft-test']},
+            synonyms={'ru': ['пакрафт-тест']},
+        )
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='River kit',
+            description_text='Легкая лодка для маршрута',
+        )
+        offer.equipment_types.add(equipment_type)
+
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+            'query': 'packraft-test',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [offer['title'] for offer in response.data['offers']],
+            ['River kit'],
+        )
+
+    def test_search_ranking_keeps_text_fallback(self):
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Dry bag',
+            description_text='Гермомешок для байдарки',
+        )
+
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+            'query': 'гермомешок',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['offers'][0]['title'], 'Dry bag')
+
+    def test_search_ranking_uses_bounded_semantic_tokens(self):
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Палатка MSR',
+            description_text='Легкая двухместная',
+        )
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Газовая горелка',
+            description_text='Для походной кухни',
+        )
+
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+            'query': 'shelter',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [offer['title'] for offer in response.data['offers']],
+            ['Палатка MSR'],
+        )
+
+    def test_search_ranking_keeps_visibility_and_mistrust_as_hard_filters(self):
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Палатка видимая',
+            description_text='Для лагеря',
+            visibility=RentalOffer.VISIBILITY_AUTHENTICATED,
+        )
+        RentalOffer.objects.create(
+            owner=self.owner,
+            title='Палатка приватная',
+            description_text='Не должна попасть в поиск',
+            visibility=RentalOffer.VISIBILITY_PRIVATE,
+        )
+
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+            'query': 'shelter',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [offer['title'] for offer in response.data['offers']],
+            ['Палатка видимая'],
+        )
+
+        CurrentState.objects.create(
+            user_from=self.requester,
+            user_to=self.owner,
+            attitude=CurrentState.MISTRUST,
+        )
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+            'query': 'shelter',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['offers'], [])
+
     @override_settings(TELEGRAM_BOT_USERNAME='DoveraBot')
     def test_rental_map_points_have_marker_payload_and_filters(self):
         equipment_type, created = RentalEquipmentType.objects.get_or_create(

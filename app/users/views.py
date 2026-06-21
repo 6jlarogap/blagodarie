@@ -4741,6 +4741,97 @@ api_rental_offer = ApiRentalOffer.as_view()
 
 class ApiRentalSearch(ApiRentalMixin, APIView):
 
+    RANK_CANDIDATE_LIMIT = 200
+    SEARCH_STOPWORDS = {
+        'and', 'for', 'with', 'the', 'rent', 'rental',
+        'для', 'или', 'что', 'где', 'когда', 'рядом', 'прокат', 'аренда',
+        'аренду', 'сдам', 'возьму', 'ищу',
+    }
+    SEMANTIC_TOKEN_GROUPS = (
+        {'tent', 'tents', 'shelter', 'camp', 'camping', 'палатка', 'палатку', 'палатки', 'тент', 'шатер'},
+        {'sleeping', 'bag', 'sack', 'спальник', 'спальный', 'мешок'},
+        {'backpack', 'rucksack', 'pack', 'рюкзак', 'рюкзаки'},
+        {'stove', 'burner', 'горелка', 'плитка'},
+        {'board', 'snowboard', 'sup', 'доска', 'сноуборд'},
+        {'kayak', 'raft', 'packraft', 'boat', 'каяк', 'байдарка', 'пакрафт', 'лодка'},
+        {'bike', 'bicycle', 'велосипед', 'вел'},
+        {'helmet', 'каска', 'шлем'},
+    )
+
+    @classmethod
+    def search_tokens(cls, text):
+        return {
+            token
+            for token in re.findall(r'[0-9a-zа-яё]+', (text or '').lower(), flags=re.I)
+            if len(token) >= 3 and token not in cls.SEARCH_STOPWORDS
+        }
+
+    @classmethod
+    def expanded_search_tokens(cls, tokens):
+        expanded = set(tokens)
+        for group in cls.SEMANTIC_TOKEN_GROUPS:
+            if tokens & group:
+                expanded.update(group)
+        return expanded
+
+    @classmethod
+    def equipment_tokens(cls, equipment_type):
+        tokens = set()
+        for term in equipment_type.terms():
+            tokens.update(cls.search_tokens(term))
+        return tokens
+
+    @classmethod
+    def offer_search_rank(cls, offer, query_text, query_tokens, expanded_tokens, concrete_equipment):
+        title_text = ' '.join(filter(None, [offer.title, offer.item_text]))
+        body_text = ' '.join(filter(None, [offer.description_text, offer.address, offer.availability_text]))
+        title_tokens = cls.search_tokens(title_text)
+        body_tokens = cls.search_tokens(body_text)
+        equipment = list(offer.equipment_types.all())
+        equipment_ids = {equipment_type.pk for equipment_type in equipment}
+        concrete_ids = {equipment_type.pk for equipment_type in concrete_equipment}
+        equipment_term_tokens = set()
+        for equipment_type in equipment:
+            equipment_term_tokens.update(cls.equipment_tokens(equipment_type))
+
+        query_lower = (query_text or '').lower().strip()
+        title_lower = title_text.lower()
+        body_lower = body_text.lower()
+        score = 0
+        if concrete_ids and equipment_ids & concrete_ids:
+            score += 100
+        if query_lower:
+            if query_lower in title_lower:
+                score += 40
+            if query_lower in body_lower:
+                score += 20
+        score += 12 * len(query_tokens & title_tokens)
+        score += 7 * len(query_tokens & body_tokens)
+        score += 6 * len(query_tokens & equipment_term_tokens)
+        semantic_tokens = expanded_tokens - query_tokens
+        score += 5 * len(semantic_tokens & title_tokens)
+        score += 3 * len(semantic_tokens & body_tokens)
+        score += 3 * len(semantic_tokens & equipment_term_tokens)
+        return score
+
+    @classmethod
+    def ranked_offers(cls, qs, query_text, concrete_equipment, number):
+        query_tokens = cls.search_tokens(query_text)
+        expanded_tokens = cls.expanded_search_tokens(query_tokens)
+        ranked = []
+        for offer in qs.distinct()[:cls.RANK_CANDIDATE_LIMIT]:
+            score = cls.offer_search_rank(
+                offer,
+                query_text,
+                query_tokens,
+                expanded_tokens,
+                concrete_equipment,
+            )
+            if score > 0:
+                ranked.append((score, offer.insert_timestamp, offer.pk, offer))
+        ranked.sort(key=lambda item: (-item[0], -item[1], -item[2]))
+        return [item[3] for item in ranked[:number]]
+
     def get(self, request):
         try:
             qs, viewer_user = self.rental_offer_queryset(request)
@@ -4754,31 +4845,6 @@ class ApiRentalSearch(ApiRentalMixin, APIView):
                         clarification=RentalEquipmentType.clarification_data(ambiguous_equipment),
                     )
                     return Response(data=data, status=status.HTTP_200_OK)
-                q_text_fallback = (
-                    Q(title__icontains=query_text) |
-                    Q(item_text__icontains=query_text) |
-                    Q(description_text__icontains=query_text) |
-                    Q(address__icontains=query_text)
-                )
-                if concrete_equipment:
-                    q_text_fallback |= Q(equipment_types__in=concrete_equipment)
-                if connection.vendor == 'postgresql':
-                    try:
-                        query = SearchQuery(query_text, search_type='websearch')
-                        vector = SearchVector(
-                            'title',
-                            'item_text',
-                            'description_text',
-                            'address',
-                        )
-                        q_search = Q(search=query)
-                        if concrete_equipment:
-                            q_search |= Q(equipment_types__in=concrete_equipment)
-                        qs = qs.annotate(search=vector).filter(q_search)
-                    except ProgrammingError:
-                        qs = qs.filter(q_text_fallback)
-                else:
-                    qs = qs.filter(q_text_fallback)
             date_from = self.parse_date(request.GET.get('date_from'), 'date_from')
             date_to = self.parse_date(request.GET.get('date_to'), 'date_to')
             if date_from:
@@ -4810,10 +4876,14 @@ class ApiRentalSearch(ApiRentalMixin, APIView):
                 number = min(int(request.GET.get('number', 10)), 50)
             except ValueError:
                 number = 10
+            if query_text:
+                offers = self.ranked_offers(qs, query_text, concrete_equipment, number)
+            else:
+                offers = list(qs.distinct()[:number])
             data = dict(
                 offers=[
                     offer.data_dict(request=request, viewer_user=viewer_user)
-                    for offer in qs.distinct()[:number]
+                    for offer in offers
                 ]
             )
             status_code = status.HTTP_200_OK
