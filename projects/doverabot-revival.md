@@ -36,6 +36,7 @@ Current implementation:
 - Durable Redis-backed FSM storage, explicit Organizm/Hermes STT handoff helpers, and deployed rental map marker forwarding were completed on 2026-06-21.
 - Rental booking/contact/reservation callbacks now have centralized payload parsing and user-visible stale/auth failure feedback.
 - The remaining runtime hard-coded Doverabot deep link in the sympathy contact handoff now uses the live bot username helper.
+- Profile-edit callbacks in `handler_callbacks.py` no longer use direct `callback.data.split(KeyboardType.SEP)` parsing, and the edited stale/auth exits now use shared visible callback notices.
 
 Primary implementation areas:
 
@@ -56,9 +57,9 @@ Primary implementation areas:
 
 ## Next Implementation Slice
 
-Continue bot hardening outside the rental callback path: clean up remaining profile-edit direct callback splits in `handler_callbacks.py`, especially non-media edit flows that were left out of the relatives/profile-photo pass.
+Continue profile-edit callback cleanup for remaining parser-backed but silent stale/auth exits in `handler_callbacks.py`: IOF, DOB unknown, comment, delete/undelete, send-message/archive, user description, and banking.
 
-Suggested `/new-go-slug`: `doverabot-profile-edit-callback-split-cleanup`.
+Suggested `/new-go-slug`: `doverabot-profile-edit-callback-feedback-finish`.
 
 Accepted prior-session decisions:
 
