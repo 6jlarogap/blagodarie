@@ -1,13 +1,13 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-7 implemented; slice 8 active
+Status: slices 1-8 implemented; decision refresh active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-rental-owner-listing-controls-chain.md](2026-06-21-doverabot-rental-owner-listing-controls-chain.md)
+Current completed chain: [2026-06-21-doverabot-rental-reservation-history-controls-chain.md](2026-06-21-doverabot-rental-reservation-history-controls-chain.md)
 
-Active next slice: Slice 8, Rental Reservation History Controls
-Active next `/new-go-slug`: `doverabot-rental-reservation-history-controls`
-After active slice, print next `/new-go-slug`: `doverabot-next-decision-refresh`
+Active next slice: Decision Refresh
+Active next `/new-go-slug`: `doverabot-next-decision-refresh`
+After active slice, choose and print the next `/new-go-slug`.
 
 ## Chain Purpose
 
@@ -220,7 +220,8 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-reservation-history-controls`
 
-Status: active next slice.
+Status: implemented and deployed in
+[2026-06-21-doverabot-rental-reservation-history-controls-chain.md](2026-06-21-doverabot-rental-reservation-history-controls-chain.md).
 
 Scope:
 
