@@ -149,6 +149,11 @@ def install_dependency_stubs(stub_common=True):
     settings.RENTAL_STT_TOKEN = 'stt-token'
     settings.RENTAL_STT_MODE = 'file_id'
     settings.RENTAL_STT_LANGUAGE = 'ru'
+    settings.RENTAL_GEOCODING_CONTRACT = 'doverabot_rental_geocoding_v1'
+    settings.RENTAL_GEOCODING_URL = ''
+    settings.RENTAL_GEOCODING_TOKEN = ''
+    settings.RENTAL_GEOCODING_LIMIT = 3
+    settings.RENTAL_GEOCODING_SEARCH_DELTA = 0.05
     settings.REDIS_CONNECT = dict(host='127.0.0.1', port=6379, db=2, decode_responses=True)
     settings.BOT_FSM_STORAGE = 'redis'
     settings.BOT_FSM_REDIS_CONNECT = settings.REDIS_CONNECT.copy()
@@ -323,6 +328,7 @@ def install_dependency_stubs(stub_common=True):
             RENTAL_BOOK = 82
             RENTAL_RESERVATION_ACTION = 83
             RENTAL_OWNER_ACTION = 84
+            RENTAL_GEOCODE = 85
             SEP = '~'
 
         class RcacheStub:

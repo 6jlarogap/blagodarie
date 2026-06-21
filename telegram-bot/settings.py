@@ -65,6 +65,15 @@ RENTAL_STT_TOKEN = ''
 RENTAL_STT_MODE = 'file_id'
 RENTAL_STT_LANGUAGE = 'ru'
 
+# Optional geocoding adapter for rental addresses.
+# Contract `doverabot_rental_geocoding_v1` sends {"query": "..."} JSON and
+# accepts provider responses with result(s)/suggestion(s) containing lat/lon.
+RENTAL_GEOCODING_CONTRACT = 'doverabot_rental_geocoding_v1'
+RENTAL_GEOCODING_URL = ''
+RENTAL_GEOCODING_TOKEN = ''
+RENTAL_GEOCODING_LIMIT = 3
+RENTAL_GEOCODING_SEARCH_DELTA = 0.05
+
 # - домен, прописанный в боте
 #
 FRONTEND_HOST = 'https://doverabot.ru'

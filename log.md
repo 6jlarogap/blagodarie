@@ -2,6 +2,14 @@
 
 ## 2026-06-21
 
+- Source-implemented `doverabot-rental-geocoding-contract`: added optional
+  `doverabot_rental_geocoding_v1` bot settings and adapter parsing, prompted
+  listing/search users with provider suggestions only when configured, and
+  applied coordinates to offer creation or bounded search only after explicit
+  callback confirmation; focused rental bot tests, full mocked bot discovery,
+  Django check, compileall, diff check, reindex, and graphify update passed.
+  Runtime deploy remains blocked by the active wrapper/untracked-helper issue
+  recorded for `doverabot-rental-proof-dispute-controls`.
 - Source-implemented `doverabot-rental-inventory-quantity-groundwork`: added
   `RentalOffer.quantity_total` defaulting to 1, API create/update validation,
   capacity-aware overlap checks that allow reservations up to listing quantity,

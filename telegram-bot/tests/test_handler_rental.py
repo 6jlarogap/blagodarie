@@ -42,6 +42,204 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             'палатка',
         )
 
+    async def test_geocode_address_no_provider_returns_empty(self):
+        self.handler_rental.settings.RENTAL_GEOCODING_URL = ''
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'geocode_provider_request',
+            mock.AsyncMock(),
+        ) as geocode_provider_request:
+            suggestions = await self.handler_rental.Rental.geocode_address('ВДНХ')
+
+        self.assertEqual(suggestions, [])
+        geocode_provider_request.assert_not_awaited()
+
+    async def test_geocode_address_configured_provider_success(self):
+        self.handler_rental.settings.RENTAL_GEOCODING_URL = 'https://geo.example/search'
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'geocode_provider_request',
+            mock.AsyncMock(return_value={
+                'results': [{
+                    'label': 'ВДНХ, Москва',
+                    'lat': '55.8298',
+                    'lon': '37.6320',
+                }],
+            }),
+        ) as geocode_provider_request:
+            suggestions = await self.handler_rental.Rental.geocode_address('ВДНХ')
+
+        geocode_provider_request.assert_awaited_once_with('ВДНХ')
+        self.assertEqual(suggestions[0]['label'], 'ВДНХ, Москва')
+        self.assertEqual(suggestions[0]['latitude'], 55.8298)
+        self.assertEqual(suggestions[0]['longitude'], 37.632)
+
+    async def test_geocode_address_failed_lookup_returns_empty(self):
+        self.handler_rental.settings.RENTAL_GEOCODING_URL = 'https://geo.example/search'
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'geocode_provider_request',
+            mock.AsyncMock(side_effect=RuntimeError('lookup failed')),
+        ):
+            suggestions = await self.handler_rental.Rental.geocode_address('ВДНХ')
+
+        self.assertEqual(suggestions, [])
+
+    async def test_offer_geocoding_prompts_before_offer_coordinates_are_stored(self):
+        message = FakeMessage(text='Палатка MSR Hubba\nместо: ВДНХ\nдаты: 2026-07-01\nцена: 500 руб')
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+        })
+        suggestions = [
+            {'label': 'ВДНХ главный вход', 'address': 'ВДНХ', 'latitude': 55.8298, 'longitude': 37.6320},
+            {'label': 'ВДНХ метро', 'address': 'ВДНХ', 'latitude': 55.8210, 'longitude': 37.6410},
+        ]
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'geocode_address',
+            mock.AsyncMock(return_value=suggestions),
+        ), mock.patch.object(
+            self.handler_rental.Rental,
+            'create_offer',
+            mock.AsyncMock(),
+        ) as create_offer:
+            await self.handler_rental.process_rental_offer(message, state)
+
+        create_offer.assert_not_awaited()
+        self.assertIn('Нашлись варианты координат', message.replies[-1].text)
+        buttons = [
+            button
+            for row in message.replies[-1].reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertIn('85~offer~use~0', [button.callback_data for button in buttons])
+        self.assertNotIn('latitude', state.data['rental_slots'])
+        self.assertEqual(state.data['pending_rental_geocode']['suggestions'], suggestions)
+
+    async def test_offer_geocoding_confirmation_adds_coordinates_to_create_payload(self):
+        callback = FakeCallback('85~offer~use~0')
+        suggestions = [
+            {'label': 'ВДНХ главный вход', 'address': 'ВДНХ', 'latitude': 55.8298, 'longitude': 37.6320},
+        ]
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+            'rental_slots': {
+                'title': 'Палатка MSR Hubba',
+                'item_text': 'Палатка MSR Hubba',
+                'description_text': 'Палатка MSR Hubba',
+                'address': 'ВДНХ',
+                'availability_text': '2026-07-01',
+                'price_text': '500 руб',
+            },
+            'pending_rental_geocode': {
+                'flow': 'offer',
+                'address': 'ВДНХ',
+                'suggestions': suggestions,
+            },
+            'pending_rental_offer': {
+                'payload': {
+                    'user_uuid': 'requester-uuid',
+                    'visibility': 'authenticated',
+                    'tgdesc': {'uuid_pack': 'offer-pack'},
+                    'title': 'Палатка MSR Hubba',
+                    'item_text': 'Палатка MSR Hubba',
+                    'description_text': 'Палатка MSR Hubba',
+                    'address': 'ВДНХ',
+                    'availability_text': '2026-07-01',
+                    'price_text': '500 руб',
+                },
+                'source_chat_id': 2002,
+                'source_message_id': 3003,
+                'cache_key': 'rental_desc~offer-pack',
+                'is_first': True,
+                'media_group_id': '',
+            },
+        })
+        response = {
+            'offer': {
+                'uuid': 'offer-uuid',
+                'title': 'Палатка MSR Hubba',
+                'owner': {'uuid': 'requester-uuid'},
+                'latitude': 55.8298,
+                'longitude': 37.6320,
+            },
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'create_offer',
+            mock.AsyncMock(return_value=(200, response)),
+        ) as create_offer, mock.patch.object(
+            self.handler_rental.Rental,
+            'register_message',
+            mock.AsyncMock(return_value=(200, {})),
+        ), mock.patch.object(
+            self.handler_rental.Rental,
+            'show_offer',
+            mock.AsyncMock(),
+        ):
+            await self.handler_rental.cbq_rental_geocode(callback, state)
+
+        payload = create_offer.await_args.args[0]
+        self.assertEqual(payload['latitude'], 55.8298)
+        self.assertEqual(payload['longitude'], 37.6320)
+        self.assertTrue(state.cleared)
+        self.assertTrue(callback.answered)
+        self.assertEqual(callback.answer_text, 'Координаты добавлены')
+
+    async def test_search_geocoding_prompts_and_waits_for_confirmation_before_search(self):
+        message = FakeMessage(text='/rent_search палатка адрес: ВДНХ')
+        state = FakeState()
+        suggestions = [
+            {'label': 'ВДНХ главный вход', 'address': 'ВДНХ', 'latitude': 55.8298, 'longitude': 37.6320},
+            {'label': 'ВДНХ метро', 'address': 'ВДНХ', 'latitude': 55.8210, 'longitude': 37.6410},
+        ]
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'geocode_address',
+            mock.AsyncMock(return_value=suggestions),
+        ), mock.patch.object(
+            self.handler_rental.Rental,
+            'search_with_params',
+            mock.AsyncMock(),
+        ) as search_with_params:
+            await self.handler_rental.Rental.cmd_rent_search(message, state)
+
+        search_with_params.assert_not_awaited()
+        self.assertIn('Нашлись варианты координат', message.replies[-1].text)
+        self.assertEqual(state.data['pending_rental_geocode']['flow'], 'search')
+        self.assertNotIn('latitude', state.data)
+
+        callback = FakeCallback('85~search~use~1')
+        callback.message = message
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'search_with_params',
+            mock.AsyncMock(return_value=(200, {'offers': []})),
+        ) as search_with_params:
+            await self.handler_rental.cbq_rental_geocode(callback, state)
+
+        search_with_params.assert_awaited_once_with(
+            'палатка адрес: ВДНХ',
+            'requester-uuid',
+            date_from='',
+            date_to='',
+            price_max='',
+            trusted_only=False,
+            map_intent=False,
+            latitude=55.821,
+            longitude=37.641,
+        )
+        self.assertTrue(state.cleared)
+        self.assertEqual(message.replies[-1].text, 'Ничего не найдено')
+
     async def test_voice_listing_slots_extract_core_fields(self):
         slots = self.handler_rental.Rental.extract_slots(
             'Палатка MSR Hubba\n'

@@ -75,6 +75,9 @@ class Rental(object):
     ACTION_OWNER_ACTIVATE = 'activate'
     ACTION_OWNER_PAUSE = 'pause'
     ACTION_OWNER_ARCHIVE = 'archive'
+    ACTION_GEOCODE_USE = 'use'
+    ACTION_GEOCODE_SKIP = 'skip'
+    GEOCODE_FLOWS = {'offer', 'search'}
     ACTIONS_OWNER = {
         ACTION_OWNER_LIST,
         ACTION_OWNER_ACTIVATE,
@@ -242,6 +245,177 @@ class Rental(object):
         return ''
 
     @classmethod
+    def geocoding_headers(cls):
+        headers = {}
+        if getattr(settings, 'RENTAL_GEOCODING_TOKEN', ''):
+            headers['Authorization'] = 'Bearer %s' % settings.RENTAL_GEOCODING_TOKEN
+        return headers
+
+    @classmethod
+    async def geocode_provider_request(cls, address):
+        url = getattr(settings, 'RENTAL_GEOCODING_URL', '')
+        if not url:
+            return None
+        timeout = aiohttp.ClientTimeout(total=getattr(settings, 'HTTP_TIMEOUT', 60))
+        payload = dict(
+            contract=getattr(settings, 'RENTAL_GEOCODING_CONTRACT', 'doverabot_rental_geocoding_v1'),
+            query=address,
+            limit=getattr(settings, 'RENTAL_GEOCODING_LIMIT', 3),
+            source='telegram_rental',
+        )
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, headers=cls.geocoding_headers(), json=payload) as resp:
+                if resp.status >= 400:
+                    logging.warning('rental geocoding failed with status %s', resp.status)
+                    return None
+                return await resp.json(content_type=None)
+
+    @classmethod
+    def geocode_suggestions_from_response(cls, data, limit=None):
+        limit = limit or getattr(settings, 'RENTAL_GEOCODING_LIMIT', 3)
+        if not data:
+            return []
+        candidates = data
+        if isinstance(data, dict):
+            candidates = (
+                data.get('results') or
+                data.get('suggestions') or
+                data.get('items') or
+                data.get('features') or
+                data.get('result') or
+                data.get('data') or
+                []
+            )
+        if isinstance(candidates, dict):
+            candidates = [candidates]
+        if not isinstance(candidates, list):
+            return []
+        suggestions = []
+        seen = set()
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            geometry = item.get('geometry') or {}
+            properties = item.get('properties') or {}
+            coordinates = geometry.get('coordinates') if isinstance(geometry, dict) else None
+            lat = (
+                item.get('latitude') or item.get('lat') or
+                properties.get('latitude') or properties.get('lat')
+            )
+            lon = (
+                item.get('longitude') or item.get('lng') or item.get('lon') or
+                properties.get('longitude') or properties.get('lng') or properties.get('lon')
+            )
+            if lat is None and isinstance(coordinates, (list, tuple)) and len(coordinates) >= 2:
+                lon, lat = coordinates[0], coordinates[1]
+            try:
+                lat = float(lat)
+                lon = float(lon)
+            except (TypeError, ValueError):
+                continue
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                continue
+            label = (
+                item.get('label') or item.get('title') or item.get('name') or
+                item.get('display_name') or item.get('formatted') or item.get('address') or
+                properties.get('label') or properties.get('name') or properties.get('address') or
+                'Адрес'
+            )
+            address = item.get('address') or properties.get('address') or label
+            dedupe_key = (round(lat, 6), round(lon, 6), str(label))
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            suggestions.append(dict(
+                label=str(label).strip(),
+                address=str(address).strip(),
+                latitude=lat,
+                longitude=lon,
+            ))
+            if len(suggestions) >= limit:
+                break
+        return suggestions
+
+    @classmethod
+    async def geocode_address(cls, address):
+        address = (address or '').strip()
+        if not address or not getattr(settings, 'RENTAL_GEOCODING_URL', ''):
+            return []
+        try:
+            data = await cls.geocode_provider_request(address)
+        except Exception:
+            logging.exception('rental geocoding request failed')
+            return []
+        return cls.geocode_suggestions_from_response(data)
+
+    @classmethod
+    def geocode_callback_data(cls, flow, action, index=0):
+        return '%s%s%s%s%s%s%s' % (
+            KeyboardType.RENTAL_GEOCODE,
+            KeyboardType.SEP,
+            flow,
+            KeyboardType.SEP,
+            action,
+            KeyboardType.SEP,
+            index,
+        )
+
+    @classmethod
+    def parse_geocode_callback_data(cls, callback):
+        parts = (callback.data or '').split(KeyboardType.SEP)
+        if (
+            len(parts) != 4 or
+            parts[0] != str(KeyboardType.RENTAL_GEOCODE) or
+            parts[1] not in cls.GEOCODE_FLOWS or
+            parts[2] not in {cls.ACTION_GEOCODE_USE, cls.ACTION_GEOCODE_SKIP} or
+            not parts[3].isdigit()
+        ):
+            return '', '', 0
+        return parts[1], parts[2], int(parts[3])
+
+    @classmethod
+    def text_geocode_label(cls, suggestion):
+        label = suggestion.get('label') or suggestion.get('address') or 'Адрес'
+        return label[:57] + '...' if len(label) > 60 else label
+
+    @classmethod
+    def markup_geocode(cls, flow, suggestions):
+        rows = []
+        for index, suggestion in enumerate(suggestions):
+            rows.append([
+                InlineKeyboardButton(
+                    text=cls.text_geocode_label(suggestion),
+                    callback_data=cls.geocode_callback_data(flow, cls.ACTION_GEOCODE_USE, index),
+                )
+            ])
+        rows.append([
+            InlineKeyboardButton(
+                text='Без координат',
+                callback_data=cls.geocode_callback_data(flow, cls.ACTION_GEOCODE_SKIP, 0),
+            )
+        ])
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+
+    @classmethod
+    def text_geocode_prompt(cls, address, suggestions):
+        variants = '\n'.join(
+            '%s. %s' % (index + 1, html.quote(cls.text_geocode_label(suggestion)))
+            for index, suggestion in enumerate(suggestions)
+        )
+        return (
+            'Нашлись варианты координат для адреса "%s".\n'
+            '%s\n\n'
+            'Выберите вариант, чтобы добавить координаты, или продолжите без координат.'
+        ) % (html.quote(address), variants)
+
+    @classmethod
+    def coordinates_from_suggestion(cls, suggestion):
+        return dict(
+            latitude=suggestion['latitude'],
+            longitude=suggestion['longitude'],
+        )
+
+    @classmethod
     def extract_slots(cls, text):
         title = ''
         for line in text.split('\n'):
@@ -354,6 +528,9 @@ class Rental(object):
             price_max = re.sub(r'\s+', '', m.group(1)).replace(',', '.')
         trusted_only = bool(re.search(r'\b(доверенн\w*|trusted|своих|свои)\b', text, flags=re.I))
         map_intent = bool(re.search(r'\b(карта|карте|map)\b', text, flags=re.I))
+        address = ''
+        if m := re.search(r'(?:адрес|где|место)\s*[:\-]\s*([^\n]+)', text, flags=re.I):
+            address = m.group(1).strip()
         has_context = bool(date_values or latitude is not None or price_max or trusted_only or re.search(
             r'\b(адрес|где|место|город|метро|улица|рядом|москва|минск|сочи|спб|санкт-петербург)\b',
             text,
@@ -366,6 +543,9 @@ class Rental(object):
             price_max=price_max,
             trusted_only=trusted_only,
             map_intent=map_intent,
+            address=address,
+            latitude=latitude,
+            longitude=longitude,
             has_context=has_context,
         )
 
@@ -510,7 +690,8 @@ class Rental(object):
 
     @classmethod
     async def search_with_params(cls, query, user_uuid, date_from='', date_to='',
-                                 price_max='', trusted_only=False, map_intent=False):
+                                 price_max='', trusted_only=False, map_intent=False,
+                                 latitude=None, longitude=None):
         params = dict(query=query, user_uuid=user_uuid, number=5)
         if date_from:
             params.update(date_from=date_from)
@@ -522,6 +703,14 @@ class Rental(object):
             params.update(trusted_only='on')
         if map_intent:
             params.update(map_intent='on')
+        if latitude is not None and longitude is not None:
+            delta = float(getattr(settings, 'RENTAL_GEOCODING_SEARCH_DELTA', 0.05) or 0.05)
+            params.update(
+                lat_south=latitude - delta,
+                lat_north=latitude + delta,
+                lng_west=longitude - delta,
+                lng_east=longitude + delta,
+            )
         status, response = await Misc.api_request(
             path='/api/rental/search',
             method='get',
@@ -1092,20 +1281,22 @@ class Rental(object):
             await message.reply('Объявление показать не удалось')
 
     @classmethod
-    async def send_search_results(cls, message, query, date_from='', date_to='',
-                                  price_max='', trusted_only=False, map_intent=False):
-        status_sender, response_sender = await Misc.post_tg_user(message.from_user)
-        if status_sender != 200:
-            await message.reply(Misc.MSG_ERROR_API)
-            return
-        status, response = await cls.search_with_params(
-            query,
-            response_sender['uuid'],
+    async def send_search_results_for_profile(cls, message, profile_from, query, date_from='', date_to='',
+                                              price_max='', trusted_only=False, map_intent=False,
+                                              latitude=None, longitude=None):
+        search_kwargs = dict(
             date_from=date_from,
             date_to=date_to,
             price_max=price_max,
             trusted_only=trusted_only,
             map_intent=map_intent,
+        )
+        if latitude is not None and longitude is not None:
+            search_kwargs.update(latitude=latitude, longitude=longitude)
+        status, response = await cls.search_with_params(
+            query,
+            profile_from['uuid'],
+            **search_kwargs,
         )
         if status != 200:
             await message.reply('Поиск временно недоступен')
@@ -1135,7 +1326,124 @@ class Rental(object):
             trusted_only=trusted_only,
         )
         for offer in offers:
-            await cls.show_offer(message, response_sender, offer, map_params=result_map_params)
+            await cls.show_offer(message, profile_from, offer, map_params=result_map_params)
+
+    @classmethod
+    async def send_search_results(cls, message, query, date_from='', date_to='',
+                                  price_max='', trusted_only=False, map_intent=False,
+                                  latitude=None, longitude=None):
+        status_sender, response_sender = await Misc.post_tg_user(message.from_user)
+        if status_sender != 200:
+            await message.reply(Misc.MSG_ERROR_API)
+            return
+        await cls.send_search_results_for_profile(
+            message,
+            response_sender,
+            query,
+            date_from=date_from,
+            date_to=date_to,
+            price_max=price_max,
+            trusted_only=trusted_only,
+            map_intent=map_intent,
+            latitude=latitude,
+            longitude=longitude,
+        )
+
+    @classmethod
+    async def maybe_prompt_offer_geocode(cls, message, state, slots, pending_offer):
+        if (
+            slots.get('latitude') is not None and slots.get('longitude') is not None
+        ) or not slots.get('address'):
+            return False
+        data = await state.get_data()
+        if data.get('rental_geocode_status') in ('confirmed', 'skipped', 'failed'):
+            return False
+        suggestions = await cls.geocode_address(slots['address'])
+        if not suggestions:
+            await state.update_data(rental_geocode_status='failed')
+            return False
+        await state.update_data(
+            rental_slots=slots,
+            pending_rental_geocode=dict(
+                flow='offer',
+                address=slots['address'],
+                suggestions=suggestions,
+            ),
+            pending_rental_offer=pending_offer,
+        )
+        await message.reply(
+            cls.text_geocode_prompt(slots['address'], suggestions),
+            reply_markup=cls.markup_geocode('offer', suggestions),
+        )
+        return True
+
+    @classmethod
+    async def maybe_prompt_search_geocode(cls, message, state, params):
+        if (
+            params.get('latitude') is not None and params.get('longitude') is not None
+        ) or not params.get('address'):
+            return False
+        data = await state.get_data()
+        if data.get('rental_geocode_status') in ('confirmed', 'skipped', 'failed'):
+            return False
+        suggestions = await cls.geocode_address(params['address'])
+        if not suggestions:
+            await state.update_data(rental_geocode_status='failed')
+            return False
+        await state.update_data(
+            query=params['query'],
+            context_text=params.get('context_text', ''),
+            date_from=params.get('date_from', ''),
+            date_to=params.get('date_to', ''),
+            price_max=params.get('price_max', ''),
+            trusted_only=params.get('trusted_only', False),
+            map_intent=params.get('map_intent', False),
+            has_context=True,
+            pending_rental_geocode=dict(
+                flow='search',
+                address=params['address'],
+                suggestions=suggestions,
+            ),
+        )
+        await message.reply(
+            cls.text_geocode_prompt(params['address'], suggestions),
+            reply_markup=cls.markup_geocode('search', suggestions),
+        )
+        return True
+
+    @classmethod
+    async def save_offer_from_payload(cls, message, state, profile_from, pending_offer):
+        payload = dict(pending_offer['payload'])
+        if pending_offer.get('rental_offer_uuid'):
+            payload.update(
+                offer_uuid=pending_offer['rental_offer_uuid'],
+                is_first=False,
+            )
+            status, response = await cls.put_offer(payload)
+        else:
+            status, response = await cls.create_offer(payload)
+            if status == 200:
+                await state.update_data(rental_offer_uuid=response['offer']['uuid'])
+        if status != 200:
+            await message.reply((response or {}).get('message') or 'Не удалось сохранить объявление')
+            await state.clear()
+            return
+        await cls.register_message(
+            response['offer']['uuid'],
+            'owner_offer',
+            pending_offer['source_chat_id'],
+            pending_offer['source_message_id'],
+            recipient_uuid=profile_from['uuid'],
+        )
+        if not pending_offer.get('is_first', True):
+            return
+        if pending_offer.get('media_group_id'):
+            wait_last = await Misc.redis_wait_last_in_pack(pending_offer['cache_key'])
+            if wait_last is False:
+                return
+        await state.clear()
+        await message.reply('Объявление проката сохранено')
+        await cls.show_offer(message, profile_from, response['offer'])
 
     @classmethod
     async def handle_search_text(cls, message, state, text):
@@ -1149,6 +1457,9 @@ class Rental(object):
         trusted_only = bool(data.get('trusted_only') or slots['trusted_only'])
         map_intent = bool(data.get('map_intent') or slots['map_intent'])
         has_context = bool(data.get('has_context') or slots['has_context'])
+        address = data.get('address') or slots['address']
+        latitude = data.get('latitude') if data.get('latitude') is not None else slots['latitude']
+        longitude = data.get('longitude') if data.get('longitude') is not None else slots['longitude']
         if data.get('query') and slots['query']:
             context_text = ('%s %s' % (context_text, slots['query'])).strip()
         if not query:
@@ -1163,12 +1474,26 @@ class Rental(object):
                 price_max=price_max,
                 trusted_only=trusted_only,
                 map_intent=map_intent,
+                address=address,
                 has_context=False,
             )
             await message.reply(cls.PROMPT_SEARCH_CONTEXT, reply_markup=Misc.reply_markup_cancel_row())
             return
-        await state.clear()
         search_query = ('%s %s' % (query, context_text)).strip()
+        if await cls.maybe_prompt_search_geocode(message, state, dict(
+                query=query,
+                context_text=context_text,
+                date_from=date_from,
+                date_to=date_to,
+                price_max=price_max,
+                trusted_only=trusted_only,
+                map_intent=map_intent,
+                address=address,
+                latitude=latitude,
+                longitude=longitude,
+        )):
+            return
+        await state.clear()
         await cls.send_search_results(
             message,
             search_query,
@@ -1177,6 +1502,8 @@ class Rental(object):
             price_max=price_max,
             trusted_only=trusted_only,
             map_intent=map_intent,
+            latitude=latitude,
+            longitude=longitude,
         )
 
     @classmethod
@@ -1438,36 +1765,18 @@ async def process_rental_offer(message: Message, state: FSMContext):
     is_first = Misc.redis_is_key_first_up(key)
     if is_first is None:
         is_first = True
-    if data.get('rental_offer_uuid'):
-        payload.update(
-            offer_uuid=data['rental_offer_uuid'],
-            is_first=False,
-        )
-        status, response = await Rental.put_offer(payload)
-    else:
-        status, response = await Rental.create_offer(payload)
-        if status == 200:
-            await state.update_data(rental_offer_uuid=response['offer']['uuid'])
-    if status != 200:
-        await message.reply((response or {}).get('message') or 'Не удалось сохранить объявление')
-        await state.clear()
-        return
-    await Rental.register_message(
-        response['offer']['uuid'],
-        'owner_offer',
-        message.chat.id,
-        message.message_id,
-        recipient_uuid=profile_from['uuid'],
+    pending_offer = dict(
+        payload=payload,
+        rental_offer_uuid=data.get('rental_offer_uuid') or '',
+        source_chat_id=message.chat.id,
+        source_message_id=message.message_id,
+        cache_key=key,
+        is_first=is_first,
+        media_group_id=message.media_group_id,
     )
-    if not is_first:
+    if await Rental.maybe_prompt_offer_geocode(message, state, slots, pending_offer):
         return
-    if message.media_group_id:
-        wait_last = await Misc.redis_wait_last_in_pack(key)
-        if wait_last is False:
-            return
-    await state.clear()
-    await message.reply('Объявление проката сохранено')
-    await Rental.show_offer(message, profile_from, response['offer'])
+    await Rental.save_offer_from_payload(message, state, profile_from, pending_offer)
 
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMRentalSearch.ask))
@@ -1482,6 +1791,62 @@ async def process_rental_search(message: Message, state: FSMContext):
         )
         return
     await Rental.handle_search_text(message, state, query)
+
+
+@router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
+        KeyboardType.RENTAL_GEOCODE,
+        KeyboardType.SEP,
+    )))
+async def cbq_rental_geocode(callback: CallbackQuery, state: FSMContext):
+    flow, action, index = Rental.parse_geocode_callback_data(callback)
+    data = await state.get_data()
+    pending = data.get('pending_rental_geocode') or {}
+    suggestions = pending.get('suggestions') or []
+    if not flow or pending.get('flow') != flow or (action == Rental.ACTION_GEOCODE_USE and index >= len(suggestions)):
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_STALE)
+        return
+    status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if status_from != 200:
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_AUTH)
+        return
+    coords = {}
+    if action == Rental.ACTION_GEOCODE_USE:
+        coords = Rental.coordinates_from_suggestion(suggestions[index])
+    if flow == 'offer':
+        pending_offer = data.get('pending_rental_offer') or {}
+        if not pending_offer:
+            await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_STALE)
+            return
+        slots = dict(data.get('rental_slots') or {})
+        payload = dict(pending_offer.get('payload') or {})
+        if coords:
+            slots.update(coords)
+            payload.update(coords)
+        pending_offer['payload'] = payload
+        await state.update_data(
+            rental_slots=slots,
+            rental_geocode_status='confirmed' if coords else 'skipped',
+            pending_rental_geocode={},
+            pending_rental_offer=pending_offer,
+        )
+        await Rental.save_offer_from_payload(callback.message, state, profile_from, pending_offer)
+        await callback.answer('Координаты добавлены' if coords else 'Продолжаю без координат')
+        return
+    search_query = ('%s %s' % (data.get('query') or '', data.get('context_text') or '')).strip()
+    await state.clear()
+    await Rental.send_search_results_for_profile(
+        callback.message,
+        profile_from,
+        search_query,
+        date_from=data.get('date_from') or '',
+        date_to=data.get('date_to') or '',
+        price_max=data.get('price_max') or '',
+        trusted_only=bool(data.get('trusted_only')),
+        map_intent=bool(data.get('map_intent')),
+        latitude=coords.get('latitude'),
+        longitude=coords.get('longitude'),
+    )
+    await callback.answer('Ищу рядом с выбранным адресом' if coords else 'Ищу без координат')
 
 
 @router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (

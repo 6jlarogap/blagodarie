@@ -406,6 +406,10 @@ class KeyboardType(object):
     #
     RENTAL_OWNER_ACTION = 84
 
+    # Подтверждение координат прокатного адреса
+    #
+    RENTAL_GEOCODE = 85
+
     # Разделитель данных в call back data
     #
     SEP = '~'
