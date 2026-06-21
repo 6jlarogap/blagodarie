@@ -1015,6 +1015,128 @@ class LegacyProfileEditCallbackFeedbackFinishTests(unittest.IsolatedAsyncioTestC
         self.assert_stale_notice(callback)
 
 
+class LegacyProfileEditStateFeedbackFinishTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+        self.handler_callbacks = import_fresh('handler_callbacks')
+
+    def assert_stale_state_reply(self, message):
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn('ввод больше не актуален', message.replies[0].text.lower())
+
+    def assert_profile_reply(self, message):
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn('профиль', message.replies[0].text.lower())
+
+    async def test_dob_missing_state_replies_and_skips_auth(self):
+        message = FakeMessage(text='01.01.1990')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(),
+        ) as check_owner:
+            await self.handler_callbacks.process_dob(message, state)
+
+        check_owner.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assert_stale_state_reply(message)
+
+    async def test_comment_auth_failure_replies_and_skips_update(self):
+        message = FakeMessage(text='comment')
+        state = FakeState({'uuid': 'person-uuid'})
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'check_owner_by_uuid',
+            mock.AsyncMock(return_value=False),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'put_user_properties',
+            mock.AsyncMock(),
+        ) as put_user_properties:
+            await self.handler_callbacks.process_comment(message, state)
+
+        put_user_properties.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assert_profile_reply(message)
+
+    async def test_send_message_api_exception_replies_and_clears(self):
+        message = FakeMessage(text='hello')
+        state = FakeState({
+            'uuid_pack': 'pack-uuid',
+            'profile_from': {'uuid': 'from-uuid', 'first_name': 'From'},
+            'profile_to': {
+                'uuid': 'to-uuid',
+                'username': 'to-user',
+                'first_name': 'To',
+                'owner': None,
+                'tg_data': [{'tg_uid': 3003}],
+            },
+        })
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'redis_is_key_first_up',
+            mock.Mock(return_value=True),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'api_request',
+            mock.AsyncMock(side_effect=RuntimeError('api down')),
+        ):
+            await self.handler_callbacks.process_message_to_send(message, state)
+
+        self.assertTrue(state.cleared)
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn(self.common.Misc.MSG_ERROR_API.lower(), message.replies[0].text.lower())
+
+    async def test_user_desc_auth_failure_replies_and_skips_update(self):
+        message = FakeMessage(text='description')
+        state = FakeState({'uuid': 'person-uuid', 'uuid_pack': 'pack-uuid'})
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(500, {})),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'put_user_properties',
+            mock.AsyncMock(),
+        ) as put_user_properties:
+            await self.handler_callbacks.process_get_user_desc(message, state)
+
+        put_user_properties.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assert_profile_reply(message)
+
+    async def test_existing_iof_command_interrupt_skips_profile_update(self):
+        message = FakeMessage(text='/start')
+        state = FakeState({'uuid': 'person-uuid'})
+
+        async def command_interrupt(message, state):
+            await state.clear()
+            await message.reply(f'{self.common.Misc.MSG_YOU_CANCELLED_INPUT}\nВыполняю команду /start')
+            return True
+
+        with mock.patch.object(
+            self.handler_callbacks,
+            'is_it_command',
+            mock.AsyncMock(side_effect=command_interrupt),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc,
+            'put_user_properties',
+            mock.AsyncMock(),
+        ) as put_user_properties:
+            await self.handler_callbacks.process_existing_iof(message, state)
+
+        put_user_properties.assert_not_awaited()
+        self.assertTrue(state.cleared)
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn('выполняю команду', message.replies[0].text.lower())
+
+
 class LegacySympaLinkTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         install_dependency_stubs(stub_common=False)

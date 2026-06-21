@@ -30,6 +30,20 @@ dp, bot, bot_data = me.dp, me.bot, me.bot_data
 
 router = Router()
 
+MSG_STATE_STALE = 'Ввод больше не актуален. Повторите команду и попробуйте снова.'
+
+
+async def reply_and_clear_state(message: Message, state: FSMContext, text=MSG_STATE_STALE):
+    await message.reply(text)
+    await state.clear()
+
+
+async def check_pack_state_or_reply(value, message: Message, state: FSMContext):
+    if await Misc.check_none_n_clear(value, state):
+        return True
+    await message.reply(MSG_STATE_STALE)
+    return False
+
 class FSMgender(StatesGroup):
     ask = State()
 
@@ -444,7 +458,7 @@ async def process_message_meet_tgdesc(message: Message, state: FSMContext):
             f'{Rcache.USER_DESC_PREFIX}{Rcache.KEY_SEP}'
             f'{data["uuid_pack"]}'
         )
-        if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
+        if not await check_pack_state_or_reply(await Misc.redis_wait_last_in_pack(key), message, state):
             return
         data.update(tgdesc_first=is_first)
         logging.info(f'MEET_LOG: {data["first_name"]} ({data["username"]}) entered description')
@@ -458,9 +472,13 @@ async def process_message_meet_dob(message: Message, state: FSMContext):
     if await is_it_command(message, state):
         return
     data = await state.get_data()
+    uuid = data.get('uuid')
+    if not uuid:
+        await reply_and_clear_state(message, state)
+        return
     status_from, profile_from = await Misc.post_tg_user(message.from_user)
-    if status_from != 200 or profile_from['uuid'] != data['uuid']:
-        await state.clear()
+    if status_from != 200 or profile_from.get('uuid') != uuid:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
         return
     dob = message.text.strip()
     status, response = await Misc.api_request(
@@ -488,7 +506,7 @@ async def process_message_meet_dob(message: Message, state: FSMContext):
             data.update(dob=dob)
             await meet_do_or_revoke(data)
     else:
-        await state.clear()
+        await reply_and_clear_state(message, state, Misc.MSG_ERROR_API)
 
 
 @router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
@@ -734,6 +752,8 @@ async def process_message_banking_after_invite(message: Message, state: FSMConte
     status, response = await put_banking(message, state)
     if status == 200:
         await send_qr(response, message.from_user)
+    else:
+        await message.reply(Misc.MSG_ERROR_API)
     await state.clear()
 
 
@@ -930,29 +950,38 @@ async def process_existing_iof(message: Message, state: FSMContext):
         return
     first_name = Misc.strip_text(message.text)
     data = await state.get_data()
-    if uuid := data.get('uuid'):
-        response_sender = await Misc.check_owner_by_uuid(
-            owner_tg_user=message.from_user,
-            uuid=uuid
-        )
-        if response_sender:
-            status, response = await Misc.put_user_properties(
-                uuid=uuid,
-                first_name=first_name,
+    uuid = data.get('uuid')
+    if not uuid:
+        await reply_and_clear_state(message, state)
+        return
+    response_sender = await Misc.check_owner_by_uuid(
+        owner_tg_user=message.from_user,
+        uuid=uuid
+    )
+    if not response_sender:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
+    status, response = await Misc.put_user_properties(
+        uuid=uuid,
+        first_name=first_name,
+    )
+    if status == 200:
+        await message.reply('Изменено')
+        if data.get('card_type') == Misc.CARD_TYPE_MEET:
+            await Misc.show_edit_meet(
+                message.from_user.id,
+                response,
             )
-            if status == 200:
-                await message.reply('Изменено')
-                if data.get('card_type') == Misc.CARD_TYPE_MEET:
-                    await Misc.show_edit_meet(
-                        message.from_user.id,
-                        response,
-                    )
-                else:
-                    await Misc.show_card(
-                        profile=response,
-                        profile_sender=response_sender,
-                        tg_user_sender=message.from_user,
-                    )
+        else:
+            await Misc.show_card(
+                profile=response,
+                profile_sender=response_sender,
+                tg_user_sender=message.from_user,
+            )
+    elif status == 400 and response and response.get('message'):
+        await message.reply(f'Ошибка!\n{response["message"]}')
+    else:
+        await message.reply(Misc.MSG_ERROR_API)
     await state.clear()
 
 
@@ -1241,31 +1270,37 @@ async def draw_dod(profile, message, state):
 
 async def put_dates(message, state, tg_user_sender):
     data = await state.get_data()
-    if data.get('uuid') and \
-       (response_check := await Misc.check_owner_by_uuid(tg_user_sender, data['uuid'])):
-        dob = data.get('dob') or ''
-        dod = data.get('dod') or ''
-        is_dead = data.get('is_dead') or dod or ''
-        status_put, response_put = await Misc.put_user_properties(
-            uuid=data['uuid'],
-            dob=dob,
-            dod=dod,
-            is_dead = '1' if is_dead else '',
-        )
-        if status_put == 200:
-            if data.get('card_type') == Misc.CARD_TYPE_MEET:
-                await message.reply(f'Дата рождения изменена')
-                await Misc.show_edit_meet(
-                    message.from_user.id,
-                    response_put,
-                )
-            else:
-                await Misc.show_card(response_put, response_check, tg_user_sender)
-        elif status_put == 400 and response_put.get('message'):
-            dates = 'даты' if response_check['response_uuid']['owner'] else 'дату рождения'
-            await message.reply(f'Ошибка!\n{response_put["message"]}\n\nНазначайте {dates} по новой')
+    uuid = data.get('uuid')
+    if not uuid:
+        await reply_and_clear_state(message, state)
+        return
+    response_check = await Misc.check_owner_by_uuid(tg_user_sender, uuid)
+    if not response_check:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
+    dob = data.get('dob') or ''
+    dod = data.get('dod') or ''
+    is_dead = data.get('is_dead') or dod or ''
+    status_put, response_put = await Misc.put_user_properties(
+        uuid=uuid,
+        dob=dob,
+        dod=dod,
+        is_dead = '1' if is_dead else '',
+    )
+    if status_put == 200:
+        if data.get('card_type') == Misc.CARD_TYPE_MEET:
+            await message.reply(f'Дата рождения изменена')
+            await Misc.show_edit_meet(
+                message.from_user.id,
+                response_put,
+            )
         else:
-            await message.reply(Misc.MSG_ERROR_API)
+            await Misc.show_card(response_put, response_check, tg_user_sender)
+    elif status_put == 400 and response_put.get('message'):
+        dates = 'даты' if response_check['response_uuid']['owner'] else 'дату рождения'
+        await message.reply(f'Ошибка!\n{response_put["message"]}\n\nНазначайте {dates} по новой')
+    else:
+        await message.reply(Misc.MSG_ERROR_API)
     await state.clear()
 
 
@@ -1307,13 +1342,19 @@ async def process_dob(message: Message, state: FSMContext):
     if await is_it_command(message, state):
         return
     data = await state.get_data()
-    if (uuid := data.get('uuid')) and \
-       (response_check := await Misc.check_owner_by_uuid(message.from_user, uuid)):
-        await state.update_data(dob=message_text)
-        if (profile := response_check['response_uuid'])['owner']:
-            await draw_dod(profile, message, state)
-        else:
-            await put_dates(message, state, message.from_user)
+    uuid = data.get('uuid')
+    if not uuid:
+        await reply_and_clear_state(message, state)
+        return
+    response_check = await Misc.check_owner_by_uuid(message.from_user, uuid)
+    if not response_check:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
+    await state.update_data(dob=message_text)
+    if (profile := response_check['response_uuid'])['owner']:
+        await draw_dod(profile, message, state)
+    else:
+        await put_dates(message, state, message.from_user)
 
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMdates.dod))
@@ -1328,10 +1369,15 @@ async def process_dod(message: Message, state: FSMContext):
     if await is_it_command(message, state):
         return
     data = await state.get_data()
-    if (uuid := data.get('uuid')) and \
-       (response_check := await Misc.check_owner_by_uuid(message.from_user, uuid)):
-        await state.update_data(dod=message_text)
-        await put_dates(message, state, message.from_user)
+    uuid = data.get('uuid')
+    if not uuid:
+        await reply_and_clear_state(message, state)
+        return
+    if not await Misc.check_owner_by_uuid(message.from_user, uuid):
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
+    await state.update_data(dod=message_text)
+    await put_dates(message, state, message.from_user)
 
 
 @router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
@@ -1367,17 +1413,27 @@ async def process_comment(message: Message, state: FSMContext):
     if await is_it_command(message, state):
         return
     data = await state.get_data()
-    if (uuid := data.get('uuid')) and \
-       (response_check := await Misc.check_owner_by_uuid(message.from_user, uuid)):
-        status_put, response_put = await Misc.put_user_properties(
-            uuid=uuid,
-            comment=message_text,
+    uuid = data.get('uuid')
+    if not uuid:
+        await reply_and_clear_state(message, state)
+        return
+    response_check = await Misc.check_owner_by_uuid(message.from_user, uuid)
+    if not response_check:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
+    status_put, response_put = await Misc.put_user_properties(
+        uuid=uuid,
+        comment=message_text,
+    )
+    if status_put == 200:
+        await message.reply(
+            f'{"Изменен" if response_check["response_uuid"]["comment"] else "Добавлен"} комментарий'
         )
-        if status_put == 200:
-            await message.reply(
-                f'{"Изменен" if response_check["response_uuid"]["comment"] else "Добавлен"} комментарий'
-            )
-            await Misc.show_card(response_put, response_check, message.from_user)
+        await Misc.show_card(response_put, response_check, message.from_user)
+    elif status_put == 400 and response_put and response_put.get('message'):
+        await message.reply(f'Ошибка!\n{response_put["message"]}')
+    else:
+        await message.reply(Misc.MSG_ERROR_API)
     await state.clear()
 
 
@@ -1602,11 +1658,14 @@ async def process_message_to_send(message: Message, state: FSMContext):
     msg_delivered = msg_saved
     success = False
     data = await state.get_data()
+    if not (data.get('uuid_pack') and data.get('profile_to') and data.get('profile_from')):
+        await reply_and_clear_state(message, state)
+        return
     key = (
         f'{Rcache.SEND_MESSAGE_PREFIX}{Rcache.KEY_SEP}'
         f'{data["uuid_pack"]}'
     )
-    if not await Misc.check_none_n_clear(is_first := Misc.redis_is_key_first_up(key), state):
+    if not await check_pack_state_or_reply(is_first := Misc.redis_is_key_first_up(key), message, state):
         return
     profile_to = data['profile_to']; profile_from = data['profile_from']
 
@@ -1655,15 +1714,15 @@ async def process_message_to_send(message: Message, state: FSMContext):
             method='post',
             json=payload_send_message,
         )
-    except:
-        await state.clear()
+    except Exception:
+        await reply_and_clear_state(message, state, Misc.MSG_ERROR_API)
         return
 
-    if not await Misc.check_none_n_clear(Misc.redis_save_time(key), state):
+    if not await check_pack_state_or_reply(Misc.redis_save_time(key), message, state):
         return
     if not is_first:
         return
-    if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
+    if not await check_pack_state_or_reply(await Misc.redis_wait_last_in_pack(key), message, state):
         return
 
     if tg_user_to_tg_data:
@@ -1774,15 +1833,17 @@ async def do_get_user_desc(message: Message, state: FSMContext):
         return failed
     data = await state.get_data()
     if not (data.get('uuid') and data.get('uuid_pack')):
+        await reply_and_clear_state(message, state)
         return failed
     status, profile = await Misc.post_tg_user(message.from_user)
-    if status != 200 or profile['uuid'] != data['uuid']:
+    if status != 200 or profile.get('uuid') != data['uuid']:
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
         return failed
     key = (
         f'{Rcache.USER_DESC_PREFIX}{Rcache.KEY_SEP}'
         f'{data["uuid_pack"]}'
     )
-    if not await Misc.check_none_n_clear(is_first := Misc.redis_is_key_first_up(key), state):
+    if not await check_pack_state_or_reply(is_first := Misc.redis_is_key_first_up(key), message, state):
         return failed
     status, response = await Misc.put_user_properties(
         form_data=False,
@@ -1790,7 +1851,10 @@ async def do_get_user_desc(message: Message, state: FSMContext):
         is_first=is_first,
         tgdesc=TgDesc.from_message(message, data['uuid_pack'])
     )
-    if status != 200 or not await Misc.check_none_n_clear(Misc.redis_save_time(key), state):
+    if status != 200:
+        await reply_and_clear_state(message, state, Misc.MSG_ERROR_API)
+        return failed
+    if not await check_pack_state_or_reply(Misc.redis_save_time(key), message, state):
         return failed
     return status, response, is_first
 
@@ -1807,7 +1871,7 @@ async def process_get_user_desc(message: Message, state: FSMContext):
                 f'{Rcache.USER_DESC_PREFIX}{Rcache.KEY_SEP}'
                 f'{data["uuid_pack"]}'
             )
-            if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
+            if not await check_pack_state_or_reply(await Misc.redis_wait_last_in_pack(key), message, state):
                 return
             await message.reply('Описание сохранено')
             if data.get('card_type') == Misc.CARD_TYPE_MEET:
@@ -1861,6 +1925,10 @@ async def process_message_banking(message: Message, state: FSMContext):
     status, response = await put_banking(message, state)
     if status == 200:
         await message.reply('Реквизиты платежей записаны')
+    elif status == 400 and response and response.get('message'):
+        await message.reply(f'Ошибка!\n{response["message"]}')
+    else:
+        await message.reply(Misc.MSG_ERROR_API)
     await state.clear()
 
 
@@ -1869,16 +1937,20 @@ async def process_message_thank_ask_money(message: Message, state: FSMContext):
     if await is_it_command(message, state):
         return
     data = await state.get_data()
-    if not (profile_to := data.get('profile_to')) or not (journal_id := data.get('journal_id')):
-        await state.clear(); return
+    profile_to = data.get('profile_to')
+    journal_id = data.get('journal_id')
+    if not (profile_to and journal_id and data.get('uuid_pack')):
+        await reply_and_clear_state(message, state)
+        return
     status_from, profile_from = await Misc.post_tg_user(message.from_user)
-    if status_from != 200 or profile_from['uuid'] != data.get('profile_from', {}).get('uuid', ''):
-        await state.clear(); return
+    if status_from != 200 or profile_from.get('uuid') != data.get('profile_from', {}).get('uuid', ''):
+        await reply_and_clear_state(message, state, Misc.MSG_CALLBACK_AUTH)
+        return
     key = (
         f'{Rcache.ASK_MONEY_PREFIX}{Rcache.KEY_SEP}'
         f'{data["uuid_pack"]}'
     )
-    if not await Misc.check_none_n_clear(is_first := Misc.redis_is_key_first_up(key), state):
+    if not await check_pack_state_or_reply(is_first := Misc.redis_is_key_first_up(key), message, state):
         return
     tgdesc_payload  = dict(
         tg_token=settings.TOKEN,
@@ -1897,7 +1969,7 @@ async def process_message_thank_ask_money(message: Message, state: FSMContext):
     if status == 200:
         if not is_first:
             return
-        if not await Misc.check_none_n_clear(await Misc.redis_wait_last_in_pack(key), state):
+        if not await check_pack_state_or_reply(await Misc.redis_wait_last_in_pack(key), message, state):
             return
         payload_send_pack = dict(
             tg_token=settings.TOKEN,
@@ -1915,6 +1987,8 @@ async def process_message_thank_ask_money(message: Message, state: FSMContext):
             'Сообщение передано получателю благодарности' if status_send_pack == 200 else \
             'Получатель не принял сообщение'
         )
+    else:
+        await message.reply(Misc.MSG_ERROR_API)
     await state.clear()
 
 
