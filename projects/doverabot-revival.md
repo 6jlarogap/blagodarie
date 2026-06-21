@@ -14,6 +14,8 @@ Runtime concierge chain: [../references/2026-06-18-doverabot-rental-runtime-conc
 
 Business process and topology plan: [../references/2026-06-20-doverabot-equipment-rental-trust-flow-plan.md](../references/2026-06-20-doverabot-equipment-rental-trust-flow-plan.md)
 
+Callback hardening chain: [../references/2026-06-21-doverabot-rental-callback-payload-feedback-chain.md](../references/2026-06-21-doverabot-rental-callback-payload-feedback-chain.md)
+
 Current decision:
 
 - Keep one public Doverabot identity with modular feature flows: `/rent`, `/offer`, `/meet`, `rod`, `/trust`, and `/thank`.
@@ -29,6 +31,8 @@ Current implementation:
 - The implementation keeps `/offer` and `/offer_multi` on the existing poll flow.
 - Rental reservation runtime now has owner/consumer bot callbacks for accept, payment reported, confirm, and cancel, with audited backend events.
 - The rental trust-flow business process is documented as a docs-only reference on 2026-06-20.
+- Durable Redis-backed FSM storage, explicit Organizm/Hermes STT handoff helpers, and deployed rental map marker forwarding were completed on 2026-06-21.
+- Rental booking/contact/reservation callbacks now have centralized payload parsing and user-visible stale/auth failure feedback.
 
 Primary implementation areas:
 
@@ -41,8 +45,7 @@ Primary implementation areas:
 
 ## Doverabot Backlog Captured
 
-- Move active FSM storage away from `MemoryStorage` before relying on long rental flows.
-- Centralize callback payload parsing.
+- Centralize remaining non-rental callback payload parsing.
 - Add handler tests around offers, callbacks, media packs, and command interruption.
 - Fix duplicate callback function names and known bug backlog from the interaction map.
 - Replace hard-coded bot links with `bot_data.username`.
@@ -50,9 +53,9 @@ Primary implementation areas:
 
 ## Next Implementation Slice
 
-Harden the rental flow before broad rollout: replace `MemoryStorage`, verify the real Organizm/Hermes transcript handoff, broaden aiogram handler tests, and decide whether deployed map UI needs a frontend change for rental markers.
+Continue bot hardening outside the rental callback path: clean up duplicate legacy callback handler names, centralize the older mixed callback payload parsing helpers, and expand user-visible feedback for unauthorized or expired non-rental callbacks.
 
-Suggested `/new-go-slug`: `doverabot-rental-durable-fsm-hermes-map-marker-tests`.
+Suggested `/new-go-slug`: `doverabot-legacy-callback-cleanup-feedback`.
 
 Accepted prior-session decisions:
 

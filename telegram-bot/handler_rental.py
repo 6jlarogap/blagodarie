@@ -57,6 +57,15 @@ class Rental(object):
     ACTION_PAYMENT_REPORTED = 'payment_reported'
     ACTION_OWNER_CONFIRM = 'owner_confirm'
     ACTION_CANCEL = 'cancel'
+    ACTIONS_RESERVATION = {
+        ACTION_OWNER_ACCEPT,
+        ACTION_PAYMENT_REPORTED,
+        ACTION_OWNER_CONFIRM,
+        ACTION_CANCEL,
+    }
+
+    MSG_CALLBACK_STALE = 'Эта кнопка устарела. Откройте прокат заново через /rent_search или /rent.'
+    MSG_CALLBACK_AUTH = 'Не удалось проверить ваш профиль. Откройте бота командой /start и попробуйте еще раз.'
 
     STATUS_LABELS = {
         'sent': 'заявка отправлена',
@@ -489,6 +498,29 @@ class Rental(object):
             KeyboardType.SEP,
             reservation_id,
         )
+
+    @classmethod
+    def parse_offer_callback_data(cls, callback, keyboard_type):
+        parts = (callback.data or '').split(KeyboardType.SEP)
+        if len(parts) != 2 or parts[0] != str(keyboard_type) or not parts[1]:
+            return ''
+        return parts[1]
+
+    @classmethod
+    def parse_reservation_action_callback_data(cls, callback):
+        parts = (callback.data or '').split(KeyboardType.SEP)
+        if (
+            len(parts) != 3 or
+            parts[0] != str(KeyboardType.RENTAL_RESERVATION_ACTION) or
+            parts[1] not in cls.ACTIONS_RESERVATION or
+            not parts[2].isdigit()
+        ):
+            return '', ''
+        return parts[1], parts[2]
+
+    @classmethod
+    async def answer_callback_notice(cls, callback, text):
+        await callback.answer(text, show_alert=True)
 
     @classmethod
     def markup_reservation_consumer(cls, reservation):
@@ -947,14 +979,13 @@ async def process_rental_search(message: Message, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_rental_book(callback: CallbackQuery, state: FSMContext):
-    try:
-        offer_uuid = callback.data.split(KeyboardType.SEP)[1]
-    except (IndexError, ValueError):
-        await callback.answer()
+    offer_uuid = Rental.parse_offer_callback_data(callback, KeyboardType.RENTAL_BOOK)
+    if not offer_uuid:
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_STALE)
         return
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
     if status_from != 200:
-        await callback.answer()
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_AUTH)
         return
     status_reserve, response_reserve = await Rental.reserve(
         offer_uuid,
@@ -1001,15 +1032,13 @@ async def cbq_rental_book(callback: CallbackQuery, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_rental_reservation_action(callback: CallbackQuery, state: FSMContext):
-    parts = (callback.data or '').split(KeyboardType.SEP)
-    if len(parts) != 3:
-        await callback.answer()
+    action, reservation_id = Rental.parse_reservation_action_callback_data(callback)
+    if not action:
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_STALE)
         return
-    action = parts[1]
-    reservation_id = parts[2]
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
     if status_from != 200:
-        await callback.answer()
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_AUTH)
         return
     if action == Rental.ACTION_PAYMENT_REPORTED:
         await state.set_state(FSMRentalPaymentProof.ask)
@@ -1121,10 +1150,9 @@ async def process_rental_payment_proof(message: Message, state: FSMContext):
         KeyboardType.SEP,
     )), StateFilter(None))
 async def cbq_rental_contact(callback: CallbackQuery, state: FSMContext):
-    try:
-        offer_uuid = callback.data.split(KeyboardType.SEP)[1]
-    except (IndexError, ValueError):
-        await callback.answer()
+    offer_uuid = Rental.parse_offer_callback_data(callback, KeyboardType.RENTAL_CONTACT)
+    if not offer_uuid:
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_STALE)
         return
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
     if status_from == 200:
@@ -1137,7 +1165,9 @@ async def cbq_rental_contact(callback: CallbackQuery, state: FSMContext):
             'Напишите сообщение владельцу объявления.',
             reply_markup=Misc.reply_markup_cancel_row(),
         )
-    await callback.answer()
+        await callback.answer()
+    else:
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_AUTH)
 
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMRentalContact.ask))

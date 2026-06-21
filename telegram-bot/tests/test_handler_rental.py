@@ -382,9 +382,13 @@ class FakeCallback:
         self.from_user = types.SimpleNamespace(id=1001, username='requester')
         self.message = FakeMessage()
         self.answered = False
+        self.answer_text = None
+        self.answer_show_alert = False
 
-    async def answer(self):
+    async def answer(self, text=None, show_alert=False):
         self.answered = True
+        self.answer_text = text
+        self.answer_show_alert = show_alert
 
 
 class FakeBot:
@@ -468,6 +472,64 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(state.data['uuid_pack'])
         self.assertTrue(callback.answered)
         self.assertIn('подтверждение оплаты', callback.message.replies[0].text)
+
+    async def test_stale_reservation_callback_shows_notice_and_skips_state(self):
+        state = FakeState()
+        callback = FakeCallback('83~payment_reported~not-a-number')
+
+        await self.handler_rental.cbq_rental_reservation_action(callback, state)
+
+        self.assertIsNone(state.state)
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_unknown_reservation_action_shows_notice(self):
+        state = FakeState()
+        callback = FakeCallback('83~archive~44')
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'reservation_action',
+            mock.AsyncMock(),
+        ) as reservation_action:
+            await self.handler_rental.cbq_rental_reservation_action(callback, state)
+
+        reservation_action.assert_not_awaited()
+        self.assertTrue(callback.answered)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_stale_booking_callback_shows_notice_and_skips_api(self):
+        callback = FakeCallback('82~')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'reserve',
+            mock.AsyncMock(),
+        ) as reserve:
+            await self.handler_rental.cbq_rental_book(callback, state)
+
+        reserve.assert_not_awaited()
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('кнопка устарела', callback.answer_text.lower())
+
+    async def test_contact_callback_auth_failure_shows_notice(self):
+        callback = FakeCallback('81~offer-uuid')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(500, {})),
+        ):
+            await self.handler_rental.cbq_rental_contact(callback, state)
+
+        self.assertIsNone(state.state)
+        self.assertTrue(callback.answered)
+        self.assertTrue(callback.answer_show_alert)
+        self.assertIn('профиль', callback.answer_text.lower())
 
     async def test_booking_reports_owner_notification_failure(self):
         callback = FakeCallback('82~offer-uuid')
