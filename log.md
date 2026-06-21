@@ -2,6 +2,13 @@
 
 ## 2026-06-21
 
+- Source-implemented `doverabot-rental-voice-listing-clarifications`: rental
+  offer voice/text slot extraction now parses dates/availability, accumulates
+  partial listing fields in FSM state, prompts for missing item/place/dates/price
+  before API creation, and keeps the complete one-message path compatible;
+  mocked bot discovery and Django check passed. Runtime deploy remains blocked
+  by the active wrapper/untracked-helper issue recorded for
+  `doverabot-rental-proof-dispute-controls`.
 - Source-implemented `doverabot-rental-hold-duration-config`: replaced the
   rental reservation hold constant with `RENTAL_RESERVATION_HOLD_SECONDS`
   defaulting to 600 seconds, exposed `reservation.hold_seconds` in API

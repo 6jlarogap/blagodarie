@@ -50,6 +50,12 @@ class Rental(object):
         'Опишите, что сдаёте в прокат: предмет, где забрать, когда доступно, '
         'цена и важные условия. Можно прислать текст, фото с подписью, видео, документ или голосовое.'
     )
+    OFFER_MISSING_LABELS = {
+        'item': 'что сдаете',
+        'place': 'где забрать или координаты',
+        'availability': 'когда доступно',
+        'price': 'цена или условия оплаты',
+    }
     PROMPT_SEARCH = 'Что ищем в прокат? Укажите предмет, место или даты одним сообщением.'
     PROMPT_SEARCH_CONTEXT = 'Где или на какие даты искать? Можно ответить голосом.'
 
@@ -233,15 +239,68 @@ class Rental(object):
         if m := re.search(r'(?:адрес|где|место)\s*[:\-]\s*([^\n]+)', text, flags=re.I):
             address = m.group(1).strip()
         latitude, longitude = Misc.check_location_str(text)
+        date_values = [
+            cls.parse_search_date(value)
+            for value in re.findall(r'\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4})\b', text)
+        ]
+        date_values = [value for value in date_values if value]
+        availability_text = ''
+        if m := re.search(r'(?:даты|доступн\w*|когда|сроки)\s*[:\-]\s*([^\n]+)', text, flags=re.I):
+            availability_text = m.group(1).strip()
+        elif date_values:
+            availability_text = ' - '.join(date_values)
         return dict(
             title=title,
             item_text=title,
             description_text=text,
             price_text=price_text,
+            availability_text=availability_text,
+            available_from=date_values[0] if date_values else '',
+            available_to=date_values[-1] if len(date_values) > 1 else '',
             address=address,
             latitude=latitude,
             longitude=longitude,
         )
+
+    @classmethod
+    def merge_offer_slots(cls, current, new):
+        merged = dict(current or {})
+        for key, value in (new or {}).items():
+            if value in (None, ''):
+                continue
+            if key in ('title', 'item_text') and merged.get(key):
+                continue
+            if key == 'description_text' and merged.get(key):
+                if value not in merged[key]:
+                    merged[key] = '%s\n%s' % (merged[key], value)
+                continue
+            merged[key] = value
+        return merged
+
+    @classmethod
+    def offer_missing_fields(cls, slots):
+        missing = []
+        if not (slots.get('title') or slots.get('item_text')):
+            missing.append('item')
+        if not (
+                slots.get('address') or
+                (slots.get('latitude') is not None and slots.get('longitude') is not None)
+        ):
+            missing.append('place')
+        if not (slots.get('availability_text') or slots.get('available_from') or slots.get('available_to')):
+            missing.append('availability')
+        if not (slots.get('price_text') or slots.get('price_amount')):
+            missing.append('price')
+        return missing
+
+    @classmethod
+    def offer_missing_prompt(cls, missing):
+        labels = [
+            cls.OFFER_MISSING_LABELS[item]
+            for item in missing
+            if item in cls.OFFER_MISSING_LABELS
+        ]
+        return 'Уточните: %s.' % '; '.join(labels)
 
     @classmethod
     def parse_search_date(cls, raw):
@@ -1240,11 +1299,19 @@ async def process_rental_offer(message: Message, state: FSMContext):
         await state.clear()
         return
     if message.content_type == ContentType.LOCATION and message.location:
+        slots = Rental.merge_offer_slots(data.get('rental_slots') or {}, dict(
+            latitude=message.location.latitude,
+            longitude=message.location.longitude,
+        ))
+        missing = Rental.offer_missing_fields(slots)
         await state.update_data(
             latitude=message.location.latitude,
             longitude=message.location.longitude,
+            rental_slots=slots,
         )
         await message.reply(
+            Rental.offer_missing_prompt(missing)
+            if missing else
             'Локация сохранена. Теперь пришлите описание предмета, сроков и цены.',
             reply_markup=Misc.reply_markup_cancel_row(),
         )
@@ -1259,10 +1326,21 @@ async def process_rental_offer(message: Message, state: FSMContext):
     ):
         await message.reply(Rental.PROMPT_OFFER, reply_markup=Misc.reply_markup_cancel_row())
         return
-    slots = Rental.extract_slots(text)
+    slots = Rental.merge_offer_slots(
+        data.get('rental_slots') or {},
+        Rental.extract_slots(text),
+    )
     for key in ('latitude', 'longitude'):
         if slots.get(key) is None and data.get(key) is not None:
             slots[key] = data[key]
+    missing = Rental.offer_missing_fields(slots)
+    if missing:
+        await state.update_data(rental_slots=slots)
+        await message.reply(
+            Rental.offer_missing_prompt(missing),
+            reply_markup=Misc.reply_markup_cancel_row(),
+        )
+        return
     payload = dict(
         user_uuid=profile_from['uuid'],
         visibility='authenticated',

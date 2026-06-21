@@ -41,6 +41,86 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             'палатка',
         )
 
+    async def test_voice_listing_slots_extract_core_fields(self):
+        slots = self.handler_rental.Rental.extract_slots(
+            'Палатка MSR Hubba\n'
+            'место: ВДНХ\n'
+            'даты: 2026-07-01 2026-07-03\n'
+            'цена: 500 руб/день'
+        )
+
+        self.assertEqual(slots['title'], 'Палатка MSR Hubba')
+        self.assertEqual(slots['address'], 'ВДНХ')
+        self.assertEqual(slots['available_from'], '2026-07-01')
+        self.assertEqual(slots['available_to'], '2026-07-03')
+        self.assertIn('500 руб/день', slots['price_text'])
+
+    async def test_process_rental_offer_prompts_for_missing_core_fields(self):
+        message = FakeMessage(text='Палатка MSR Hubba')
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+        })
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'create_offer',
+            mock.AsyncMock(),
+        ) as create_offer:
+            await self.handler_rental.process_rental_offer(message, state)
+
+        create_offer.assert_not_awaited()
+        self.assertIn('Уточните', message.replies[-1].text)
+        self.assertIn('где забрать', message.replies[-1].text)
+        self.assertIn('когда доступно', message.replies[-1].text)
+        self.assertIn('цена', message.replies[-1].text)
+        self.assertEqual(state.data['rental_slots']['title'], 'Палатка MSR Hubba')
+
+    async def test_process_rental_offer_collects_followup_and_sends_final_payload(self):
+        message = FakeMessage(text='место: ВДНХ\nдаты: 2026-07-01 2026-07-03\nцена: 500 руб/день')
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+            'rental_slots': {
+                'title': 'Палатка MSR Hubba',
+                'item_text': 'Палатка MSR Hubba',
+                'description_text': 'Палатка MSR Hubba',
+            },
+        })
+        response = {
+            'offer': {
+                'uuid': 'offer-uuid',
+                'title': 'Палатка MSR Hubba',
+                'description_text': 'Палатка MSR Hubba',
+                'owner': {'uuid': 'requester-uuid'},
+            },
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'create_offer',
+            mock.AsyncMock(return_value=(200, response)),
+        ) as create_offer, mock.patch.object(
+            self.handler_rental.Rental,
+            'register_message',
+            mock.AsyncMock(return_value=(200, {})),
+        ), mock.patch.object(
+            self.handler_rental.Rental,
+            'show_offer',
+            mock.AsyncMock(),
+        ):
+            await self.handler_rental.process_rental_offer(message, state)
+
+        payload = create_offer.await_args.args[0]
+        self.assertEqual(payload['title'], 'Палатка MSR Hubba')
+        self.assertEqual(payload['address'], 'ВДНХ')
+        self.assertEqual(payload['available_from'], '2026-07-01')
+        self.assertEqual(payload['available_to'], '2026-07-03')
+        self.assertIn('500 руб/день', payload['price_text'])
+        self.assertEqual(payload['tgdesc']['uuid_pack'], 'offer-pack')
+        self.assertTrue(state.cleared)
+        self.assertEqual(message.replies[-1].text, 'Объявление проката сохранено')
+
     async def test_markup_offer_includes_show_on_map_link(self):
         markup = self.handler_rental.Rental.markup_offer(
             {'uuid': 'viewer-uuid'},
@@ -318,6 +398,28 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             await self.handler_rental.process_rental_search(message, state)
 
         message_or_voice_text.assert_not_awaited()
+
+    async def test_process_rental_offer_stops_on_command_interrupt(self):
+        message = FakeMessage(text='/rent')
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+        })
+
+        with mock.patch.object(self.handler_rental, 'is_it_command', mock.AsyncMock(return_value=True)), \
+             mock.patch.object(
+                 self.handler_rental.Rental,
+                 'message_or_voice_text',
+                 mock.AsyncMock(return_value='палатка'),
+             ) as message_or_voice_text, mock.patch.object(
+                 self.handler_rental.Rental,
+                 'create_offer',
+                 mock.AsyncMock(),
+             ) as create_offer:
+            await self.handler_rental.process_rental_offer(message, state)
+
+        message_or_voice_text.assert_not_awaited()
+        create_offer.assert_not_awaited()
 
     async def test_inline_rental_search_smoke_uses_date_params_and_reports_empty(self):
         message = FakeMessage(text='/rent_search tent 2026-07-01 москва')
