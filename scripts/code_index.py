@@ -35,6 +35,7 @@ EXCLUDED_DIR_NAMES = {
     "build",
     "dist",
     "ENV",
+    "graphify-out",
     "media",
     "migrations",
     "node_modules",
