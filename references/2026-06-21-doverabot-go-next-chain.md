@@ -1,13 +1,13 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-4 implemented; remaining slices planned
+Status: slices 1-5 implemented; remaining slices planned
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-handler-test-harness-split-chain.md](2026-06-21-doverabot-handler-test-harness-split-chain.md)
+Current completed chain: [2026-06-21-doverabot-rental-v1-smoke-observability-chain.md](2026-06-21-doverabot-rental-v1-smoke-observability-chain.md)
 
-Active next slice: Slice 5, Rental V1 Smoke Observability
-Active next `/new-go-slug`: `doverabot-rental-v1-smoke-observability`
-After active slice, print next `/new-go-slug`: `doverabot-next-decision-refresh`
+Active next slice: Slice 6, Next Decision Refresh
+Active next `/new-go-slug`: `doverabot-next-decision-refresh`
+After active slice, print next `/new-go-slug`: to be chosen during refresh
 
 ## Chain Purpose
 
@@ -138,6 +138,9 @@ Print after completion, suggested next `/new-go-slug`:
 ## Slice 5: Rental V1 Smoke Observability
 
 Suggested `/new-go-slug`: `doverabot-rental-v1-smoke-observability`
+
+Status: implemented; runtime deploy not required in
+[2026-06-21-doverabot-rental-v1-smoke-observability-chain.md](2026-06-21-doverabot-rental-v1-smoke-observability-chain.md).
 
 Scope:
 

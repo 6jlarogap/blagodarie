@@ -73,6 +73,26 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         message_or_voice_text.assert_not_awaited()
 
+    async def test_inline_rental_search_smoke_uses_date_params_and_reports_empty(self):
+        message = FakeMessage(text='/rent_search tent 2026-07-01 москва')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'search_with_params',
+            mock.AsyncMock(return_value=(200, {'offers': []})),
+        ) as search_with_params:
+            await self.handler_rental.Rental.cmd_rent_search(message, state)
+
+        search_with_params.assert_awaited_once_with(
+            'tent 2026-07-01 москва',
+            'requester-uuid',
+            date_from='2026-07-01',
+            date_to='',
+        )
+        self.assertTrue(state.cleared)
+        self.assertEqual(message.replies[-1].text, 'Ничего не найдено')
+
     async def test_payment_reported_callback_enters_payment_proof_state(self):
         state = FakeState()
         callback = FakeCallback('83~payment_reported~44')
@@ -172,6 +192,92 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(callback.answered)
         self.assertTrue(any('владельцу не удалось' in reply.text for reply in callback.message.replies))
+
+    async def test_booking_success_registers_prompt_and_notifies_owner(self):
+        callback = FakeCallback('82~offer-uuid')
+        state = FakeState()
+        self.handler_rental.bot = FakeBot()
+        response = {
+            'reservation': {
+                'id': 11,
+                'sequence_number': 1,
+                'status': 'awaiting_payment',
+                'recipient_kind': 'owner',
+                'hold_seconds_remaining': 600,
+                'recipient_payment_info_snapshot': 'owner bank',
+            },
+            'offer': {'uuid': 'offer-uuid', 'title': 'Travel tent'},
+            'owner': {'tg_data': [{'tg_uid': 3003}], 'username': 'owner'},
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'reserve',
+            mock.AsyncMock(return_value=(200, response)),
+        ), mock.patch.object(
+            self.handler_rental.Rental,
+            'register_message',
+            mock.AsyncMock(return_value=(200, {})),
+        ) as register_message:
+            await self.handler_rental.cbq_rental_book(callback, state)
+
+        self.assertTrue(callback.answered)
+        self.assertIn('Заявка на бронь №1 создана', callback.message.replies[0].text)
+        register_message.assert_awaited_once_with(
+            'offer-uuid',
+            'booking_prompt',
+            callback.message.chat.id,
+            callback.message.replies[0].message_id,
+            recipient_uuid='requester-uuid',
+        )
+        self.assertEqual(len(self.handler_rental.bot.sent_messages), 1)
+        self.assertEqual(self.handler_rental.bot.sent_messages[0][0], 3003)
+        self.assertIn('Заявка на бронь №1', self.handler_rental.bot.sent_messages[0][1])
+
+    async def test_payment_proof_success_forwards_pack_notifies_owner_and_clears_state(self):
+        message = FakeMessage(text='paid')
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'reservation_id': '44',
+            'uuid_pack': 'proof-pack',
+        })
+        self.handler_rental.bot = FakeBot()
+        response = {
+            'reservation': {
+                'id': 44,
+                'sequence_number': 2,
+                'status': 'payment_proof_submitted',
+                'recipient_kind': 'owner',
+            },
+            'offer': {'uuid': 'offer-uuid', 'title': 'Travel tent'},
+            'owner': {'tg_data': [{'tg_uid': 3003}], 'username': 'owner'},
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'payment_proof',
+            mock.AsyncMock(return_value=(200, response)),
+        ) as payment_proof, mock.patch.object(
+            self.handler_rental.Misc,
+            'api_request',
+            mock.AsyncMock(return_value=(200, {})),
+            create=True,
+        ) as api_request:
+            await self.handler_rental.process_rental_payment_proof(message, state)
+
+        payment_proof.assert_awaited_once_with(
+            '44',
+            {'uuid': 'requester-uuid', 'first_name': 'Requester'},
+            message,
+            'proof-pack',
+        )
+        api_request.assert_awaited_once()
+        self.assertEqual(api_request.await_args.kwargs['path'], '/api/show_tgmsg_pack')
+        self.assertEqual(api_request.await_args.kwargs['json']['uuid_pack'], 'proof-pack')
+        self.assertTrue(state.cleared)
+        self.assertEqual(len(self.handler_rental.bot.sent_messages), 1)
+        self.assertIn('Получено подтверждение оплаты', self.handler_rental.bot.sent_messages[0][1])
+        self.assertIn('Подтверждение получено', message.replies[-1].text)
 
 if __name__ == '__main__':
     unittest.main()

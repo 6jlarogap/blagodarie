@@ -351,6 +351,10 @@ def install_dependency_stubs(stub_common=True):
                 return InlineKeyboardMarkupStub(inline_keyboard=[])
 
             @staticmethod
+            def check_location_str(_text):
+                return None, None
+
+            @staticmethod
             async def post_tg_user(_user):
                 return 200, {'uuid': 'requester-uuid', 'first_name': 'Requester'}
 

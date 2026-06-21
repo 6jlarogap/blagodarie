@@ -30,6 +30,8 @@ Runtime deeplink consistency chain: [../references/2026-06-21-doverabot-runtime-
 
 Handler test harness split chain: [../references/2026-06-21-doverabot-handler-test-harness-split-chain.md](../references/2026-06-21-doverabot-handler-test-harness-split-chain.md)
 
+Rental V1 smoke observability chain: [../references/2026-06-21-doverabot-rental-v1-smoke-observability-chain.md](../references/2026-06-21-doverabot-rental-v1-smoke-observability-chain.md)
+
 Go-next chain: [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md)
 
 Current decision:
@@ -62,6 +64,10 @@ Current implementation:
   deep-link payloads and runtime bot usernames.
 - The mocked Telegram bot tests now share one harness module and are split by
   handler domain while preserving the existing 68-test discovery surface.
+- Rental V1 now has source-level smoke coverage for search, booking callback
+  registration/owner notification, and payment-proof pack forwarding, plus
+  repeatable public curl checks for rental search, map exposure, and offer
+  lookup.
 
 Primary implementation areas:
 
@@ -85,10 +91,10 @@ Primary implementation areas:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-rental-v1-smoke-observability`.
+Active next `/new-go-slug`: `doverabot-next-decision-refresh`.
 
 After that slice, print next `/new-go-slug`:
-`doverabot-next-decision-refresh`.
+to be chosen during the refresh.
 
 After that, keep each completed chain pointing to the next slug in the go-next chain.
 
