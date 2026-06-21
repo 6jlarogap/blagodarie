@@ -1501,6 +1501,7 @@ class RentalOffer(BaseModelInsertUpdateTimestamp, GeoPointAddressModel):
     availability_text = models.TextField(verbose_name=_("Доступность"), blank=True, default='')
     available_from = models.DateField(_("Доступно с"), null=True, blank=True, db_index=True)
     available_to = models.DateField(_("Доступно до"), null=True, blank=True, db_index=True)
+    quantity_total = models.PositiveIntegerField(_("Количество одинаковых предметов"), default=1)
     visibility = models.CharField(
         _("Видимость"),
         max_length=20,
@@ -1596,6 +1597,7 @@ class RentalOffer(BaseModelInsertUpdateTimestamp, GeoPointAddressModel):
             availability_text=self.availability_text,
             available_from=self.available_from.isoformat() if self.available_from else '',
             available_to=self.available_to.isoformat() if self.available_to else '',
+            quantity_total=self.quantity_total,
             visibility=self.visibility,
             latitude=self.latitude,
             longitude=self.longitude,

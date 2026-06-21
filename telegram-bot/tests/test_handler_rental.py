@@ -47,7 +47,8 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             'Палатка MSR Hubba\n'
             'место: ВДНХ\n'
             'даты: 2026-07-01 2026-07-03\n'
-            'цена: 500 руб/день'
+            'цена: 500 руб/день\n'
+            'количество: 3'
         )
 
         self.assertEqual(slots['title'], 'Палатка MSR Hubba')
@@ -55,6 +56,7 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(slots['available_from'], '2026-07-01')
         self.assertEqual(slots['available_to'], '2026-07-03')
         self.assertIn('500 руб/день', slots['price_text'])
+        self.assertEqual(slots['quantity_total'], '3')
 
     async def test_process_rental_offer_prompts_for_missing_core_fields(self):
         message = FakeMessage(text='Палатка MSR Hubba')
@@ -78,7 +80,7 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state.data['rental_slots']['title'], 'Палатка MSR Hubba')
 
     async def test_process_rental_offer_collects_followup_and_sends_final_payload(self):
-        message = FakeMessage(text='место: ВДНХ\nдаты: 2026-07-01 2026-07-03\nцена: 500 руб/день')
+        message = FakeMessage(text='место: ВДНХ\nдаты: 2026-07-01 2026-07-03\nцена: 500 руб/день\nколичество: 3')
         state = FakeState({
             'user_uuid': 'requester-uuid',
             'uuid_pack': 'offer-pack',
@@ -118,9 +120,22 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload['available_from'], '2026-07-01')
         self.assertEqual(payload['available_to'], '2026-07-03')
         self.assertIn('500 руб/день', payload['price_text'])
+        self.assertEqual(payload['quantity_total'], '3')
         self.assertEqual(payload['tgdesc']['uuid_pack'], 'offer-pack')
         self.assertTrue(state.cleared)
         self.assertEqual(message.replies[-1].text, 'Объявление проката сохранено')
+
+    async def test_offer_and_owner_text_include_quantity_when_multiple(self):
+        offer = {
+            'uuid': 'offer-uuid',
+            'title': 'Палатка MSR Hubba',
+            'description_text': 'Три одинаковые палатки',
+            'quantity_total': 3,
+            'owner': {'uuid': 'owner-uuid', 'first_name': 'Owner'},
+        }
+
+        self.assertIn('Количество: 3', self.handler_rental.Rental.text_offer(offer))
+        self.assertIn('Количество: 3', self.handler_rental.Rental.text_owner_offer(offer))
 
     async def test_markup_offer_includes_show_on_map_link(self):
         markup = self.handler_rental.Rental.markup_offer(

@@ -100,6 +100,8 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(offer.owner, self.owner)
         self.assertEqual(offer.title, 'Tent 2 places')
         self.assertEqual(offer.latitude, 55.75)
+        self.assertEqual(offer.quantity_total, 1)
+        self.assertEqual(response.data['offer']['quantity_total'], 1)
         self.assertEqual(response.data['offer']['price_text'], '500 руб/день')
 
     @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
@@ -142,6 +144,26 @@ class ApiRentalOfferTests(TestCase):
             [offer['title'] for offer in response.data['offers']],
             ['Paused tent'],
         )
+
+        response = self.client.put('/api/rental/offer/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.owner_profile.uuid),
+            'offer_uuid': str(active_offer.uuid),
+            'quantity_total': 3,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        active_offer.refresh_from_db()
+        self.assertEqual(active_offer.quantity_total, 3)
+        self.assertEqual(response.data['offer']['quantity_total'], 3)
+
+        response = self.client.put('/api/rental/offer/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.owner_profile.uuid),
+            'offer_uuid': str(active_offer.uuid),
+            'quantity_total': 0,
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Неверный параметр quantity_total')
 
         response = self.client.get('/api/rental/offer/', data={
             'owner_uuid': str(self.owner_profile.uuid),
@@ -519,6 +541,48 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(response.status_code, 200)
         first_reservation.refresh_from_db()
         self.assertEqual(first_reservation.status, RentalReservationIntent.STATUS_EXPIRED)
+        self.assertEqual(RentalReservationIntent.objects.count(), 2)
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    def test_quantity_capacity_allows_overlaps_up_to_listing_quantity(self):
+        other = User.objects.create_user(username='other', first_name='Other')
+        other_profile = Profile.objects.create(user=other)
+        third = User.objects.create_user(username='third', first_name='Third')
+        third_profile = Profile.objects.create(user=third)
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Two tents',
+            description_text='Две одинаковые палатки',
+            quantity_total=2,
+        )
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.requester_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-01',
+            'date_to': '2026-07-03',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(other_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-02',
+            'date_to': '2026-07-04',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post('/api/rental/reservation/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(third_profile.uuid),
+            'offer_uuid': str(offer.uuid),
+            'date_from': '2026-07-02',
+            'date_to': '2026-07-04',
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'На эти даты уже есть активная бронь')
         self.assertEqual(RentalReservationIntent.objects.count(), 2)
 
     @override_settings(

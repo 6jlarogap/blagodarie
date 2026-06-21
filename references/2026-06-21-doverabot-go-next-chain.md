@@ -1,12 +1,12 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-14 source-implemented; runtime deploy blocked since slice 10; slices 15-17 planned; rental inventory quantity groundwork active
+Status: slices 1-15 source-implemented; runtime deploy blocked since slice 10; slices 16-17 planned; rental geocoding contract active
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
-Current completed chain: [2026-06-21-doverabot-rental-map-query-link-polish-chain.md](2026-06-21-doverabot-rental-map-query-link-polish-chain.md)
+Current completed chain: [2026-06-21-doverabot-rental-inventory-quantity-groundwork-chain.md](2026-06-21-doverabot-rental-inventory-quantity-groundwork-chain.md)
 
-Active next slice: Rental Inventory Quantity Groundwork
-Active next `/new-go-slug`: `doverabot-rental-inventory-quantity-groundwork`
+Active next slice: Rental Geocoding Contract
+Active next `/new-go-slug`: `doverabot-rental-geocoding-contract`
 After active slice, advance to the next planned slice and print its
 `/new-go-slug`; do not run another decision refresh until this saved sequence is
 exhausted or new production facts invalidate it.
@@ -417,7 +417,8 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-inventory-quantity-groundwork`
 
-Status: planned
+Status: source implemented; runtime deploy blocked in
+[2026-06-21-doverabot-rental-inventory-quantity-groundwork-chain.md](2026-06-21-doverabot-rental-inventory-quantity-groundwork-chain.md).
 
 Scope:
 

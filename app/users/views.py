@@ -4173,6 +4173,18 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
         except (KeyError, TypeError, ValueError):
             raise ServiceException('Неверный параметр %s' % key)
 
+    def parse_positive_int(self, data, key, default=1):
+        value = data.get(key, default)
+        if value in (None, ''):
+            return default
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            raise ServiceException('Неверный параметр %s' % key)
+        if value < 1:
+            raise ServiceException('Неверный параметр %s' % key)
+        return value
+
     def rental_field_values(self, data, partial=False):
         values = {}
         for field in self.RENTAL_TEXT_FIELDS:
@@ -4194,6 +4206,8 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
             values['available_to'] = self.parse_date(data.get('available_to'), 'available_to')
         if not partial or 'price_amount' in data:
             values['price_amount'] = self.parse_decimal(data.get('price_amount'), 'price_amount')
+        if not partial or 'quantity_total' in data:
+            values['quantity_total'] = self.parse_positive_int(data, 'quantity_total')
         if not values.get('description_text') and data.get('transcript_text'):
             values['description_text'] = self.clean_text(data, 'transcript_text')
         if values.get('available_from') and values.get('available_to') and \
@@ -4341,13 +4355,14 @@ class ApiRentalMixin(RentalVisibilityMixin, UuidMixin):
 
     def ensure_no_reservation_overlap(self, offer, date_from, date_to,
                                       exclude_reservation=None, now=None):
+        capacity = max(1, offer.quantity_total or 1)
         if self.active_reservation_overlap_queryset(
                 offer,
                 date_from,
                 date_to,
                 exclude_reservation=exclude_reservation,
                 now=now,
-        ).exists():
+        ).count() >= capacity:
             raise ServiceException('На эти даты уже есть активная бронь')
 
     def rental_user_payload(self, user):

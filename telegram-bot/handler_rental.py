@@ -255,6 +255,13 @@ class Rental(object):
         address = ''
         if m := re.search(r'(?:адрес|где|место)\s*[:\-]\s*([^\n]+)', text, flags=re.I):
             address = m.group(1).strip()
+        quantity_total = ''
+        if m := re.search(
+                r'(?:количество|кол-во|шт\.?)\s*[:\-]?\s*(\d+)|(\d+)\s*(?:шт\.?|штук|единиц)',
+                text,
+                flags=re.I,
+        ):
+            quantity_total = m.group(1) or m.group(2) or ''
         latitude, longitude = Misc.check_location_str(text)
         date_values = [
             cls.parse_search_date(value)
@@ -274,6 +281,7 @@ class Rental(object):
             availability_text=availability_text,
             available_from=date_values[0] if date_values else '',
             available_to=date_values[-1] if len(date_values) > 1 else '',
+            quantity_total=quantity_total,
             address=address,
             latitude=latitude,
             longitude=longitude,
@@ -625,6 +633,9 @@ class Rental(object):
             )
         if offer.get('address'):
             result += '\nАдрес: %s\n' % html.quote(offer['address'])
+        quantity = offer.get('quantity_total') or ''
+        if str(quantity) not in ('', '1'):
+            result += '\nКоличество: %s\n' % html.quote(str(quantity))
         badges = offer.get('trust_badges') or {}
         result += '\nВладелец: %s' % Misc.get_deeplink_with_name(offer['owner'])
         if badges:
@@ -724,6 +735,9 @@ class Rental(object):
             result += 'Доступность: %s\n' % html.quote(availability.strip())
         if offer.get('address'):
             result += 'Адрес: %s\n' % html.quote(offer['address'])
+        quantity = offer.get('quantity_total') or ''
+        if str(quantity) not in ('', '1'):
+            result += 'Количество: %s\n' % html.quote(str(quantity))
         result += '\n%s' % Misc.get_html_a(cls.get_deeplink(offer['uuid']), 'Ссылка на объявление')
         return result
 

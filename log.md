@@ -2,6 +2,14 @@
 
 ## 2026-06-21
 
+- Source-implemented `doverabot-rental-inventory-quantity-groundwork`: added
+  `RentalOffer.quantity_total` defaulting to 1, API create/update validation,
+  capacity-aware overlap checks that allow reservations up to listing quantity,
+  quantity parsing from owner listing text, and public/owner card quantity
+  display for multi-item listings. Full mocked bot discovery, full rental
+  backend tests, Django check, and migration drift check passed; migration
+  `users.0062_rentaloffer_quantity_total` is committed but not applied because
+  runtime deploy remains blocked by the active wrapper/untracked-helper issue.
 - Source-implemented `doverabot-rental-map-query-link-polish`: bot map links
   now carry rental UUID/query/equipment/date/price/trusted-only params from
   search, owner listing, and reservation-history contexts; `with_rentals=on`
