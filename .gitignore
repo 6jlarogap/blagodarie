@@ -31,6 +31,8 @@ node_modules/
 
 # Local agent context files
 /AGENTS.md
+/.codex/
+/scripts/graphify-code.sh
 
 # Generated Graphify knowledge graph and Obsidian export
 /graphify-out/
