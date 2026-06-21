@@ -75,3 +75,6 @@ Deploy checks:
 - Continue the ordered go-next chain in
   [2026-06-21-doverabot-go-next-chain.md](2026-06-21-doverabot-go-next-chain.md).
 - Suggested next `/new-go-slug`: `doverabot-runtime-deeplink-consistency`.
+- The next slice plan already prints its own successor: after
+  `doverabot-runtime-deeplink-consistency`, print
+  `doverabot-handler-test-harness-split`.

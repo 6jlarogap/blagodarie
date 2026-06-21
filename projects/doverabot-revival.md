@@ -75,7 +75,10 @@ Primary implementation areas:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Suggested `/new-go-slug`: `doverabot-runtime-deeplink-consistency`.
+Active next `/new-go-slug`: `doverabot-runtime-deeplink-consistency`.
+
+After that slice, print next `/new-go-slug`:
+`doverabot-handler-test-harness-split`.
 
 After that, keep each completed chain pointing to the next slug in the go-next chain.
 

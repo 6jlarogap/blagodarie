@@ -5,12 +5,26 @@ Status: slices 1-2 implemented; remaining slices planned
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 Current completed chain: [2026-06-21-doverabot-legacy-callback-parser-audit-chain.md](2026-06-21-doverabot-legacy-callback-parser-audit-chain.md)
 
+Active next slice: Slice 3, Runtime Deeplink Consistency
+Active next `/new-go-slug`: `doverabot-runtime-deeplink-consistency`
+After active slice, print next `/new-go-slug`: `doverabot-handler-test-harness-split`
+
 ## Chain Purpose
 
 Keep Doverabot implementation work moving in small `/new go` slices where each
 completed chain has an explicit next suggested slug. Each slice should stay
 small enough to finish with source checks, commit, deploy when runtime code
 changes, and an operational handoff.
+
+Always-visible next-slice rule:
+
+- The top of this file must name the active next slice and the slug that should
+  be run now.
+- Each slice plan must name the slug to print after that slice completes.
+- Each completed chain handoff must repeat the same next slug in its Follow-Up
+  Basket, so the next command is visible from either file.
+- When a slice is completed, advance the active next slice above to the next
+  planned slice and keep the chain moving.
 
 ## Slice 1: Offer And Sympathy Feedback Coverage
 
@@ -39,7 +53,8 @@ Completion criteria:
 - Local bot tests and syntax checks pass.
 - Runtime code changes are committed, deployed, and logged.
 
-Suggested next `/new-go-slug`: `doverabot-legacy-callback-parser-audit`
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-legacy-callback-parser-audit`
 
 ## Slice 2: Legacy Callback Parser Audit
 
@@ -66,7 +81,8 @@ Completion criteria:
 - Local bot tests and syntax checks pass.
 - Runtime code changes are committed, deployed, and logged.
 
-Suggested next `/new-go-slug`: `doverabot-runtime-deeplink-consistency`
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-runtime-deeplink-consistency`
 
 ## Slice 3: Runtime Deeplink Consistency
 
@@ -88,7 +104,8 @@ Completion criteria:
 - Local bot tests and syntax checks pass.
 - Runtime code changes are committed, deployed, and logged.
 
-Suggested next `/new-go-slug`: `doverabot-handler-test-harness-split`
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-handler-test-harness-split`
 
 ## Slice 4: Handler Test Harness Split
 
@@ -109,7 +126,8 @@ Completion criteria:
   `python3 -m unittest discover telegram-bot/tests`.
 - No runtime deploy is needed unless production code changes.
 
-Suggested next `/new-go-slug`: `doverabot-rental-v1-smoke-observability`
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-v1-smoke-observability`
 
 ## Slice 5: Rental V1 Smoke Observability
 
@@ -130,7 +148,8 @@ Completion criteria:
 - Any new source tests pass locally.
 - Runtime code changes, if any, are committed, deployed, and logged.
 
-Suggested next `/new-go-slug`: `doverabot-next-decision-refresh`
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-next-decision-refresh`
 
 ## Slice 6: Next Decision Refresh
 
@@ -151,4 +170,5 @@ Completion criteria:
 - The latest completed chain points to that slug.
 - Any obsolete slice suggestions are marked done, superseded, or deferred.
 
-Suggested next `/new-go-slug`: to be chosen during this refresh.
+Print after completion, suggested next `/new-go-slug`: to be chosen during this
+refresh.
