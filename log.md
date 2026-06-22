@@ -2,22 +2,21 @@
 
 ## 2026-06-22
 
-- Implemented `doverabot-rental-medium-stt-adapter` source but runtime deploy
-  is blocked: added a Doverabot-owned localhost rental STT HTTP adapter using
-  faster-whisper `medium`, added `pip-rental-stt.txt`, extended the admin
-  wrapper with rental STT service install/restart/status/log commands, and kept
-  the safe `bot-runtime-setting` surface. Source commit: `321ee4e`. Checks
-  passed: `bash -n deploy/bin/blagodarie-admin`, adapter py_compile, focused
-  rental bot tests (39 tests; existing mocked geocoding failure log remains),
-  bot compileall, `git diff --check`, and graphify update. Runtime install
-  resumed after the maintainer manually installed the updated wrapper; the STT
-  venv and unit installed, but `doverabot-rental-stt.service` cannot bind
-  `127.0.0.1:8765` because the port is already in use. `/healthz` on that port
-  returns an unrelated `claude-sonnet-4-6` JSON payload, and STT logs show
-  `OSError: [Errno 98] ... address already in use`. The failing STT service was
-  stopped, live `RENTAL_STT_*` settings remain missing, and nginx/web/bot are
-  active. The chain is not deployed until the port conflict is resolved or a
-  new approved localhost port is selected.
+- Implemented and deployed `doverabot-rental-medium-stt-adapter`: added a
+  Doverabot-owned localhost rental STT HTTP adapter using faster-whisper
+  `medium`, added `pip-rental-stt.txt`, extended the admin wrapper with rental
+  STT service install/restart/status/log commands, and kept the safe
+  `bot-runtime-setting` surface. Source commits: `321ee4e` and `4bd1ce6`.
+  Checks passed: wrapper shell syntax, adapter py_compile, focused rental bot
+  tests (39 tests; existing mocked geocoding failure log remains), bot
+  compileall, `git diff --check`, and graphify update. Runtime handoff
+  completed after moving the adapter from occupied `127.0.0.1:8765` to
+  `127.0.0.1:8766`: STT venv/unit installed, `/healthz` returns the adapter
+  payload, live settings now set `RENTAL_STT_URL`,
+  `RENTAL_STT_MODE=download`, `RENTAL_STT_LANGUAGE=ru`, and
+  `RENTAL_STT_CONTRACT=organizm_hermes_v1`; `RENTAL_STT_TOKEN` remains missing
+  for localhost-only use. `restart-rental-stt`, `restart-bot`, `is-active`,
+  `logs-rental-stt`, and `logs-bot` completed; nginx/web/bot/STT are active.
 - Implemented and deployed `vpn-slice-worker-chain`: added current-server-only
   VPN profiles with weekly subscription token rotation, subscription URL
   serving, sanitized Xray counter import with weekly/monthly rollups, runway
