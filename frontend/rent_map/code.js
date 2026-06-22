@@ -12,6 +12,7 @@
     'rental_trusted_only',
     'rental_uuid'
   ];
+  var BOUNDS_KEYS = ['lat_south', 'lat_north', 'lng_west', 'lng_east'];
 
   var el = {};
   var state = {
@@ -21,7 +22,9 @@
     markers: {},
     points: [],
     offers: [],
-    selectedUuid: ''
+    selectedUuid: '',
+    viewportBounds: null,
+    sheetExpanded: false
   };
 
   function $(id) {
@@ -60,6 +63,17 @@
     };
   }
 
+  function boundsParams() {
+    var params = {};
+    if (!state.viewportBounds) return params;
+    BOUNDS_KEYS.forEach(function (key) {
+      if (state.viewportBounds[key] !== undefined && state.viewportBounds[key] !== null) {
+        params[key] = state.viewportBounds[key];
+      }
+    });
+    return params;
+  }
+
   function viewerParams() {
     var params = {};
     if (state.auth && state.auth.user_uuid) params.user_uuid = state.auth.user_uuid;
@@ -77,7 +91,7 @@
     if (filters.rental_date_to) params.date_to = filters.rental_date_to;
     if (filters.rental_price_max) params.price_max = filters.rental_price_max;
     if (filters.rental_trusted_only) params.trusted_only = filters.rental_trusted_only;
-    return params;
+    return Object.assign(params, boundsParams());
   }
 
   function pointParams() {
@@ -87,7 +101,7 @@
     FILTER_KEYS.forEach(function (key) {
       if (filters[key]) params[key] = filters[key];
     });
-    return params;
+    return Object.assign(params, boundsParams());
   }
 
   function initFiltersFromUrl() {
@@ -99,6 +113,37 @@
     $('filterPriceMax').value = params.get('rental_price_max') || '';
     $('filterTrustedOnly').checked = isTruthy(params.get('rental_trusted_only'));
     state.selectedUuid = params.get('rental_uuid') || '';
+    var bounds = {};
+    var hasBounds = BOUNDS_KEYS.every(function (key) {
+      var raw = params.get(key);
+      if (raw === null || raw === '') return false;
+      var parsed = Number(raw);
+      if (!Number.isFinite(parsed)) return false;
+      bounds[key] = parsed;
+      return true;
+    });
+    state.viewportBounds = hasBounds ? bounds : null;
+  }
+
+  function updateUrlState() {
+    if (!window.history || !window.history.replaceState) return;
+    var url = new URL(window.location.href);
+    var filters = currentFilters();
+    FILTER_KEYS.forEach(function (key) {
+      if (filters[key]) url.searchParams.set(key, filters[key]);
+      else url.searchParams.delete(key);
+    });
+    if (state.viewportBounds) {
+      BOUNDS_KEYS.forEach(function (key) {
+        url.searchParams.set(key, state.viewportBounds[key]);
+      });
+    } else {
+      BOUNDS_KEYS.forEach(function (key) {
+        url.searchParams.delete(key);
+      });
+    }
+    window.history.replaceState(window.history.state, document.title, url.toString());
+    window.DOCUMENT_URL = new URL(window.location.href);
   }
 
   function setMessage(message, isError) {
@@ -115,6 +160,16 @@
     el.filterForm.querySelectorAll('button, input, select').forEach(function (node) {
       node.disabled = Boolean(isLoading);
     });
+  }
+
+  function renderLoading() {
+    el.listingList.innerHTML = '';
+    for (var i = 0; i < 3; i += 1) {
+      var item = document.createElement('div');
+      item.className = 'listing-card skeleton-card';
+      item.innerHTML = '<span></span><span></span><span></span>';
+      el.listingList.appendChild(item);
+    }
   }
 
   function formatPrice(offer) {
@@ -189,6 +244,16 @@
     var rentalPoints = points.filter(function (point) {
       return point.is_rental && point.rental_uuid && point.latitude && point.longitude;
     });
+    if (state.viewportBounds) {
+      rentalPoints = rentalPoints.filter(function (point) {
+        var lat = Number(point.latitude);
+        var lng = Number(point.longitude);
+        return lat >= state.viewportBounds.lat_south &&
+          lat <= state.viewportBounds.lat_north &&
+          lng >= state.viewportBounds.lng_west &&
+          lng <= state.viewportBounds.lng_east;
+      });
+    }
     if (!state.map) {
       rentalPoints.forEach(function (point) {
         var button = document.createElement('button');
@@ -298,7 +363,7 @@
       card.appendChild(actions);
 
       card.addEventListener('click', function (event) {
-        if (event.target.closest('a')) return;
+        if (event.target.closest && event.target.closest('a')) return;
         selectOffer(offer.uuid, true);
       });
       card.addEventListener('keydown', function (event) {
@@ -313,6 +378,7 @@
 
   function selectOffer(uuid, fromUser) {
     state.selectedUuid = uuid || '';
+    updateUrlState();
     document.querySelectorAll('.listing-card').forEach(function (card) {
       var selected = card.dataset.uuid === state.selectedUuid;
       card.classList.toggle('is-selected', selected);
@@ -329,6 +395,42 @@
       marker.openPopup();
       state.map.panTo(marker.getLatLng());
     }
+    if (fromUser) setSheetExpanded(true);
+  }
+
+  function offerMatchesSelected(offers) {
+    if (!state.selectedUuid) return true;
+    return offers.some(function (offer) {
+      return offer.uuid === state.selectedUuid;
+    });
+  }
+
+  async function ensureSelectedOffer(offers) {
+    if (!state.selectedUuid || offerMatchesSelected(offers)) return offers;
+    var params = viewerParams();
+    params.uuid = state.selectedUuid;
+    var response = await apiGet('/api/rental/offer/', params);
+    if (!response.ok || !response.data || !response.data.offer) return offers;
+    return [response.data.offer].concat(offers);
+  }
+
+  function currentMapBounds() {
+    if (!state.map) return null;
+    var bounds = state.map.getBounds();
+    return {
+      lat_south: Number(bounds.getSouth().toFixed(6)),
+      lat_north: Number(bounds.getNorth().toFixed(6)),
+      lng_west: Number(bounds.getWest().toFixed(6)),
+      lng_east: Number(bounds.getEast().toFixed(6))
+    };
+  }
+
+  function setSheetExpanded(expanded) {
+    state.sheetExpanded = Boolean(expanded);
+    el.listPane.classList.toggle('is-expanded', state.sheetExpanded);
+    el.listPane.classList.toggle('is-collapsed', !state.sheetExpanded);
+    el.sheetToggle.setAttribute('aria-expanded', state.sheetExpanded ? 'true' : 'false');
+    el.sheetToggle.textContent = state.sheetExpanded ? 'Свернуть' : 'Список';
   }
 
   function responseMessage(response, fallback) {
@@ -342,6 +444,8 @@
     setLoading(true);
     setMessage('Загрузка объявлений...', false);
     setMapStatus('');
+    renderLoading();
+    updateUrlState();
     try {
       var results = await Promise.all([
         apiGet('/api/rental/search/', searchParams()),
@@ -352,7 +456,7 @@
       if (!search.ok) throw new Error(responseMessage(search, 'Не удалось загрузить объявления'));
       if (!points.ok) throw new Error(responseMessage(points, 'Не удалось загрузить точки на карте'));
 
-      state.offers = (search.data && search.data.offers) || [];
+      state.offers = await ensureSelectedOffer((search.data && search.data.offers) || []);
       state.points = (points.data && points.data.points) || [];
       renderListings(state.offers);
       renderMap(state.points, [
@@ -363,8 +467,10 @@
         setMessage('', false);
         if (!state.selectedUuid) state.selectedUuid = state.offers[0].uuid;
         selectOffer(state.selectedUuid, false);
+        if (state.viewportBounds) setMapStatus('Показана выбранная область карты.');
       } else if (state.auth && state.auth.user_uuid) {
         setMessage('По этим фильтрам объявлений нет.', false);
+        setMapStatus('Нет точек в выбранной области.');
       } else {
         setMessage('Авторизуйтесь через Telegram, чтобы увидеть доступные объявления.', false);
       }
@@ -373,6 +479,7 @@
       }
     } catch (error) {
       setMessage(error && error.message ? error.message : 'Не удалось загрузить прокат.', true);
+      setMapStatus('Ошибка загрузки карты проката.');
       renderListings([]);
       renderMap([], MOSCOW);
     } finally {
@@ -392,12 +499,27 @@
     el.filterForm.addEventListener('submit', function (event) {
       event.preventDefault();
       state.selectedUuid = '';
+      state.viewportBounds = null;
+      loadRentals();
+    });
+    $('viewportButton').addEventListener('click', function () {
+      var bounds = currentMapBounds();
+      if (!bounds) {
+        setMapStatus('Карта еще не готова.');
+        return;
+      }
+      state.viewportBounds = bounds;
+      state.selectedUuid = '';
       loadRentals();
     });
     $('resetButton').addEventListener('click', function () {
       el.filterForm.reset();
       state.selectedUuid = '';
+      state.viewportBounds = null;
       loadRentals();
+    });
+    el.sheetToggle.addEventListener('click', function () {
+      setSheetExpanded(!state.sheetExpanded);
     });
   }
 
@@ -406,9 +528,11 @@
     el.map = $('map');
     el.mapStatus = $('mapStatus');
     el.listingList = $('listingList');
+    el.listPane = $('listPane');
     el.resultCount = $('resultCount');
     el.stateMessage = $('stateMessage');
     el.botLink = $('botLink');
+    el.sheetToggle = $('sheetToggle');
 
     initFiltersFromUrl();
     initMap();

@@ -1,7 +1,7 @@
 # Doverabot Rental Frontend Redesign Chain
 
 Date: 2026-06-22
-Status: slice 2 implemented; active slug `doverabot-rental-frontend-live-polish`
+Status: slice 3 implemented; active slug `doverabot-rental-frontend-followup-decision`
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 
 Slug queue:
@@ -80,7 +80,7 @@ Completion criteria:
 ## Slice 3: Rental Frontend Live Polish
 
 Slug: `doverabot-rental-frontend-live-polish`
-Status: planned
+Status: implemented
 Next slug: `doverabot-rental-frontend-followup-decision`
 
 Scope:

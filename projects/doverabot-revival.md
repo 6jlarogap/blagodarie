@@ -139,12 +139,12 @@ Remaining product backlog:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-rental-frontend-live-polish`.
+Active next `/new-go-slug`: `doverabot-rental-frontend-followup-decision`.
 
 Selected candidate chain:
 [../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md](../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md).
 
-After that slice, print `doverabot-rental-frontend-followup-decision`.
+After that slice, print the selected next `/new-go-slug`.
 
 Accepted prior-session decisions:
 

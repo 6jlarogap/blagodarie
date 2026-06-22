@@ -59,6 +59,7 @@
       </label>
       <div class="filter-actions">
         <button class="button primary" type="submit">Найти</button>
+        <button class="button secondary" id="viewportButton" type="button">В области</button>
         <button class="button secondary" id="resetButton" type="button">Сброс</button>
       </div>
     </form>
@@ -68,13 +69,16 @@
         <div id="map"></div>
         <div class="map-status" id="mapStatus"></div>
       </section>
-      <aside class="list-pane" aria-label="Объявления проката">
+      <aside class="list-pane is-collapsed" id="listPane" aria-label="Объявления проката">
         <div class="list-header">
           <div>
             <div class="eyebrow">Результаты</div>
             <h2 id="resultTitle">Объявления</h2>
           </div>
-          <div class="count-pill" id="resultCount">0</div>
+          <div class="list-tools">
+            <div class="count-pill" id="resultCount">0</div>
+            <button class="sheet-toggle" id="sheetToggle" type="button" aria-expanded="false">Список</button>
+          </div>
         </div>
         <div class="state-message" id="stateMessage"></div>
         <div class="listing-list" id="listingList"></div>

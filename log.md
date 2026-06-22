@@ -23,6 +23,19 @@
   showed only service restart entries. Unrelated local tracked bot changes were
   temporarily stashed before deploy and restored afterward; the untracked
   `scripts/unblock-django-test-db.sh` helper remained unstaged.
+- Implemented and deployed `doverabot-rental-frontend-live-polish`: improved
+  `/rent/` loading, empty, and error states; added a mobile bottom sheet,
+  viewport-bound refresh, URL state, and direct `rental_uuid` offer lookup.
+  Checks passed: JS syntax, local static HTTP smoke for polished HTML/JS/CSS,
+  `git diff --check`, reindex, and graphify update. Browser viewport automation
+  was blocked because `require('playwright')` failed and no
+  Chromium/Chrome/Firefox binary was present in `PATH`; live HTTP smokes with
+  direct `rental_uuid` and viewport-style params returned 200 for `/rent/`,
+  `/rent/code.js`, `/rent/style.css`, and rental map points. Static deploy ran
+  through `blagodarie-admin deploy-static`, nginx syntax passed, and
+  `is-active` returned active for nginx/web/bot. Unrelated local tracked bot
+  changes were temporarily stashed before deploy and restored afterward; the
+  untracked `scripts/unblock-django-test-db.sh` helper remained unstaged.
 
 ## 2026-06-21
 
