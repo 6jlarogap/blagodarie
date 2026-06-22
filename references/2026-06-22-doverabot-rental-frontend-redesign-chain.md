@@ -151,7 +151,7 @@ Deferred candidates:
 ## Media Thumbnail Follow-Up
 
 Slug: `doverabot-rental-frontend-media-thumbnails`
-Status: implemented
+Status: implemented and deployed
 Next slug: `doverabot-rental-owner-web-controls`
 
 Outcome:

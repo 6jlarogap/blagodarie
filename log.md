@@ -2,6 +2,21 @@
 
 ## 2026-06-22
 
+- Implemented and deployed `doverabot-rental-frontend-media-thumbnails`:
+  rental offer/search payloads now expose Telegram-origin media metadata,
+  photo thumbnails are proxied server-side through
+  `/api/rental/media/<tgdesc_id>/thumbnail/` without exposing the bot token,
+  and maintained `/rent/` cards render bounded thumbnails with non-photo
+  fallback labels. Source commit: `1d1c14b`. Checks passed:
+  focused Django `users` tests (23 tests), Django check, JS syntax check for
+  `frontend/rent_map/code.js`, `git diff --check`, reindex, and graphify
+  update. Runtime deploy completed through `blagodarie-admin deploy`; the
+  existing Django `security.W002` warning remains, nginx syntax was OK,
+  nginx/web/bot are active, live smokes returned HTTP 200 for `/rent/`,
+  `/rent/code.js`, `/rent/style.css`, and `/api/rental/search/`, and the new
+  thumbnail route returned expected HTTP 404 for an invalid media id. Recent
+  web/bot log tails showed service restart entries only. Next slug:
+  `doverabot-rental-owner-web-controls`.
 - Implemented and deployed `doverabot-rental-voice-stt-observability-recovery`:
   owned the previously uncommitted rental bot voice/STT changes, added
   STT-aware rental prompts, opt-in structured debug logging, spoken Russian

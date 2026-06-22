@@ -534,7 +534,7 @@ Print after completion, suggested next `/new-go-slug`:
 
 Suggested `/new-go-slug`: `doverabot-rental-frontend-media-thumbnails`
 
-Status: implemented; deploy pending in this handoff.
+Status: implemented and deployed in commit `1d1c14b`.
 
 Scope:
 
