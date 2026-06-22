@@ -53,6 +53,13 @@ urlpatterns = [
     re_path(r'^api/rental/reservation/?$', views.api_rental_reservation),
     re_path(r'^api/rental/reservation/payment_proof/?$', views.api_rental_reservation_payment_proof),
 
+    re_path(r'^api/vpn/profile/?$', views.api_vpn_profile),
+    re_path(r'^api/vpn/my_usage/?$', views.api_vpn_usage),
+    re_path(r'^api/vpn/dashboard/?$', views.api_vpn_dashboard),
+    re_path(r'^api/vpn/connect_friend/?$', views.api_vpn_connect_friend),
+    re_path(r'^api/vpn/stats/import/?$', views.api_vpn_stats_import),
+    re_path(r'^api/vpn/subscription/(?P<token>[a-f0-9]{48})/?$', views.api_vpn_subscription),
+
     re_path(r'^api/token/url/?$', views.api_token_url),
     re_path(r'^api/token/authdata/?$', views.api_token_authdata),
     re_path(r'^api/token/invite/?$', views.api_token_invite),

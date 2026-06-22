@@ -289,6 +289,14 @@ TELEGRAM_API_PROXY = None
 TELEGRAM_API_TIMEOUT = 5
 TELEGRAM_BOT_USERNAME = None
 
+# Current-server VPN MVP. Exact renewal dates/amounts should be entered through
+# Django admin (`VpnServerRunway`) or overridden in local settings.
+VPN_PROFILE_TOKEN_TTL = 7 * 86400
+VPN_DEFAULT_CONFIG_URI_TEMPLATE = ''
+VPN_SUBSCRIPTION_URL_TEMPLATE = ''
+VPN_PAYMENT_CURRENCY = 'RUB'
+VPN_CURRENT_SERVER = {}
+
 # Данные для регистрации от телеграма,
 # старше этого срока, в секундах, считаются устаревшими
 #

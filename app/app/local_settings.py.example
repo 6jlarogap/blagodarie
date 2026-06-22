@@ -86,3 +86,13 @@ OAUTH_PROVIDERS = {
         'public_key': 'another_secret',
     },
 }
+
+# Optional current-server VPN settings. Prefer Django admin for renewal facts.
+VPN_CURRENT_SERVER = {
+    'label': 'current',
+    'prepaid_until': None,  # 'YYYY-MM-DD'
+    'upcoming_payment_amount': None,
+    'currency': 'RUB',
+}
+VPN_DEFAULT_CONFIG_URI_TEMPLATE = ''
+VPN_SUBSCRIPTION_URL_TEMPLATE = ''

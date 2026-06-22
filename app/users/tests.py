@@ -13,7 +13,9 @@ from rest_framework.test import APIClient
 
 from contact.models import CurrentState, Key, KeyType
 from users.models import Profile, RentalEquipmentType, RentalOffer, RentalOfferMessage, \
-    RentalReservationEvent, RentalReservationIntent, RentalReservationPaymentProof, TgDesc
+    RentalReservationEvent, RentalReservationIntent, RentalReservationPaymentProof, TgDesc, \
+    VpnDonorPreference, VpnFeedbackTicket, VpnProfile, VpnRunwayLedgerEntry, \
+    VpnServerRunway, VpnStatsSnapshot, VpnTrafficPeriod
 from users.views import ApiAuthTelegram
 
 
@@ -1206,3 +1208,192 @@ class ApiRentalOfferTests(TestCase):
         })
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data['message'], 'Неверная роль в истории брони')
+
+
+class ApiVpnMvpTests(TestCase):
+
+    bot_token = '123456:test-token'
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='vpnuser', first_name='Vpn User')
+        self.profile = Profile.objects.create(user=self.user)
+
+    @override_settings(
+        TELEGRAM_BOT_TOKEN=bot_token,
+        VPN_DEFAULT_CONFIG_URI_TEMPLATE='vless://%(token)s@current.example#%(label)s',
+        VPN_PROFILE_TOKEN_TTL=7 * 86400,
+    )
+    def test_weekly_token_rotation_expires_old_subscription_token(self):
+        response = self.client.post('/api/vpn/profile/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.profile.uuid),
+            'action': 'fresh',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        vpn_profile = VpnProfile.objects.get(user=self.user)
+        old_token = vpn_profile.subscription_token
+
+        response = self.client.post('/api/vpn/profile/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.profile.uuid),
+            'action': 'fresh',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        vpn_profile.refresh_from_db()
+        new_token = vpn_profile.subscription_token
+        self.assertNotEqual(old_token, new_token)
+
+        response = self.client.get('/api/vpn/subscription/%s/' % old_token)
+        self.assertEqual(response.status_code, 404)
+        response = self.client.get('/api/vpn/subscription/%s/' % new_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(new_token, response.content.decode('utf-8'))
+
+    def test_xray_stats_import_stores_sanitized_counters_and_rollups(self):
+        vpn_profile = VpnProfile.objects.create(
+            user=self.user,
+            config_uri='vless://SECRET-current-server-config',
+        )
+        payload = {
+            'stats': [
+                {
+                    'name': 'user>>>%s>>>traffic>>>uplink' % vpn_profile.label,
+                    'value': 1000,
+                    'config_uri': 'SECRET-current-server-config',
+                },
+                {
+                    'name': 'user>>>%s>>>traffic>>>downlink' % vpn_profile.label,
+                    'value': 2000,
+                    'password': 'SECRET',
+                },
+            ],
+        }
+        result = VpnStatsSnapshot.import_xray_counters(payload, captured_at=100000)
+        self.assertEqual(result['imported'], 1)
+        snapshot = VpnStatsSnapshot.objects.get()
+        self.assertEqual(snapshot.source_label, vpn_profile.label)
+        self.assertNotIn('SECRET', json.dumps(snapshot.data_dict(), default=str))
+
+        VpnStatsSnapshot.import_xray_counters({
+            vpn_profile.label: {
+                'uplink': 1500,
+                'downlink': 3000,
+                'config_uri': 'SECRET-current-server-config',
+            },
+        }, captured_at=100100)
+        period = VpnTrafficPeriod.objects.get(period_kind=VpnTrafficPeriod.KIND_WEEK)
+        self.assertEqual(period.total_bytes(), 1500)
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    def test_public_dashboard_uses_usage_bands_not_named_exact_gb(self):
+        other = User.objects.create_user(username='exactname', first_name='Exact Name')
+        other_profile = Profile.objects.create(user=other)
+        vpn_profile = VpnProfile.objects.create(user=self.user, config_uri='vless://one')
+        other_vpn = VpnProfile.objects.create(user=other, config_uri='vless://two')
+        today = datetime.date.today()
+        VpnTrafficPeriod.objects.create(
+            profile=vpn_profile,
+            period_kind=VpnTrafficPeriod.KIND_MONTH,
+            period_start=VpnTrafficPeriod.current_start(VpnTrafficPeriod.KIND_MONTH, today=today),
+            downlink_bytes=5 * 1024 * 1024 * 1024,
+        )
+        VpnTrafficPeriod.objects.create(
+            profile=other_vpn,
+            period_kind=VpnTrafficPeriod.KIND_MONTH,
+            period_start=VpnTrafficPeriod.current_start(VpnTrafficPeriod.KIND_MONTH, today=today),
+            downlink_bytes=60 * 1024 * 1024 * 1024,
+        )
+
+        response = self.client.get('/api/vpn/dashboard/')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('exact_users', response.data)
+        response_json = json.dumps(response.data, default=str)
+        self.assertNotIn('exactname', response_json)
+        self.assertNotIn('Exact Name', response_json)
+        month_bands = {
+            item['band']: item['count']
+            for item in response.data['usage_graph']['month']
+        }
+        self.assertEqual(month_bands['1-10 GB'], 1)
+        self.assertEqual(month_bands['50+ GB'], 1)
+
+        admin = User.objects.create_user(
+            username='vpnadmin',
+            first_name='Vpn Admin',
+            is_superuser=True,
+            is_staff=True,
+        )
+        admin_profile = Profile.objects.create(user=admin)
+        response = self.client.get('/api/vpn/dashboard/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(admin_profile.uuid),
+            'exact': 1,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('exact_users', response.data)
+        self.assertIn('exactname', json.dumps(response.data['exact_users'], default=str))
+
+    def test_donor_highlights_are_opt_in(self):
+        visible = User.objects.create_user(username='visible-donor', first_name='Visible Donor')
+        hidden = User.objects.create_user(username='hidden-donor', first_name='Hidden Donor')
+        Profile.objects.create(user=visible)
+        Profile.objects.create(user=hidden)
+        VpnDonorPreference.objects.create(user=visible, is_visible=True, public_name='Visible Friend')
+        VpnDonorPreference.objects.create(user=hidden, is_visible=False, public_name='Hidden Friend')
+        VpnRunwayLedgerEntry.objects.create(
+            user=visible,
+            entry_type=VpnRunwayLedgerEntry.ENTRY_DONATION,
+            amount=Decimal('100.00'),
+        )
+        VpnRunwayLedgerEntry.objects.create(
+            user=hidden,
+            entry_type=VpnRunwayLedgerEntry.ENTRY_DONATION,
+            amount=Decimal('200.00'),
+        )
+
+        response = self.client.get('/api/vpn/dashboard/')
+        self.assertEqual(response.status_code, 200)
+        highlights_json = json.dumps(response.data['funding']['donor_highlights'], default=str)
+        self.assertIn('Visible Friend', highlights_json)
+        self.assertNotIn('Hidden Friend', highlights_json)
+
+    @override_settings(
+        TELEGRAM_BOT_TOKEN=bot_token,
+        VPN_DEFAULT_CONFIG_URI_TEMPLATE='vless://%(token)s@current.example#%(label)s',
+    )
+    def test_fresh_prompt_is_current_server_funding_copy(self):
+        VpnServerRunway.objects.create(
+            label='current',
+            prepaid_until=datetime.date.today() + datetime.timedelta(days=10),
+            upcoming_payment_amount=Decimal('900.00'),
+            currency='RUB',
+        )
+        response = self.client.post('/api/vpn/profile/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.profile.uuid),
+            'action': 'fresh',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        prompt = response.data['donation_prompt']
+        self.assertIn('Server runway:', prompt)
+        self.assertIn('Fair share:', prompt)
+        self.assertNotIn('new server', prompt.lower())
+        self.assertNotIn('rent a new server', prompt.lower())
+        self.assertNotIn('новый сервер', prompt.lower())
+
+    @override_settings(
+        TELEGRAM_BOT_TOKEN=bot_token,
+        VPN_DEFAULT_CONFIG_URI_TEMPLATE='',
+    )
+    def test_fresh_without_current_config_records_structured_failure(self):
+        response = self.client.post('/api/vpn/profile/', data={
+            'tg_token': self.bot_token,
+            'user_uuid': str(self.profile.uuid),
+            'action': 'fresh',
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('artifact_label', response.data)
+        ticket = VpnFeedbackTicket.objects.get()
+        self.assertEqual(ticket.reason, VpnFeedbackTicket.REASON_CONFIG_FAILED)
+        self.assertEqual(ticket.artifact_label, response.data['artifact_label'])

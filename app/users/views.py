@@ -15,7 +15,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db.models.query_utils import Q
-from django.db.models import Prefetch, F
+from django.db.models import Prefetch, F, Sum
 from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db.utils import ProgrammingError
 from django.core.validators import URLValidator
@@ -40,7 +40,9 @@ from users.models import Oauth, CreateUserMixin, IncognitoUser, Profile, TgGroup
     OfferRefJournal, OfferRefState, ApiDonateUser, \
     RentalEquipmentType, RentalOffer, RentalOfferContactRequest, \
     RentalOfferMessage, RentalReservationIntent, RentalReservationEvent, \
-    RentalReservationPaymentProof
+    RentalReservationPaymentProof, VpnServerRunway, VpnProfile, \
+    VpnStatsSnapshot, VpnTrafficPeriod, VpnDonorPreference, \
+    VpnRunwayLedgerEntry, VpnFeedbackTicket
 from contact.models import Key, KeyType, CurrentState, OperationType, Wish, Ability, \
                            ApiAddOperationMixin, Journal, TgMessageJournal
 from wote.models import Video, Vote
@@ -6326,6 +6328,373 @@ class ApiShowTgmsgPack(TelegramApiMixin, APIView):
         return Response(data=data, status=status_code)
 
 api_show_tgmsg_pack = ApiShowTgmsgPack.as_view()
+
+
+class ApiVpnMixin(UuidMixin):
+
+    USAGE_BANDS = (
+        (0, 1, '0-1 GB'),
+        (1, 10, '1-10 GB'),
+        (10, 50, '10-50 GB'),
+        (50, None, '50+ GB'),
+    )
+
+    def check_bot_token(self, request):
+        token = request.data.get('tg_token') or request.GET.get('tg_token')
+        if token != settings.TELEGRAM_BOT_TOKEN:
+            raise ServiceException('Неверный токен телеграм бота')
+
+    def request_user(self, request, require_bot_token=True):
+        if request.user.is_authenticated:
+            return request.user, request.user.profile
+        if require_bot_token:
+            self.check_bot_token(request)
+        data = request.data if request.method.upper() == 'POST' else request.GET
+        user_uuid = data.get('user_uuid')
+        if user_uuid:
+            return self.check_user_uuid(user_uuid, related=('user',))
+        raise ServiceException('Не задан пользователь VPN')
+
+    def is_vpn_admin(self, user):
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        return user.groups.filter(pk=settings.GROUP_IDS['power_telegram']).exists()
+
+    def money_str(self, amount, currency):
+        if amount in (None, ''):
+            return ''
+        return '%s %s' % (amount, currency)
+
+    def gb(self, value):
+        return round(float(value or 0) / 1024 / 1024 / 1024, 2)
+
+    def server_payload(self, today):
+        server = VpnServerRunway.current()
+        if server:
+            return server.data_dict(today=today)
+        config = getattr(settings, 'VPN_CURRENT_SERVER', {})
+        prepaid_until = config.get('prepaid_until') if isinstance(config, dict) else None
+        if isinstance(prepaid_until, str) and prepaid_until:
+            try:
+                prepaid_until = datetime.datetime.strptime(prepaid_until, '%Y-%m-%d').date()
+            except ValueError:
+                prepaid_until = None
+        amount = config.get('upcoming_payment_amount') if isinstance(config, dict) else None
+        currency = config.get('currency', getattr(settings, 'VPN_PAYMENT_CURRENCY', 'RUB')) \
+            if isinstance(config, dict) else getattr(settings, 'VPN_PAYMENT_CURRENCY', 'RUB')
+        days_left = (prepaid_until - today).days if prepaid_until else None
+        return dict(
+            label=config.get('label', 'current') if isinstance(config, dict) else 'current',
+            prepaid_until=prepaid_until.isoformat() if prepaid_until else '',
+            days_left=days_left,
+            upcoming_payment_amount=str(amount) if amount not in (None, '') else '',
+            currency=currency,
+            active=True,
+        )
+
+    def period_totals(self, period_kind, today):
+        period_start = VpnTrafficPeriod.current_start(period_kind, today=today)
+        totals = {}
+        for row in VpnTrafficPeriod.objects.filter(
+                period_kind=period_kind,
+                period_start=period_start,
+        ).values('profile_id').annotate(
+                uplink=Sum('uplink_bytes'),
+                downlink=Sum('downlink_bytes'),
+        ):
+            totals[row['profile_id']] = (row['uplink'] or 0) + (row['downlink'] or 0)
+        return totals
+
+    def usage_bands(self, profiles, totals):
+        band_counts = {
+            label: 0
+            for low, high, label in self.USAGE_BANDS
+        }
+        for profile in profiles:
+            gb_value = self.gb(totals.get(profile.pk, 0))
+            for low, high, label in self.USAGE_BANDS:
+                if gb_value >= low and (high is None or gb_value < high):
+                    band_counts[label] += 1
+                    break
+        return [
+            dict(band=label, count=count)
+            for low, high, label in self.USAGE_BANDS
+            for count in (band_counts[label],)
+        ]
+
+    def donor_highlights(self):
+        entries = VpnRunwayLedgerEntry.objects.select_related(
+            'user',
+            'user__vpn_donor_preference',
+        ).filter(
+            entry_type=VpnRunwayLedgerEntry.ENTRY_DONATION,
+            is_confirmed=True,
+            user__vpn_donor_preference__is_visible=True,
+        ).order_by('-received_at', '-pk')[:6]
+        return [
+            dict(
+                name=entry.user.vpn_donor_preference.display_name(),
+                amount=str(entry.amount),
+                currency=entry.currency,
+                received_at=entry.received_at.isoformat(),
+            )
+            for entry in entries
+        ]
+
+    def dashboard_payload(self, request=None, viewer_user=None, exact=False):
+        today = datetime.date.today()
+        server = self.server_payload(today=today)
+        active_profiles = list(VpnProfile.objects.select_related(
+            'user',
+            'user__profile',
+        ).filter(status=VpnProfile.STATUS_ACTIVE).order_by('user__first_name', 'user__username'))
+        active_users = len(active_profiles)
+        week_totals = self.period_totals(VpnTrafficPeriod.KIND_WEEK, today)
+        month_totals = self.period_totals(VpnTrafficPeriod.KIND_MONTH, today)
+        currency = server.get('currency') or getattr(settings, 'VPN_PAYMENT_CURRENCY', 'RUB')
+        upcoming = server.get('upcoming_payment_amount') or None
+        upcoming_decimal = None
+        if upcoming is not None:
+            try:
+                upcoming_decimal = Decimal(str(upcoming))
+            except (TypeError, InvalidOperation, ValueError):
+                upcoming_decimal = None
+        donations_received = VpnRunwayLedgerEntry.donations_since_latest_payment()
+        project_income = VpnRunwayLedgerEntry.project_income_since_latest_payment()
+        remaining_target = None
+        fair_share = None
+        if upcoming_decimal is not None:
+            remaining_target = max(Decimal('0'), upcoming_decimal - project_income)
+            if active_users:
+                fair_share = (remaining_target / Decimal(active_users)).quantize(Decimal('0.01'))
+        payload = dict(
+            runway=server,
+            funding=dict(
+                active_users=active_users,
+                donations_received=str(donations_received),
+                project_income=str(project_income),
+                upcoming_payment_amount=str(upcoming_decimal) if upcoming_decimal is not None else '',
+                remaining_payment_target=str(remaining_target) if remaining_target is not None else '',
+                fair_share_per_active_user=str(fair_share) if fair_share is not None else '',
+                currency=currency,
+                donor_highlights=self.donor_highlights(),
+            ),
+            usage_graph=dict(
+                week=self.usage_bands(active_profiles, week_totals),
+                month=self.usage_bands(active_profiles, month_totals),
+            ),
+        )
+        if exact and viewer_user and self.is_vpn_admin(viewer_user):
+            payload['exact_users'] = [
+                dict(
+                    user_uuid=str(profile.user.profile.uuid),
+                    username=profile.user.username,
+                    first_name=profile.user.first_name,
+                    label=profile.label,
+                    week_gb=self.gb(week_totals.get(profile.pk, 0)),
+                    month_gb=self.gb(month_totals.get(profile.pk, 0)),
+                )
+                for profile in active_profiles
+            ]
+        return payload
+
+    def donation_prompt(self, dashboard):
+        days_left = dashboard.get('runway', {}).get('days_left')
+        days_text = str(days_left) if days_left is not None else 'unknown'
+        funding = dashboard.get('funding', {})
+        fair_share = funding.get('fair_share_per_active_user') or 'not set'
+        currency = funding.get('currency') or ''
+        fair_share_text = '%s %s' % (fair_share, currency) if currency and fair_share != 'not set' else fair_share
+        return (
+            'Your profile is fresh. Server runway: %s days. '
+            'Fair share: %s. Donate if this helps.'
+        ) % (days_text, fair_share_text)
+
+
+class ApiVpnProfile(ApiVpnMixin, APIView):
+
+    @transaction.atomic
+    def post(self, request):
+        try:
+            user, profile = self.request_user(request)
+            action = request.data.get('action') or 'get'
+            vpn_profile, created = VpnProfile.objects.get_or_create(user=user)
+
+            if action not in ('get', 'fresh', 'donor_visibility'):
+                raise ServiceException('Неверное действие VPN')
+
+            if action == 'donor_visibility':
+                preference, pref_created = VpnDonorPreference.objects.get_or_create(user=user)
+                preference.is_visible = str(request.data.get('is_visible', '')).lower() in (
+                    '1', 'true', 'yes', 'on',
+                )
+                if 'public_name' in request.data:
+                    preference.public_name = str(request.data.get('public_name') or '').strip()[:80]
+                preference.save()
+                data = dict(
+                    donor_preference=dict(
+                        is_visible=preference.is_visible,
+                        public_name=preference.public_name,
+                    )
+                )
+                return Response(data=data, status=status.HTTP_200_OK)
+
+            needs_refresh = action == 'fresh' or not vpn_profile.config_uri or \
+                vpn_profile.token_expires_at <= int(time.time())
+            if needs_refresh:
+                if not vpn_profile.refresh_access(config_uri=request.data.get('config_uri')):
+                    ticket = VpnFeedbackTicket.objects.create(
+                        user=user,
+                        profile=vpn_profile,
+                        reason=VpnFeedbackTicket.REASON_CONFIG_FAILED,
+                        artifact_label=vpn_profile.artifact_label,
+                        message='current-server config missing',
+                    )
+                    transaction.set_rollback(False)
+                    return Response(data=dict(
+                        message='VPN profile config is not ready for the current server',
+                        artifact_label=vpn_profile.artifact_label,
+                        ticket=ticket.data_dict(),
+                    ), status=status.HTTP_400_BAD_REQUEST)
+
+            feedback_text = str(request.data.get('feedback_text') or '').strip()
+            ticket = None
+            if feedback_text:
+                ticket = VpnFeedbackTicket.objects.create(
+                    user=user,
+                    profile=vpn_profile,
+                    reason=VpnFeedbackTicket.REASON_STILL_BROKEN,
+                    artifact_label=vpn_profile.artifact_label,
+                    message=feedback_text[:4000],
+                )
+            dashboard = self.dashboard_payload(request=request, viewer_user=user)
+            data = dict(
+                profile=vpn_profile.data_dict(request=request, include_secret=True),
+                dashboard=dashboard,
+                donation_prompt=self.donation_prompt(dashboard) if action == 'fresh' else '',
+                ticket=ticket.data_dict() if ticket else None,
+            )
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            transaction.set_rollback(True)
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+
+api_vpn_profile = ApiVpnProfile.as_view()
+
+
+class ApiVpnUsage(ApiVpnMixin, APIView):
+
+    def get(self, request):
+        try:
+            user, profile = self.request_user(request)
+            vpn_profile = VpnProfile.objects.filter(user=user).first()
+            today = datetime.date.today()
+            data = dict(
+                week=dict(total_bytes=0, total_gb=0),
+                month=dict(total_bytes=0, total_gb=0),
+            )
+            if vpn_profile:
+                for period_kind in (VpnTrafficPeriod.KIND_WEEK, VpnTrafficPeriod.KIND_MONTH):
+                    period = VpnTrafficPeriod.objects.filter(
+                        profile=vpn_profile,
+                        period_kind=period_kind,
+                        period_start=VpnTrafficPeriod.current_start(period_kind, today=today),
+                    ).first()
+                    total = period.total_bytes() if period else 0
+                    data[period_kind] = dict(total_bytes=total, total_gb=self.gb(total))
+                data['profile'] = vpn_profile.data_dict(request=request)
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+
+api_vpn_usage = ApiVpnUsage.as_view()
+
+
+class ApiVpnDashboard(ApiVpnMixin, APIView):
+
+    def get(self, request):
+        try:
+            viewer_user = None
+            exact = str(request.GET.get('exact', '')).lower() in ('1', 'true', 'yes')
+            if request.GET.get('tg_token') or request.GET.get('user_uuid') or request.user.is_authenticated:
+                viewer_user, profile = self.request_user(request, require_bot_token=not request.user.is_authenticated)
+            if exact and not self.is_vpn_admin(viewer_user):
+                raise PermissionDenied()
+            data = self.dashboard_payload(
+                request=request,
+                viewer_user=viewer_user,
+                exact=exact,
+            )
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+
+api_vpn_dashboard = ApiVpnDashboard.as_view()
+
+
+class ApiVpnConnectFriend(ApiVpnMixin, APIView):
+
+    def post(self, request):
+        try:
+            user, profile = self.request_user(request)
+            bot_username = getattr(settings, 'TELEGRAM_BOT_USERNAME', '') or 'DoveraBot'
+            start_url = 'https://t.me/%s?start=vpn' % bot_username
+            data = dict(
+                url=start_url,
+                message=(
+                    'Use MTProto only to bootstrap Telegram if needed. '
+                    'Then your friend opens Doverabot and receives their own current-server Xray profile.'
+                ),
+            )
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+
+api_vpn_connect_friend = ApiVpnConnectFriend.as_view()
+
+
+class ApiVpnSubscription(APIView):
+
+    def get(self, request, token):
+        vpn_profile = VpnProfile.active_for_token(token)
+        if not vpn_profile or not vpn_profile.config_uri:
+            raise NotFound
+        return HttpResponse(vpn_profile.config_uri, content_type='text/plain; charset=utf-8')
+
+
+api_vpn_subscription = ApiVpnSubscription.as_view()
+
+
+class ApiVpnStatsImport(ApiVpnMixin, APIView):
+
+    def post(self, request):
+        try:
+            self.check_bot_token(request)
+            payload = request.data.get('stats', request.data)
+            captured_at = request.data.get('captured_at')
+            data = VpnStatsSnapshot.import_xray_counters(payload, captured_at=captured_at)
+            status_code = status.HTTP_200_OK
+        except ServiceException as excpt:
+            data = dict(message=excpt.args[0])
+            status_code = status.HTTP_400_BAD_REQUEST
+        return Response(data=data, status=status_code)
+
+
+api_vpn_stats_import = ApiVpnStatsImport.as_view()
 
 
 class ApiMeetgamers(TelegramApiMixin, APIView):

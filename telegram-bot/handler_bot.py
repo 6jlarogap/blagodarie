@@ -40,6 +40,98 @@ class FSMnewOrg(StatesGroup):
 class FSMagreeToRules(StatesGroup):
     ask = State()
 
+
+def _command_tail(text):
+    parts = (text or '').split(maxsplit=1)
+    return parts[1].strip() if len(parts) > 1 else ''
+
+
+def _vpn_profile_payload(profile, action='get', **kwargs):
+    payload = dict(
+        tg_token=settings.TOKEN,
+        user_uuid=profile['uuid'],
+        action=action,
+    )
+    payload.update(kwargs)
+    return payload
+
+
+async def _vpn_sender_profile(message):
+    status_sender, profile = await Misc.post_tg_user(message.from_user)
+    if status_sender != 200:
+        await message.reply(Misc.MSG_ERROR_API)
+        return None
+    return profile
+
+
+async def _reply_vpn_profile(message, response):
+    profile = response.get('profile') or {}
+    subscription_url = profile.get('subscription_url') or ''
+    config_uri = profile.get('config_uri') or ''
+    label = profile.get('label') or 'vpn'
+    text = (
+        '<b>VPN профиль</b>\n'
+        f'Метка: <code>{html.quote(label)}</code>\n'
+    )
+    if subscription_url:
+        text += f'Подписка: <code>{html.quote(subscription_url)}</code>\n'
+    if config_uri:
+        text += f'\nКонфигурация:\n<code>{html.quote(config_uri)}</code>\n'
+    if profile.get('token_expires_at'):
+        text += '\nТокен подписки обновляется еженедельно.'
+    await message.reply(text)
+    qr_value = subscription_url or config_uri
+    if qr_value:
+        qr_profile = dict(username=label, photo='')
+        bytes_io = await Misc.get_qrcode(qr_profile, qr_value)
+        await bot.send_photo(
+            chat_id=message.from_user.id,
+            photo=BufferedInputFile(bytes_io.getvalue(), filename=bytes_io.name),
+        )
+
+
+def _format_vpn_money(value, currency):
+    if value in (None, ''):
+        return 'не задано'
+    return f'{value} {currency}'.strip()
+
+
+def _vpn_dashboard_text(response):
+    runway = response.get('runway') or {}
+    funding = response.get('funding') or {}
+    usage_graph = response.get('usage_graph') or {}
+    currency = funding.get('currency') or runway.get('currency') or ''
+    days_left = runway.get('days_left')
+    days_text = str(days_left) if days_left is not None else 'не задано'
+    text = (
+        '<b>VPN: текущий сервер</b>\n'
+        f'Оплачен до: {runway.get("prepaid_until") or "не задано"}\n'
+        f'Запас: {days_text} дней\n'
+        f'Следующий платеж: {_format_vpn_money(funding.get("upcoming_payment_amount"), currency)}\n'
+        f'Активные пользователи: {funding.get("active_users", 0)}\n'
+        f'Справедливая доля: {_format_vpn_money(funding.get("fair_share_per_active_user"), currency)}\n'
+        f'Донаты: {_format_vpn_money(funding.get("donations_received"), currency)}\n'
+    )
+    highlights = funding.get('donor_highlights') or []
+    if highlights:
+        text += '\n<b>Спасибо за поддержку</b>\n'
+        for item in highlights:
+            text += f'{html.quote(item["name"])}: {item["amount"]} {item["currency"]}\n'
+    for period_key, caption in (('week', 'Неделя'), ('month', 'Месяц')):
+        text += f'\n<b>{caption}: группы расхода</b>\n'
+        for item in usage_graph.get(period_key, []):
+            text += f'{item["band"]}: {item["count"]}\n'
+    exact_users = response.get('exact_users') or []
+    if exact_users:
+        text += '\n<b>Точный расход, админ</b>\n'
+        for item in exact_users[:30]:
+            text += (
+                f'{html.quote(item["first_name"] or item["username"] or item["label"])}: '
+                f'{item["week_gb"]} GB/week, {item["month_gb"]} GB/month\n'
+            )
+    return text
+
+
 @router.message(
     F.text,
     F.chat.type.in_((ChatType.PRIVATE,)),
@@ -271,6 +363,144 @@ async def cmd_feedback(message: Message, state: FSMContext):
         Misc.get_html_a(settings.BOT_CHAT['href'], settings.BOT_CHAT['caption']),
     )
 
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
+    Command(re.compile('^vpn$', flags=re.I)),
+)
+async def cmd_vpn(message: Message, state: FSMContext):
+    logging.debug(f"Executing cmd_vpn command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
+    profile = await _vpn_sender_profile(message)
+    if not profile:
+        return
+    status_vpn, response_vpn = await Misc.api_request(
+        path='/api/vpn/profile/',
+        method='post',
+        json=_vpn_profile_payload(profile),
+    )
+    if status_vpn == 200 and response_vpn:
+        await _reply_vpn_profile(message, response_vpn)
+    else:
+        await message.reply((response_vpn or {}).get('message') or Misc.MSG_ERROR_API)
+
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
+    Command(re.compile('^fresh$', flags=re.I)),
+)
+async def cmd_fresh(message: Message, state: FSMContext):
+    logging.debug(f"Executing cmd_fresh command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
+    profile = await _vpn_sender_profile(message)
+    if not profile:
+        return
+    feedback_text = _command_tail(message.text)
+    payload = _vpn_profile_payload(profile, action='fresh')
+    if feedback_text:
+        payload['feedback_text'] = feedback_text
+    status_vpn, response_vpn = await Misc.api_request(
+        path='/api/vpn/profile/',
+        method='post',
+        json=payload,
+    )
+    if status_vpn == 200 and response_vpn:
+        await _reply_vpn_profile(message, response_vpn)
+        if response_vpn.get('donation_prompt'):
+            await message.reply(response_vpn['donation_prompt'])
+        if response_vpn.get('ticket'):
+            await message.reply(
+                'Заявка записана. Метка: '
+                f'<code>{html.quote(response_vpn["ticket"]["artifact_label"])}</code>'
+            )
+    else:
+        artifact_label = (response_vpn or {}).get('artifact_label')
+        text = (response_vpn or {}).get('message') or Misc.MSG_ERROR_API
+        if artifact_label:
+            text += f'\nМетка: <code>{html.quote(artifact_label)}</code>'
+        await message.reply(text)
+
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
+    Command(re.compile('^my_usage$', flags=re.I)),
+)
+async def cmd_my_usage(message: Message, state: FSMContext):
+    logging.debug(f"Executing cmd_my_usage command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
+    profile = await _vpn_sender_profile(message)
+    if not profile:
+        return
+    status_usage, response_usage = await Misc.api_request(
+        path='/api/vpn/my_usage/',
+        method='get',
+        params=dict(tg_token=settings.TOKEN, user_uuid=profile['uuid']),
+    )
+    if status_usage == 200 and response_usage:
+        await message.reply(
+            '<b>Ваш VPN расход</b>\n'
+            f'Неделя: {response_usage["week"]["total_gb"]} GB\n'
+            f'Месяц: {response_usage["month"]["total_gb"]} GB'
+        )
+    else:
+        await message.reply((response_usage or {}).get('message') or Misc.MSG_ERROR_API)
+
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
+    Command(re.compile('^vpn_dashboard$', flags=re.I)),
+)
+async def cmd_vpn_dashboard(message: Message, state: FSMContext):
+    logging.debug(f"Executing cmd_vpn_dashboard command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
+    profile = await _vpn_sender_profile(message)
+    if not profile:
+        return
+    params = dict(tg_token=settings.TOKEN, user_uuid=profile['uuid'])
+    if profile.get('is_power'):
+        params['exact'] = 1
+    status_dashboard, response_dashboard = await Misc.api_request(
+        path='/api/vpn/dashboard/',
+        method='get',
+        params=params,
+    )
+    if status_dashboard == 200 and response_dashboard:
+        await message.reply(_vpn_dashboard_text(response_dashboard))
+    else:
+        await message.reply((response_dashboard or {}).get('message') or Misc.MSG_ERROR_API)
+
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
+    Command(re.compile('^connect_friend$', flags=re.I)),
+)
+async def cmd_connect_friend(message: Message, state: FSMContext):
+    logging.debug(f"Executing cmd_connect_friend command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
+    profile = await _vpn_sender_profile(message)
+    if not profile:
+        return
+    status_friend, response_friend = await Misc.api_request(
+        path='/api/vpn/connect_friend/',
+        method='post',
+        json=dict(tg_token=settings.TOKEN, user_uuid=profile['uuid']),
+    )
+    if status_friend == 200 and response_friend:
+        await message.reply(
+            'Ссылка для друга:\n'
+            f'{html.quote(response_friend["url"])}\n\n'
+            'MTProto можно использовать только как временный вход в Telegram. '
+            'VPN профиль Doverabot выдаст другу лично.'
+        )
+    else:
+        await message.reply((response_friend or {}).get('message') or Misc.MSG_ERROR_API)
+
+
 async def show_start(message, state, set_state=True):
     status, response = await Misc.get_template('start')
     if status == 200 and response:
@@ -458,6 +688,9 @@ async def cmd_start(message: Message, state: FSMContext):
 
     elif arg == 'meet':
         await cmd_meet(message, state, profile=response_sender)
+
+    elif arg == 'vpn':
+        await cmd_vpn(message, state)
 
     else:
         await message.reply(f'Такая команда — /start {arg} — не предусмотрена!')

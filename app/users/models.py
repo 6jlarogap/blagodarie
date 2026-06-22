@@ -2,6 +2,7 @@ import datetime, string, random, os, binascii, time
 import urllib.request, urllib.error, urllib.parse
 from urllib.parse import urlencode
 import json, re, hashlib
+from decimal import Decimal
 from uuid import uuid4, UUID
 
 from django.conf import settings
@@ -2043,6 +2044,580 @@ class TgDesc(BaseModelInsertTimestamp):
             file_id = self.file_id,
             file_type = self.file_type,
         )
+
+
+class VpnServerRunway(BaseModelInsertUpdateTimestamp):
+    """
+    Current prepaid VPN server renewal facts.
+
+    This slice is intentionally scoped to the existing/current server. Payment
+    dates and amounts are entered through admin/config, not hard-coded here.
+    """
+
+    label = models.CharField(_("Сервер"), max_length=128, default='current', db_index=True)
+    prepaid_until = models.DateField(_("Оплачен до"), null=True, blank=True, db_index=True)
+    upcoming_payment_amount = models.DecimalField(
+        _("Следующий платеж"),
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    currency = models.CharField(_("Валюта"), max_length=8, default='RUB')
+    active = models.BooleanField(_("Текущий"), default=True, db_index=True)
+    notes = models.TextField(verbose_name=_("Заметки"), blank=True, default='')
+
+    class Meta:
+        ordering = ('-active', '-pk')
+
+    def __str__(self):
+        return self.label
+
+    @classmethod
+    def current(cls):
+        return cls.objects.filter(active=True).order_by('-pk').first()
+
+    def days_left(self, today=None):
+        if not self.prepaid_until:
+            return None
+        today = today or datetime.date.today()
+        return (self.prepaid_until - today).days
+
+    def data_dict(self, today=None):
+        return dict(
+            label=self.label,
+            prepaid_until=self.prepaid_until.isoformat() if self.prepaid_until else '',
+            days_left=self.days_left(today=today),
+            upcoming_payment_amount=str(self.upcoming_payment_amount)
+                if self.upcoming_payment_amount is not None else '',
+            currency=self.currency,
+            active=self.active,
+        )
+
+
+class VpnProfile(BaseModelInsertUpdateTimestamp):
+    """
+    Personal Xray access profile for the current server.
+    """
+
+    STATUS_ACTIVE = 'active'
+    STATUS_PAUSED = 'paused'
+    STATUS_DISABLED = 'disabled'
+
+    STATUSES = (
+        (STATUS_ACTIVE, _("Активен")),
+        (STATUS_PAUSED, _("Пауза")),
+        (STATUS_DISABLED, _("Отключен")),
+    )
+
+    FRESH_OK = 'ok'
+    FRESH_MISSING_CONFIG = 'missing_config'
+
+    FRESH_STATUSES = (
+        (FRESH_OK, _("Обновлен")),
+        (FRESH_MISSING_CONFIG, _("Нет конфигурации")),
+    )
+
+    user = models.OneToOneField(
+        'auth.User',
+        verbose_name=_("Пользователь"),
+        on_delete=models.CASCADE,
+        related_name='vpn_profile',
+    )
+    label = models.CharField(_("Метка Xray"), max_length=128, unique=True, db_index=True)
+    status = models.CharField(
+        _("Статус"),
+        max_length=16,
+        choices=STATUSES,
+        default=STATUS_ACTIVE,
+        db_index=True,
+    )
+    subscription_token = models.CharField(
+        _("Токен подписки"),
+        max_length=64,
+        unique=True,
+        db_index=True,
+    )
+    token_expires_at = models.BigIntegerField(_("Токен истекает"), default=0, db_index=True)
+    config_uri = models.TextField(verbose_name=_("URI конфигурации"), blank=True, default='')
+    artifact_label = models.CharField(
+        _("Метка артефакта"),
+        max_length=160,
+        blank=True,
+        default='',
+        db_index=True,
+    )
+    last_refreshed_at = models.BigIntegerField(_("Последнее обновление"), default=0)
+    last_fresh_status = models.CharField(
+        _("Статус обновления"),
+        max_length=32,
+        choices=FRESH_STATUSES,
+        default=FRESH_OK,
+    )
+    last_fresh_error = models.TextField(verbose_name=_("Ошибка обновления"), blank=True, default='')
+
+    class Meta:
+        ordering = ('user__first_name', 'user__username')
+
+    def __str__(self):
+        return self.label
+
+    def default_label(self):
+        username = re.sub(r'[^a-zA-Z0-9_\-]+', '-', self.user.username or '').strip('-')
+        if not username:
+            username = 'user'
+        username = username[:48]
+        return 'dovera-%s-%s' % (self.user_id, username)
+
+    @classmethod
+    def make_token(cls):
+        return binascii.hexlify(os.urandom(24)).decode('ascii')
+
+    def make_unique_token(self):
+        for i in range(1000):
+            token = self.make_token()
+            qs = VpnProfile.objects.filter(subscription_token=token)
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if not qs.exists():
+                return token
+        raise ServiceException('Не удалось создать уникальный VPN token')
+
+    @classmethod
+    def token_ttl(cls):
+        try:
+            return int(getattr(settings, 'VPN_PROFILE_TOKEN_TTL', 7 * 86400))
+        except (TypeError, ValueError):
+            return 7 * 86400
+
+    def template_context(self):
+        return dict(
+            token=self.subscription_token,
+            label=self.label,
+            user_id=self.user_id,
+            username=self.user.username,
+            profile_uuid=str(self.user.profile.uuid),
+        )
+
+    def format_template(self, template):
+        try:
+            return template % self.template_context()
+        except (KeyError, TypeError, ValueError):
+            return ''
+
+    def save(self, *args, **kwargs):
+        if not self.label and self.user_id:
+            self.label = self.default_label()
+        if not self.subscription_token:
+            self.subscription_token = self.make_unique_token()
+        return super(VpnProfile, self).save(*args, **kwargs)
+
+    def refresh_access(self, config_uri=None):
+        """
+        Rotate the weekly subscription token and refresh config from admin/config.
+
+        Returns False and records a structured status if no current-server config
+        source exists. It never suggests provisioning another server.
+        """
+        if not self.pk:
+            self.save()
+        now = int(time.time())
+        self.subscription_token = self.make_unique_token()
+        self.token_expires_at = now + self.token_ttl()
+
+        if config_uri is not None:
+            self.config_uri = str(config_uri).strip()
+        elif getattr(settings, 'VPN_DEFAULT_CONFIG_URI_TEMPLATE', ''):
+            self.config_uri = self.format_template(settings.VPN_DEFAULT_CONFIG_URI_TEMPLATE)
+
+        self.last_refreshed_at = now
+        self.artifact_label = '%s-%s' % (self.label, now)
+        if self.config_uri:
+            self.last_fresh_status = self.FRESH_OK
+            self.last_fresh_error = ''
+        else:
+            self.last_fresh_status = self.FRESH_MISSING_CONFIG
+            self.last_fresh_error = 'VPN current-server config URI is not configured'
+        self.save()
+        return self.last_fresh_status == self.FRESH_OK
+
+    def subscription_url(self, request=None):
+        template = getattr(settings, 'VPN_SUBSCRIPTION_URL_TEMPLATE', '')
+        if template:
+            return self.format_template(template)
+        path = '/api/vpn/subscription/%s/' % self.subscription_token
+        return request.build_absolute_uri(path) if request else path
+
+    @classmethod
+    def active_for_token(cls, token):
+        if not token:
+            return None
+        return cls.objects.filter(
+            subscription_token=token,
+            status=cls.STATUS_ACTIVE,
+            token_expires_at__gte=int(time.time()),
+        ).first()
+
+    def data_dict(self, request=None, include_secret=False):
+        data = dict(
+            id=self.pk,
+            user_uuid=str(self.user.profile.uuid),
+            label=self.label,
+            status=self.status,
+            subscription_url=self.subscription_url(request=request),
+            token_expires_at=self.token_expires_at,
+            artifact_label=self.artifact_label,
+            last_refreshed_at=self.last_refreshed_at,
+            last_fresh_status=self.last_fresh_status,
+        )
+        if include_secret:
+            data.update(config_uri=self.config_uri)
+        return data
+
+
+class VpnTrafficPeriod(BaseModelInsertUpdateTimestamp):
+    """
+    Stored per-profile weekly/monthly traffic counters.
+    """
+
+    KIND_WEEK = 'week'
+    KIND_MONTH = 'month'
+
+    PERIOD_KINDS = (
+        (KIND_WEEK, _("Неделя")),
+        (KIND_MONTH, _("Месяц")),
+    )
+
+    profile = models.ForeignKey(
+        VpnProfile,
+        verbose_name=_("VPN профиль"),
+        on_delete=models.CASCADE,
+        related_name='traffic_periods',
+    )
+    period_kind = models.CharField(_("Период"), max_length=16, choices=PERIOD_KINDS, db_index=True)
+    period_start = models.DateField(_("Начало периода"), db_index=True)
+    uplink_bytes = models.BigIntegerField(_("Отправлено байт"), default=0)
+    downlink_bytes = models.BigIntegerField(_("Получено байт"), default=0)
+
+    class Meta:
+        ordering = ('-period_start', 'profile__label')
+        unique_together = ('profile', 'period_kind', 'period_start')
+
+    def total_bytes(self):
+        return (self.uplink_bytes or 0) + (self.downlink_bytes or 0)
+
+    @staticmethod
+    def week_start(date_value):
+        return date_value - datetime.timedelta(days=date_value.weekday())
+
+    @staticmethod
+    def month_start(date_value):
+        return date_value.replace(day=1)
+
+    @classmethod
+    def current_start(cls, period_kind, today=None):
+        today = today or datetime.date.today()
+        if period_kind == cls.KIND_WEEK:
+            return cls.week_start(today)
+        return cls.month_start(today)
+
+    @classmethod
+    def add_delta(cls, profile, captured_date, uplink_delta, downlink_delta):
+        for period_kind, period_start in (
+            (cls.KIND_WEEK, cls.week_start(captured_date)),
+            (cls.KIND_MONTH, cls.month_start(captured_date)),
+        ):
+            period, created = cls.objects.get_or_create(
+                profile=profile,
+                period_kind=period_kind,
+                period_start=period_start,
+                defaults=dict(uplink_bytes=0, downlink_bytes=0),
+            )
+            period.uplink_bytes += max(0, int(uplink_delta or 0))
+            period.downlink_bytes += max(0, int(downlink_delta or 0))
+            period.save()
+
+    def data_dict(self):
+        return dict(
+            period_kind=self.period_kind,
+            period_start=self.period_start.isoformat(),
+            uplink_bytes=self.uplink_bytes,
+            downlink_bytes=self.downlink_bytes,
+            total_bytes=self.total_bytes(),
+        )
+
+
+class VpnStatsSnapshot(BaseModelInsertTimestamp):
+    """
+    Sanitized imported Xray stats snapshot.
+
+    Raw configs and opaque inbound JSON are intentionally not persisted.
+    """
+
+    profile = models.ForeignKey(
+        VpnProfile,
+        verbose_name=_("VPN профиль"),
+        on_delete=models.CASCADE,
+        related_name='stats_snapshots',
+    )
+    captured_at = models.BigIntegerField(_("Когда снят счетчик"), db_index=True)
+    source = models.CharField(_("Источник"), max_length=64, default='xray', db_index=True)
+    source_label = models.CharField(_("Метка источника"), max_length=128, db_index=True)
+    uplink_bytes = models.BigIntegerField(_("Отправлено байт"), default=0)
+    downlink_bytes = models.BigIntegerField(_("Получено байт"), default=0)
+
+    class Meta:
+        ordering = ('-captured_at', '-pk')
+
+    def total_bytes(self):
+        return (self.uplink_bytes or 0) + (self.downlink_bytes or 0)
+
+    @classmethod
+    def _stats_items(cls, payload):
+        if isinstance(payload, dict) and isinstance(payload.get('stats'), list):
+            return payload['stats']
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            return [
+                dict(label=label, **value)
+                for label, value in payload.items()
+                if isinstance(value, dict)
+            ]
+        return []
+
+    @classmethod
+    def normalize_xray_counters(cls, payload):
+        counters = {}
+
+        def add(label, direction, value):
+            label = str(label or '').strip()
+            direction = str(direction or '').strip().lower()
+            if not label or direction not in ('uplink', 'downlink'):
+                return
+            try:
+                value = int(value or 0)
+            except (TypeError, ValueError):
+                return
+            counters.setdefault(label, dict(uplink=0, downlink=0))
+            counters[label][direction] += max(0, value)
+
+        for item in cls._stats_items(payload):
+            if not isinstance(item, dict):
+                continue
+            label = item.get('source_label') or item.get('label') or item.get('email')
+            direction = item.get('direction')
+            name = item.get('name')
+            if name and '>>>' in str(name):
+                parts = str(name).split('>>>')
+                if len(parts) >= 2:
+                    label = parts[1]
+                if parts[-1] in ('uplink', 'downlink'):
+                    direction = parts[-1]
+            if 'uplink' in item or 'downlink' in item:
+                add(label, 'uplink', item.get('uplink'))
+                add(label, 'downlink', item.get('downlink'))
+            else:
+                add(label, direction, item.get('value', item.get('bytes')))
+        return counters
+
+    @classmethod
+    @transaction.atomic
+    def import_xray_counters(cls, payload, captured_at=None, source='xray'):
+        captured_at = int(captured_at or time.time())
+        captured_date = datetime.datetime.fromtimestamp(captured_at).date()
+        counters = cls.normalize_xray_counters(payload)
+        imported = 0
+        skipped_labels = []
+        for label, values in counters.items():
+            profile = VpnProfile.objects.filter(label=label).first()
+            if not profile:
+                skipped_labels.append(label)
+                continue
+            previous = cls.objects.filter(
+                profile=profile,
+                captured_at__lt=captured_at,
+            ).order_by('-captured_at', '-pk').first()
+            snapshot = cls.objects.create(
+                profile=profile,
+                captured_at=captured_at,
+                source=source,
+                source_label=label,
+                uplink_bytes=values.get('uplink', 0),
+                downlink_bytes=values.get('downlink', 0),
+            )
+            imported += 1
+            if previous:
+                uplink_delta = snapshot.uplink_bytes - previous.uplink_bytes
+                downlink_delta = snapshot.downlink_bytes - previous.downlink_bytes
+                VpnTrafficPeriod.add_delta(
+                    profile=profile,
+                    captured_date=captured_date,
+                    uplink_delta=uplink_delta,
+                    downlink_delta=downlink_delta,
+                )
+        return dict(
+            imported=imported,
+            skipped_labels=skipped_labels,
+        )
+
+    def data_dict(self):
+        return dict(
+            profile_label=self.profile.label,
+            captured_at=self.captured_at,
+            source=self.source,
+            source_label=self.source_label,
+            uplink_bytes=self.uplink_bytes,
+            downlink_bytes=self.downlink_bytes,
+            total_bytes=self.total_bytes(),
+        )
+
+
+class VpnDonorPreference(BaseModelInsertUpdateTimestamp):
+    user = models.OneToOneField(
+        'auth.User',
+        verbose_name=_("Пользователь"),
+        on_delete=models.CASCADE,
+        related_name='vpn_donor_preference',
+    )
+    is_visible = models.BooleanField(_("Показывать в благодарностях"), default=False)
+    public_name = models.CharField(_("Публичное имя"), max_length=80, blank=True, default='')
+
+    class Meta:
+        ordering = ('user__first_name', 'user__username')
+
+    def __str__(self):
+        return self.display_name()
+
+    def display_name(self):
+        return self.public_name or self.user.first_name or self.user.username or str(self.user_id)
+
+
+class VpnRunwayLedgerEntry(BaseModelInsertTimestamp):
+    ENTRY_DONATION = 'donation'
+    ENTRY_REFERRAL_CREDIT = 'referral_credit'
+    ENTRY_PAYMENT = 'payment'
+    ENTRY_ADJUSTMENT = 'adjustment'
+
+    ENTRY_TYPES = (
+        (ENTRY_DONATION, _("Донат")),
+        (ENTRY_REFERRAL_CREDIT, _("Реферальный кредит")),
+        (ENTRY_PAYMENT, _("Оплата сервера")),
+        (ENTRY_ADJUSTMENT, _("Корректировка")),
+    )
+
+    entry_type = models.CharField(_("Тип"), max_length=32, choices=ENTRY_TYPES, db_index=True)
+    user = models.ForeignKey(
+        'auth.User',
+        verbose_name=_("Пользователь"),
+        on_delete=models.SET_NULL,
+        related_name='vpn_ledger_entries',
+        null=True,
+        blank=True,
+    )
+    amount = models.DecimalField(_("Сумма"), max_digits=12, decimal_places=2)
+    currency = models.CharField(_("Валюта"), max_length=8, default='RUB')
+    received_at = models.DateField(_("Дата"), default=datetime.date.today, db_index=True)
+    is_confirmed = models.BooleanField(_("Подтверждено"), default=True, db_index=True)
+    note = models.TextField(verbose_name=_("Заметка"), blank=True, default='')
+
+    class Meta:
+        ordering = ('-received_at', '-pk')
+
+    def __str__(self):
+        return '%s %s %s' % (self.entry_type, self.amount, self.currency)
+
+    @classmethod
+    def latest_payment_date(cls):
+        payment = cls.objects.filter(
+            entry_type=cls.ENTRY_PAYMENT,
+            is_confirmed=True,
+        ).order_by('-received_at', '-pk').first()
+        return payment.received_at if payment else None
+
+    @classmethod
+    def project_income_since_latest_payment(cls):
+        qs = cls.objects.filter(
+            entry_type__in=(cls.ENTRY_DONATION, cls.ENTRY_REFERRAL_CREDIT),
+            is_confirmed=True,
+        )
+        payment_date = cls.latest_payment_date()
+        if payment_date:
+            qs = qs.filter(received_at__gt=payment_date)
+        total = qs.aggregate(total=Sum('amount'))['total']
+        return total or Decimal('0')
+
+    @classmethod
+    def donations_since_latest_payment(cls):
+        qs = cls.objects.filter(
+            entry_type=cls.ENTRY_DONATION,
+            is_confirmed=True,
+        )
+        payment_date = cls.latest_payment_date()
+        if payment_date:
+            qs = qs.filter(received_at__gt=payment_date)
+        total = qs.aggregate(total=Sum('amount'))['total']
+        return total or Decimal('0')
+
+    def data_dict(self):
+        return dict(
+            entry_type=self.entry_type,
+            amount=str(self.amount),
+            currency=self.currency,
+            received_at=self.received_at.isoformat(),
+            is_confirmed=self.is_confirmed,
+            user_uuid=str(self.user.profile.uuid) if self.user_id else '',
+        )
+
+
+class VpnFeedbackTicket(BaseModelInsertTimestamp):
+    REASON_CONFIG_FAILED = 'config_failed'
+    REASON_STILL_BROKEN = 'still_broken'
+
+    REASONS = (
+        (REASON_CONFIG_FAILED, _("Не удалось выдать конфигурацию")),
+        (REASON_STILL_BROKEN, _("Свежая конфигурация не помогла")),
+    )
+
+    STATUS_OPEN = 'open'
+    STATUS_CLOSED = 'closed'
+
+    STATUSES = (
+        (STATUS_OPEN, _("Открыто")),
+        (STATUS_CLOSED, _("Закрыто")),
+    )
+
+    user = models.ForeignKey(
+        'auth.User',
+        verbose_name=_("Пользователь"),
+        on_delete=models.CASCADE,
+        related_name='vpn_feedback_tickets',
+    )
+    profile = models.ForeignKey(
+        VpnProfile,
+        verbose_name=_("VPN профиль"),
+        on_delete=models.SET_NULL,
+        related_name='feedback_tickets',
+        null=True,
+        blank=True,
+    )
+    reason = models.CharField(_("Причина"), max_length=32, choices=REASONS, db_index=True)
+    artifact_label = models.CharField(_("Метка артефакта"), max_length=160, db_index=True)
+    message = models.TextField(verbose_name=_("Сообщение"), blank=True, default='')
+    status = models.CharField(_("Статус"), max_length=16, choices=STATUSES, default=STATUS_OPEN, db_index=True)
+
+    class Meta:
+        ordering = ('-insert_timestamp', '-pk')
+
+    def data_dict(self):
+        return dict(
+            id=self.pk,
+            reason=self.reason,
+            artifact_label=self.artifact_label,
+            status=self.status,
+            insert_timestamp=self.insert_timestamp,
+        )
+
 
 class ApiDonateUser(object):
 
