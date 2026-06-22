@@ -46,6 +46,7 @@ urlpatterns = [
     re_path(r'^api/offer/ref/?$', views.api_offer_ref),
 
     re_path(r'^api/rental/offer/?$', views.api_rental_offer),
+    re_path(r'^api/rental/media/(?P<tgdesc_id>\d+)/thumbnail/?$', views.api_rental_media_thumbnail),
     re_path(r'^api/rental/search/?$', views.api_rental_search),
     re_path(r'^api/rental/contact/?$', views.api_rental_contact),
     re_path(r'^api/rental/message/?$', views.api_rental_message),

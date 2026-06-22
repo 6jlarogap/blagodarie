@@ -1582,6 +1582,35 @@ class RentalOffer(BaseModelInsertUpdateTimestamp, GeoPointAddressModel):
             )
         return result
 
+    def rental_media(self, request=None, viewer_user=None):
+        viewer_params = dict(offer_uuid=str(self.uuid))
+        if viewer_user and viewer_user.is_authenticated:
+            viewer_params['user_uuid'] = str(viewer_user.profile.uuid)
+
+        result = []
+        for message in self.tgdesc.all().order_by('message_id', 'pk'):
+            if not message.file_id or not message.file_type:
+                continue
+            item = dict(
+                id=message.pk,
+                message_id=message.message_id,
+                chat_id=message.chat_id,
+                media_group_id=message.media_group_id,
+                caption=message.caption,
+                file_type=message.file_type,
+                uuid_pack=str(message.uuid_pack),
+                thumbnail_url='',
+            )
+            if request and message.file_type == 'photo':
+                item['thumbnail_url'] = request.build_absolute_uri(
+                    '/api/rental/media/%s/thumbnail/?%s' % (
+                        message.pk,
+                        urlencode(viewer_params),
+                    )
+                )
+            result.append(item)
+        return result
+
     def data_dict(self, request=None, viewer_user=None, include_payment=False):
         result = dict(
             uuid=self.uuid,
@@ -1617,6 +1646,7 @@ class RentalOffer(BaseModelInsertUpdateTimestamp, GeoPointAddressModel):
             ],
             telegram_messages=self.telegram_messages(),
             canonical_message=self.canonical_message(),
+            media=self.rental_media(request=request, viewer_user=viewer_user),
             trust_badges=self.trust_badges(viewer_user=viewer_user),
         )
         if include_payment:

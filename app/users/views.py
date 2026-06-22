@@ -1,4 +1,5 @@
 import os, re, hmac, hashlib, json, time, datetime, copy, string, random
+from io import BytesIO
 from decimal import Decimal, InvalidOperation
 import redis, html
 from uuid import uuid4, UUID
@@ -8,8 +9,10 @@ from urllib.parse import urlparse
 from ged4py.parser import GedcomReader
 
 from django.shortcuts import render, redirect
+from django.http import HttpResponse
 from django.db import transaction, IntegrityError, connection
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db.models.query_utils import Q
 from django.db.models import Prefetch, F
@@ -4737,6 +4740,99 @@ class ApiRentalOffer(ApiRentalMixin, APIView):
         return Response(data=data, status=status_code)
 
 api_rental_offer = ApiRentalOffer.as_view()
+
+
+class ApiRentalMediaThumbnail(ApiRentalMixin, APIView):
+
+    THUMBNAIL_SIZE = 320
+    CACHE_SECONDS = 24 * 60 * 60
+
+    def visible_media(self, request, tgdesc_id):
+        offer_uuid = self.clean_text(request.GET, 'offer_uuid')
+        if not offer_uuid:
+            raise NotFound()
+        qs, viewer_user = self.rental_offer_queryset(
+            request,
+            active_only=False,
+            include_private_link=True,
+        )
+        try:
+            offer = qs.get(uuid=offer_uuid, tgdesc__pk=tgdesc_id)
+            media = offer.tgdesc.get(pk=tgdesc_id)
+        except (TypeError, ValueError, ValidationError, RentalOffer.DoesNotExist, TgDesc.DoesNotExist,):
+            raise NotFound()
+        if media.file_type != 'photo' or not media.file_id:
+            raise NotFound()
+        return media
+
+    def telegram_file_bytes(self, file_id):
+        bot_token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
+        if not bot_token:
+            raise ServiceException('Не настроен токен телеграм бота')
+        try:
+            get_file_url = 'https://api.telegram.org/bot%s/getFile?%s' % (
+                bot_token,
+                urllib.parse.urlencode(dict(file_id=file_id)),
+            )
+            with urllib.request.urlopen(
+                urllib.request.Request(get_file_url),
+                timeout=10,
+            ) as response:
+                file_payload = json.loads(response.read().decode('utf-8'))
+            file_path = (file_payload.get('result') or {}).get('file_path')
+            if not file_payload.get('ok') or not file_path:
+                raise ServiceException('Не удалось получить файл телеграма')
+            download_url = 'https://api.telegram.org/file/bot%s/%s' % (
+                bot_token,
+                urllib.parse.quote(file_path, safe='/'),
+            )
+            with urllib.request.urlopen(
+                urllib.request.Request(download_url),
+                timeout=15,
+            ) as response:
+                return response.read()
+        except (OSError, ValueError, KeyError, urllib.error.URLError, ServiceException,):
+            raise ServiceException('Не удалось загрузить медиа телеграма')
+
+    def thumbnail_bytes(self, file_id):
+        from PIL import Image, ImageOps
+
+        source = self.telegram_file_bytes(file_id)
+        try:
+            image = Image.open(BytesIO(source))
+            image = ImageOps.exif_transpose(image)
+            image.thumbnail((self.THUMBNAIL_SIZE, self.THUMBNAIL_SIZE), Image.LANCZOS)
+            if image.mode in ('RGBA', 'LA'):
+                background = Image.new('RGB', image.size, 'white')
+                background.paste(image, mask=image.getchannel('A'))
+                image = background
+            elif image.mode != 'RGB':
+                image = image.convert('RGB')
+            output = BytesIO()
+            image.save(output, format='JPEG', quality=78, optimize=True)
+            return output.getvalue()
+        except OSError:
+            raise ServiceException('Медиа телеграма не является изображением')
+
+    def get(self, request, tgdesc_id):
+        media = self.visible_media(request, tgdesc_id)
+        cache_key = 'rental-media-thumbnail:%s:%s' % (media.pk, self.THUMBNAIL_SIZE)
+        content = cache.get(cache_key)
+        if content is None:
+            try:
+                content = self.thumbnail_bytes(media.file_id)
+            except ServiceException as excpt:
+                return Response(
+                    data=dict(message=excpt.args[0]),
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+            cache.set(cache_key, content, self.CACHE_SECONDS)
+        response = HttpResponse(content, content_type='image/jpeg')
+        response['Cache-Control'] = 'public, max-age=%s' % self.CACHE_SECONDS
+        return response
+
+
+api_rental_media_thumbnail = ApiRentalMediaThumbnail.as_view()
 
 
 class ApiRentalSearch(ApiRentalMixin, APIView):

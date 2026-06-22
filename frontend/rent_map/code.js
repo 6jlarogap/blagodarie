@@ -204,6 +204,46 @@
     return 'https://t.me/' + encodeURIComponent(state.botUsername) + '?start=rent-' + encodeURIComponent(offer.uuid);
   }
 
+  function mediaItems(offer) {
+    return (offer.media || []).filter(function (item) {
+      return item && (item.thumbnail_url || item.file_type);
+    });
+  }
+
+  function renderMedia(offer, card) {
+    var media = mediaItems(offer);
+    if (!media.length) return;
+    var strip = document.createElement('div');
+    strip.className = 'media-strip';
+    media.slice(0, 4).forEach(function (item, index) {
+      var thumb = document.createElement('div');
+      thumb.className = 'media-thumb';
+      if (item.thumbnail_url) {
+        var image = document.createElement('img');
+        image.src = item.thumbnail_url;
+        image.loading = 'lazy';
+        image.alt = item.caption || titleOf(offer);
+        image.addEventListener('error', function () {
+          thumb.classList.add('is-placeholder');
+          thumb.textContent = item.file_type || 'media';
+          image.remove();
+        });
+        thumb.appendChild(image);
+      } else {
+        thumb.classList.add('is-placeholder');
+        thumb.textContent = item.file_type || 'media';
+      }
+      if (index === 3 && media.length > 4) {
+        var more = document.createElement('span');
+        more.className = 'media-more';
+        more.textContent = '+' + String(media.length - 4);
+        thumb.appendChild(more);
+      }
+      strip.appendChild(thumb);
+    });
+    card.appendChild(strip);
+  }
+
   function makeMarkerIcon(selected) {
     if (!window.L) return null;
     return window.L.divIcon({
@@ -323,6 +363,8 @@
       card.className = 'listing-card';
       card.dataset.uuid = offer.uuid;
       card.tabIndex = 0;
+
+      renderMedia(offer, card);
 
       var title = document.createElement('h3');
       title.textContent = titleOf(offer);

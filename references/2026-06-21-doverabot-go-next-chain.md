@@ -1,17 +1,18 @@
 # Doverabot Go Next Chain
 
 Date: 2026-06-21
-Status: slices 1-18 implemented; runtime deployment caught up
+Status: slices 1-19 implemented; runtime deployment caught up
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 Current completed chain: [2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md](2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md)
 
-Active next slice: Rental Frontend Media Thumbnails
-Active next `/new-go-slug`: `doverabot-rental-frontend-media-thumbnails`
+Active next slice: Rental Owner Web Controls
+Active next `/new-go-slug`: `doverabot-rental-owner-web-controls`
 Selected candidate chain: rental frontend redesign in
 [2026-06-22-doverabot-rental-frontend-redesign-chain.md](2026-06-22-doverabot-rental-frontend-redesign-chain.md).
-The frontend redesign chain selected media thumbnails as the next small
-source-owned `/rent/` follow-up before larger owner or reservation-history web
-controls.
+The frontend redesign chain completed media thumbnails as the smallest
+source-owned `/rent/` follow-up. Owner web controls are the next deferred
+frontend step before broader reservation-history web controls or legacy map
+cleanup.
 
 ## Chain Purpose
 
@@ -528,3 +529,59 @@ Completion criteria:
 
 Print after completion, suggested next `/new-go-slug`:
 `doverabot-next-decision-refresh`
+
+## Slice 19: Rental Frontend Media Thumbnails
+
+Suggested `/new-go-slug`: `doverabot-rental-frontend-media-thumbnails`
+
+Status: implemented; deploy pending in this handoff.
+
+Scope:
+
+- Expose Telegram-origin rental offer media as browser-safe thumbnail metadata
+  in rental offer/search payloads.
+- Add a backend thumbnail proxy for Telegram photo `file_id` values without
+  exposing the bot token in frontend URLs.
+- Render bounded photo thumbnails in maintained `/rent/` listing cards.
+- Keep generated frontend bundles, owner dashboards, reservation-history web
+  controls, and local media schema changes out of scope.
+
+Completion criteria:
+
+- Backend tests cover rental search media payloads and the server-side Telegram
+  thumbnail proxy.
+- `/rent/` cards render thumbnails when offer media is present and degrade
+  cleanly for non-photo media.
+- Django check, frontend syntax, diff check, reindex, graph update, deploy, and
+  status checks pass.
+- Runtime code changes are committed, deployed, and logged.
+
+Print after completion, suggested next `/new-go-slug`:
+`doverabot-rental-owner-web-controls`
+
+## Slice 20: Rental Owner Web Controls
+
+Suggested `/new-go-slug`: `doverabot-rental-owner-web-controls`
+
+Status: planned.
+
+Scope:
+
+- Add an authenticated owner-management surface to the maintained `/rent/`
+  frontend so owners can review their own active, paused, and archived listings.
+- Provide owner web actions for pause, resume, archive, public link, and show on
+  map using existing owner-safe backend controls.
+- Preserve the bot owner controls and current public renter search behavior.
+
+Out of scope:
+
+- Reservation-history web controls.
+- Escrow, deposits, moderation dashboards, or automatic reputation changes.
+- Generated frontend bundle patching.
+
+Completion criteria:
+
+- Owner web controls are discoverable from `/rent/` for authenticated owners.
+- Backend/frontend tests or smokes cover authorization and status transitions.
+- Relevant checks, reindex, graph update, commit, deploy, and handoff logging
+  are complete or exact blockers are recorded.

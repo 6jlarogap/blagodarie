@@ -1,8 +1,10 @@
 import hashlib
 import hmac
 import datetime
+import json
 import time
 from decimal import Decimal
+from io import BytesIO
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -13,6 +15,21 @@ from contact.models import CurrentState, Key, KeyType
 from users.models import Profile, RentalEquipmentType, RentalOffer, RentalOfferMessage, \
     RentalReservationEvent, RentalReservationIntent, RentalReservationPaymentProof, TgDesc
 from users.views import ApiAuthTelegram
+
+
+class MockUrlopenResponse:
+
+    def __init__(self, content):
+        self.content = content
+
+    def read(self):
+        return self.content
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
 
 
 class ApiAuthTelegramTests(SimpleTestCase):
@@ -103,6 +120,80 @@ class ApiRentalOfferTests(TestCase):
         self.assertEqual(offer.quantity_total, 1)
         self.assertEqual(response.data['offer']['quantity_total'], 1)
         self.assertEqual(response.data['offer']['price_text'], '500 руб/день')
+
+    def test_search_includes_rental_media_thumbnail_urls(self):
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Photo tent',
+            description_text='Палатка с фото',
+        )
+        media = TgDesc.objects.create(
+            message_id=10,
+            chat_id=20,
+            caption='Фото палатки',
+            file_id='telegram-photo-file',
+            file_type='photo',
+            uuid_pack='00000000-0000-0000-0000-000000000010',
+        )
+        offer.tgdesc.add(media)
+
+        response = self.client.get('/api/rental/search/', data={
+            'user_uuid': str(self.requester_profile.uuid),
+        })
+
+        self.assertEqual(response.status_code, 200)
+        offer_data = response.data['offers'][0]
+        self.assertEqual(offer_data['media'][0]['id'], media.pk)
+        self.assertEqual(offer_data['media'][0]['file_type'], 'photo')
+        self.assertEqual(offer_data['media'][0]['caption'], 'Фото палатки')
+        self.assertIn(
+            '/api/rental/media/%s/thumbnail/' % media.pk,
+            offer_data['media'][0]['thumbnail_url'],
+        )
+        self.assertIn('offer_uuid=%s' % offer.uuid, offer_data['media'][0]['thumbnail_url'])
+        self.assertIn(
+            'user_uuid=%s' % self.requester_profile.uuid,
+            offer_data['media'][0]['thumbnail_url'],
+        )
+
+    @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
+    @mock.patch('users.views.urllib.request.urlopen')
+    def test_rental_media_thumbnail_proxies_telegram_photo(self, mock_urlopen):
+        from PIL import Image
+
+        offer = RentalOffer.objects.create(
+            owner=self.owner,
+            title='Photo tent',
+            description_text='Палатка с фото',
+        )
+        media = TgDesc.objects.create(
+            message_id=10,
+            chat_id=20,
+            caption='Фото палатки',
+            file_id='telegram-photo-file',
+            file_type='photo',
+            uuid_pack='00000000-0000-0000-0000-000000000011',
+        )
+        offer.tgdesc.add(media)
+        image_content = BytesIO()
+        Image.new('RGB', (64, 48), 'red').save(image_content, format='JPEG')
+        mock_urlopen.side_effect = [
+            MockUrlopenResponse(json.dumps({
+                'ok': True,
+                'result': {'file_path': 'photos/file.jpg'},
+            }).encode('utf-8')),
+            MockUrlopenResponse(image_content.getvalue()),
+        ]
+
+        response = self.client.get('/api/rental/media/%s/thumbnail/' % media.pk, data={
+            'offer_uuid': str(offer.uuid),
+            'user_uuid': str(self.requester_profile.uuid),
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'image/jpeg')
+        self.assertTrue(response.content.startswith(b'\xff\xd8'))
+        self.assertEqual(mock_urlopen.call_count, 2)
 
     @override_settings(TELEGRAM_BOT_TOKEN=bot_token)
     def test_owner_listing_controls_include_paused_archived_and_status_updates(self):

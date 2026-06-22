@@ -107,6 +107,9 @@ Current implementation:
 - The rental frontend redesign chain delivered `/rent/` maintained source,
   nginx routing, bot map links to `/rent/`, listing/map sync, URL state,
   viewport refresh, and direct `rental_uuid` behavior.
+- The `/rent/` frontend now shows Telegram-origin offer photo thumbnails in
+  listing cards through a backend thumbnail proxy that keeps the bot token out
+  of browser URLs.
 - The voice/STT recovery chain owns the previously uncommitted rental bot
   changes for STT-aware prompts, opt-in debug logging, spoken date/address slot
   extraction, and visible unrecognized-voice feedback.
@@ -147,13 +150,14 @@ Remaining product backlog:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-rental-frontend-media-thumbnails`.
+Active next `/new-go-slug`: `doverabot-rental-owner-web-controls`.
 
 Selected candidate chain:
 [../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md](../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md).
 
-Reason: add offer media thumbnails to the maintained `/rent/` cards before
-larger owner or reservation-history web controls.
+Reason: media parity is now in place for renter-facing cards, so the next
+smallest deferred frontend step is authenticated owner listing controls before
+reservation-history web controls or legacy map cleanup.
 
 Accepted prior-session decisions:
 

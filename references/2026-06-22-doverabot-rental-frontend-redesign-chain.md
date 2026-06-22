@@ -1,7 +1,7 @@
 # Doverabot Rental Frontend Redesign Chain
 
 Date: 2026-06-22
-Status: implemented; active next slug `doverabot-rental-frontend-media-thumbnails`
+Status: implemented; active next slug `doverabot-rental-owner-web-controls`
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 
 Slug queue:
@@ -131,7 +131,7 @@ Completion criteria:
 
 ## Follow-Up Decision
 
-Selected next slug: `doverabot-rental-frontend-media-thumbnails`.
+Selected next slug: `doverabot-rental-frontend-media-thumbnails` (implemented).
 
 Reason: the new `/rent/` frontend now has maintained source, map/list sync,
 URL state, and direct offer selection, but listing cards still cannot show the
@@ -141,12 +141,28 @@ without adding owner dashboard or reservation-history web control scope.
 
 Deferred candidates:
 
-- `doverabot-rental-owner-web-controls`: useful later, but it introduces a new
-  authenticated owner-management surface.
+- `doverabot-rental-owner-web-controls`: selected next after media thumbnails;
+  it introduces a new authenticated owner-management surface.
 - `doverabot-rental-reservation-history-web-controls`: useful later, but it
   expands into role-aware reservation actions and audit UX.
 - `doverabot-rental-legacy-map-cleanup`: defer until `/rent/` has media parity
   and enough live use to confirm the legacy map no longer needs rental affordances.
+
+## Media Thumbnail Follow-Up
+
+Slug: `doverabot-rental-frontend-media-thumbnails`
+Status: implemented
+Next slug: `doverabot-rental-owner-web-controls`
+
+Outcome:
+
+- Rental offer/search payloads now include a `media` array derived from stored
+  Telegram description packs.
+- Telegram photo `file_id` values are rendered through
+  `/api/rental/media/<tgdesc_id>/thumbnail/`, which fetches and thumbnails media
+  server-side instead of exposing the bot token to the browser.
+- Maintained `/rent/` listing cards render bounded media thumbnails and fall
+  back cleanly for non-photo media.
 
 ## Run Strategy
 
