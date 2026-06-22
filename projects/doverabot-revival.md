@@ -34,6 +34,8 @@ Rental V1 smoke observability chain: [../references/2026-06-21-doverabot-rental-
 
 Go-next chain: [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md)
 
+Rental frontend redesign chain: [../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md](../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md)
+
 Next decision refresh chain: [../references/2026-06-21-doverabot-next-decision-refresh-chain.md](../references/2026-06-21-doverabot-next-decision-refresh-chain.md)
 
 Post-reservation decision refresh chain: [../references/2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md](../references/2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md)
@@ -97,6 +99,9 @@ Current implementation:
   `users.0062_rentaloffer_quantity_total` are applied, web/bot services are
   restarted, and live rental search, map, offer lookup, and reservation-history
   guard smokes pass.
+- The 2026-06-22 decision refresh confirmed the current frontend decision:
+  build `/rent/` as a rental-first static frontend from maintained source, not
+  as a generated-bundle patch to the legacy map.
 
 Primary implementation areas:
 
@@ -134,9 +139,12 @@ Remaining product backlog:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-next-decision-refresh`.
+Active next `/new-go-slug`: `doverabot-rental-frontend-mvp`.
 
-After that slice, print the selected next `/new-go-slug`.
+Selected candidate chain:
+[../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md](../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md).
+
+After that slice, print `doverabot-rental-frontend-live-polish`.
 
 Accepted prior-session decisions:
 

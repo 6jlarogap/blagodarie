@@ -5,10 +5,12 @@ Status: slices 1-18 implemented; runtime deployment caught up
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 Current completed chain: [2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md](2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md)
 
-Active next slice: Next Decision Refresh
-Active next `/new-go-slug`: `doverabot-next-decision-refresh`
-The saved runtime-catchup sequence is exhausted; run the decision refresh to
-choose the next small product or hardening slice from current production state.
+Active next slice: Rental Frontend MVP
+Active next `/new-go-slug`: `doverabot-rental-frontend-mvp`
+Selected candidate chain: rental frontend redesign in
+[2026-06-22-doverabot-rental-frontend-redesign-chain.md](2026-06-22-doverabot-rental-frontend-redesign-chain.md).
+The 2026-06-22 decision refresh confirmed `doverabot-rental-frontend-mvp` as
+the next small product slice from current production state.
 
 ## Chain Purpose
 

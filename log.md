@@ -1,5 +1,15 @@
 # Log
 
+## 2026-06-22
+
+- Implemented `doverabot-next-decision-refresh`: re-read the saved rental
+  frontend redesign chain and current runtime state, confirmed nginx,
+  gunicorn, and telegram-bot active with `sudo -n
+  /usr/local/sbin/blagodarie-admin status`, and selected
+  `doverabot-rental-frontend-mvp` as the active next implementation slice.
+  Runtime deploy not required for this docs-only refresh; next slug is
+  `doverabot-rental-frontend-mvp`.
+
 ## 2026-06-21
 
 - Implemented and deployed `doverabot-rental-runtime-deploy-unblock`: added the
