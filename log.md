@@ -2,6 +2,21 @@
 
 ## 2026-06-22
 
+- Implemented and deployed `vpn-slice-worker-chain`: added current-server-only
+  VPN profiles with weekly subscription token rotation, subscription URL
+  serving, sanitized Xray counter import with weekly/monthly rollups, runway
+  ledger, opt-in donor highlights, structured fresh-config failure tickets, and
+  bot commands `/vpn`, `/fresh`, `/my_usage`, `/vpn_dashboard`, and
+  `/connect_friend`. Source commit: `17fa53a`. Checks passed: Python syntax
+  compile for changed backend/bot files, `git diff --check`, Django check,
+  focused Django `users` tests (29 tests), migration drift check (`No changes
+  detected`; history check printed a local PostgreSQL socket permission
+  warning), and graphify update. Runtime handoff completed through
+  `blagodarie-admin`: dry-run, sync, migration `users.0063_vpn_mvp`, deploy,
+  `check-django`, `is-active`, and `status` all completed; nginx/web/bot are
+  active. Existing Django `security.W002` clickjacking middleware warning
+  remains. Funding copy is scoped to the current prepaid server and does not
+  suggest renting a new server.
 - Implemented and deployed `doverabot-rental-frontend-media-thumbnails`:
   rental offer/search payloads now expose Telegram-origin media metadata,
   photo thumbnails are proxied server-side through
