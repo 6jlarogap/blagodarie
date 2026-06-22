@@ -2,6 +2,22 @@
 
 ## 2026-06-22
 
+- Implemented and runtime-deployed `doverabot-rental-llm-extractor`: added a
+  disabled-by-default HTTP JSON LLM extractor for rental offer/search text,
+  whitelisted and normalized slot keys before merge, preserved regex/date/place
+  fallback behavior, routed `/rent_offer` and `/rent_search` through async
+  extractor wrappers, exposed LLM/STT timeout runtime settings in the repo
+  wrapper source, and tracked the existing `.graphifyignore`. Source commit:
+  `00e9ec8`. Checks passed: focused rental bot tests (47 tests), full mocked
+  bot discovery (105 tests), bot compileall, wrapper shell syntax,
+  `git diff --check`, Django test-settings check, reindex, and graphify update.
+  Runtime deploy through the already-installed wrapper completed with the
+  existing Django `security.W002` warning; nginx/web/bot/STT are active and
+  read-only rental search plus `/rent/` smokes returned HTTP 200. Blocker:
+  `sudo bash deploy/install-blagodarie-admin-workflow.sh` failed with
+  `sudo: A terminal is required to authenticate`, so the installed
+  `bot-runtime-setting` command does not yet expose the new
+  `RENTAL_LLM_EXTRACTOR_*` or `RENTAL_STT_TIMEOUT` keys.
 - Implemented and deployed `doverabot-rental-medium-stt-adapter`: added a
   Doverabot-owned localhost rental STT HTTP adapter using faster-whisper
   `medium`, added `pip-rental-stt.txt`, extended the admin wrapper with rental

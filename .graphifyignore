@@ -1,0 +1,9 @@
+# Generated/static assets that overwhelm graph queries with vendor symbols.
+/app/static/
+/frontend/*/dist/
+/frontend/genesis/d3js/
+
+# Cache-busted frontend copies; keep the source files like code.js indexed.
+/frontend/**/*.????????????????.js
+/frontend/**/*.min.js
+/frontend/**/*.min.*.js
