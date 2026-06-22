@@ -9,6 +9,20 @@
   `doverabot-rental-frontend-mvp` as the active next implementation slice.
   Runtime deploy not required for this docs-only refresh; next slug is
   `doverabot-rental-frontend-mvp`.
+- Implemented and deployed `doverabot-rental-frontend-mvp`: added maintained
+  no-build static source at `frontend/rent_map/`, served it at `/rent/` with a
+  shared `/common/` nginx alias while preserving the legacy map at `/`, and
+  moved rental bot map links to `/rent/` without dropping existing rental query
+  parameters. Checks passed: JS syntax, focused rental bot tests, full mocked
+  bot discovery, compileall, `git diff --check`, reindex, graphify update, and
+  nginx syntax/install. Deployment ran through `blagodarie-admin deploy`; the
+  existing Django `security.W002` warning remains. Post-deploy `is-active`
+  returned active for nginx/web/bot, status showed web and bot restarted, live
+  smokes returned HTTP 200 for `/rent/`, `/rent/code.js`, `/common/js/funcs.js`,
+  legacy `/`, rental search, and rental map points, and recent web/bot log tails
+  showed only service restart entries. Unrelated local tracked bot changes were
+  temporarily stashed before deploy and restored afterward; the untracked
+  `scripts/unblock-django-test-db.sh` helper remained unstaged.
 
 ## 2026-06-21
 

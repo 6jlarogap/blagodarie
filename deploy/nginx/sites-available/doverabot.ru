@@ -13,6 +13,19 @@ server {
     root /srv/blagodarie/frontend/map_npm/dist;
     index index.html;
 
+    location /common/ {
+        alias /srv/blagodarie/frontend/common/;
+    }
+
+    location = /rent {
+        return 301 /rent/;
+    }
+
+    location /rent/ {
+        alias /srv/blagodarie/frontend/rent_map/;
+        index index.html;
+    }
+
     location = /auth/telegram {
         proxy_pass http://127.0.0.1:8000/api/auth/telegram/;
         proxy_set_header Host api.doverabot.ru;

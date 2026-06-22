@@ -1,0 +1,422 @@
+(function () {
+  'use strict';
+
+  var SEARCH_LIMIT = 50;
+  var MOSCOW = [55.75222, 37.61556];
+  var FILTER_KEYS = [
+    'rental_query',
+    'rental_equipment_type',
+    'rental_date_from',
+    'rental_date_to',
+    'rental_price_max',
+    'rental_trusted_only',
+    'rental_uuid'
+  ];
+
+  var el = {};
+  var state = {
+    auth: null,
+    botUsername: 'DoveraBot',
+    map: null,
+    markers: {},
+    points: [],
+    offers: [],
+    selectedUuid: ''
+  };
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function setText(node, value) {
+    node.textContent = value == null ? '' : String(value);
+  }
+
+  function value(id) {
+    return ($(id).value || '').trim();
+  }
+
+  function isTruthy(value) {
+    return value && !/^(0|false|off|no|нет)$/i.test(String(value));
+  }
+
+  function apiUrl(path) {
+    return new URL(path, window.get_api_url());
+  }
+
+  function apiGet(path, params) {
+    return window.api_request(apiUrl(path), { params: params });
+  }
+
+  function currentFilters() {
+    return {
+      rental_query: value('filterQuery'),
+      rental_equipment_type: value('filterEquipment'),
+      rental_date_from: value('filterDateFrom'),
+      rental_date_to: value('filterDateTo'),
+      rental_price_max: value('filterPriceMax'),
+      rental_trusted_only: $('filterTrustedOnly').checked ? 'on' : '',
+      rental_uuid: state.selectedUuid || ''
+    };
+  }
+
+  function viewerParams() {
+    var params = {};
+    if (state.auth && state.auth.user_uuid) params.user_uuid = state.auth.user_uuid;
+    if (state.auth && state.auth.auth_token) params.auth_token = state.auth.auth_token;
+    return params;
+  }
+
+  function searchParams() {
+    var filters = currentFilters();
+    var params = viewerParams();
+    params.number = SEARCH_LIMIT;
+    if (filters.rental_query) params.query = filters.rental_query;
+    if (filters.rental_equipment_type) params.equipment_type = filters.rental_equipment_type;
+    if (filters.rental_date_from) params.date_from = filters.rental_date_from;
+    if (filters.rental_date_to) params.date_to = filters.rental_date_to;
+    if (filters.rental_price_max) params.price_max = filters.rental_price_max;
+    if (filters.rental_trusted_only) params.trusted_only = filters.rental_trusted_only;
+    return params;
+  }
+
+  function pointParams() {
+    var filters = currentFilters();
+    var params = viewerParams();
+    params.rental = 'on';
+    FILTER_KEYS.forEach(function (key) {
+      if (filters[key]) params[key] = filters[key];
+    });
+    return params;
+  }
+
+  function initFiltersFromUrl() {
+    var params = new URLSearchParams(window.location.search);
+    $('filterQuery').value = params.get('rental_query') || '';
+    $('filterEquipment').value = params.get('rental_equipment_type') || '';
+    $('filterDateFrom').value = params.get('rental_date_from') || '';
+    $('filterDateTo').value = params.get('rental_date_to') || '';
+    $('filterPriceMax').value = params.get('rental_price_max') || '';
+    $('filterTrustedOnly').checked = isTruthy(params.get('rental_trusted_only'));
+    state.selectedUuid = params.get('rental_uuid') || '';
+  }
+
+  function setMessage(message, isError) {
+    setText(el.stateMessage, message || '');
+    el.stateMessage.classList.toggle('is-error', Boolean(isError));
+  }
+
+  function setMapStatus(message) {
+    setText(el.mapStatus, message || '');
+  }
+
+  function setLoading(isLoading) {
+    el.filterForm.classList.toggle('is-loading', Boolean(isLoading));
+    el.filterForm.querySelectorAll('button, input, select').forEach(function (node) {
+      node.disabled = Boolean(isLoading);
+    });
+  }
+
+  function formatPrice(offer) {
+    if (offer.price_text) return offer.price_text;
+    if (offer.price_amount) {
+      return [offer.price_amount, offer.price_currency, offer.price_period].filter(Boolean).join(' ');
+    }
+    return 'Цена не указана';
+  }
+
+  function formatAvailability(offer) {
+    var parts = [];
+    if (offer.availability_text) parts.push(offer.availability_text);
+    if (offer.available_from || offer.available_to) {
+      parts.push((offer.available_from || '?') + ' - ' + (offer.available_to || '?'));
+    }
+    return parts.join(' · ') || 'Даты не указаны';
+  }
+
+  function equipmentLabel(type) {
+    var labels = type.labels || {};
+    if (labels.ru && labels.ru.length) return labels.ru[0];
+    if (labels.en && labels.en.length) return labels.en[0];
+    return type.canonical_name || type.slug || '';
+  }
+
+  function titleOf(offer) {
+    return offer.title || offer.item_text || 'Прокат';
+  }
+
+  function telegramUrl(offer) {
+    return 'https://t.me/' + encodeURIComponent(state.botUsername) + '?start=rent-' + encodeURIComponent(offer.uuid);
+  }
+
+  function makeMarkerIcon(selected) {
+    if (!window.L) return null;
+    return window.L.divIcon({
+      className: '',
+      html: '<div class="rent-marker' + (selected ? ' is-selected' : '') + '">R</div>',
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+      popupAnchor: [0, -18]
+    });
+  }
+
+  function initMap() {
+    if (!window.L) {
+      el.map.className = 'fallback-map';
+      setMapStatus('Карта недоступна, список точек открыт ниже.');
+      return;
+    }
+    state.map = window.L.map(el.map, {
+      zoomControl: true,
+      scrollWheelZoom: true
+    }).setView(MOSCOW, 10);
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(state.map);
+  }
+
+  function clearMarkers() {
+    Object.keys(state.markers).forEach(function (uuid) {
+      if (state.map) state.map.removeLayer(state.markers[uuid]);
+    });
+    state.markers = {};
+    if (!state.map) el.map.innerHTML = '';
+  }
+
+  function renderMap(points, center) {
+    clearMarkers();
+    var rentalPoints = points.filter(function (point) {
+      return point.is_rental && point.rental_uuid && point.latitude && point.longitude;
+    });
+    if (!state.map) {
+      rentalPoints.forEach(function (point) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'fallback-marker';
+        button.dataset.uuid = point.rental_uuid;
+        button.textContent = point.title || 'Прокат';
+        button.addEventListener('click', function () {
+          selectOffer(point.rental_uuid, true);
+        });
+        el.map.appendChild(button);
+      });
+      return;
+    }
+
+    var bounds = [];
+    rentalPoints.forEach(function (point) {
+      var latLng = [Number(point.latitude), Number(point.longitude)];
+      var marker = window.L.marker(latLng, {
+        title: point.title || 'Прокат',
+        icon: makeMarkerIcon(point.rental_uuid === state.selectedUuid)
+      });
+      marker.addTo(state.map);
+      if (point.popup) marker.bindPopup(point.popup);
+      marker.on('click', function () {
+        selectOffer(point.rental_uuid, true);
+      });
+      state.markers[point.rental_uuid] = marker;
+      bounds.push(latLng);
+    });
+    if (bounds.length) {
+      state.map.fitBounds(bounds, { padding: [36, 36], maxZoom: 14 });
+    } else if (center && center.length === 2) {
+      state.map.setView(center, 10);
+    }
+  }
+
+  function renderTags(offer, card) {
+    var types = offer.equipment_types || [];
+    if (!types.length) return;
+    var row = document.createElement('div');
+    row.className = 'tag-row';
+    types.forEach(function (type) {
+      var tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = equipmentLabel(type);
+      row.appendChild(tag);
+    });
+    card.appendChild(row);
+  }
+
+  function appendMeta(grid, label, valueText) {
+    var node = document.createElement('div');
+    node.className = 'meta';
+    var strong = document.createElement('strong');
+    strong.textContent = label + ': ';
+    node.appendChild(strong);
+    node.appendChild(document.createTextNode(valueText || ''));
+    grid.appendChild(node);
+  }
+
+  function renderListings(offers) {
+    el.listingList.innerHTML = '';
+    el.resultCount.textContent = String(offers.length);
+    offers.forEach(function (offer) {
+      var card = document.createElement('article');
+      card.className = 'listing-card';
+      card.dataset.uuid = offer.uuid;
+      card.tabIndex = 0;
+
+      var title = document.createElement('h3');
+      title.textContent = titleOf(offer);
+      card.appendChild(title);
+
+      if (offer.description_text) {
+        var description = document.createElement('p');
+        description.className = 'meta';
+        description.textContent = offer.description_text;
+        card.appendChild(description);
+      }
+
+      var meta = document.createElement('div');
+      meta.className = 'meta-grid';
+      appendMeta(meta, 'Цена', formatPrice(offer));
+      appendMeta(meta, 'Доступность', formatAvailability(offer));
+      appendMeta(meta, 'Адрес', offer.address || 'Не указан');
+      appendMeta(meta, 'Владелец', (offer.owner && offer.owner.first_name) || 'Doverabot');
+      card.appendChild(meta);
+      renderTags(offer, card);
+
+      var actions = document.createElement('div');
+      actions.className = 'card-actions';
+      var book = document.createElement('a');
+      book.className = 'card-link';
+      book.href = telegramUrl(offer);
+      book.target = '_blank';
+      book.rel = 'noopener';
+      book.textContent = 'Забронировать';
+      var contact = document.createElement('a');
+      contact.className = 'card-link secondary';
+      contact.href = telegramUrl(offer);
+      contact.target = '_blank';
+      contact.rel = 'noopener';
+      contact.textContent = 'Написать';
+      actions.appendChild(book);
+      actions.appendChild(contact);
+      card.appendChild(actions);
+
+      card.addEventListener('click', function (event) {
+        if (event.target.closest('a')) return;
+        selectOffer(offer.uuid, true);
+      });
+      card.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          selectOffer(offer.uuid, true);
+        }
+      });
+      el.listingList.appendChild(card);
+    });
+  }
+
+  function selectOffer(uuid, fromUser) {
+    state.selectedUuid = uuid || '';
+    document.querySelectorAll('.listing-card').forEach(function (card) {
+      var selected = card.dataset.uuid === state.selectedUuid;
+      card.classList.toggle('is-selected', selected);
+      if (selected && fromUser) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    document.querySelectorAll('.fallback-marker').forEach(function (marker) {
+      marker.classList.toggle('is-selected', marker.dataset.uuid === state.selectedUuid);
+    });
+    Object.keys(state.markers).forEach(function (markerUuid) {
+      state.markers[markerUuid].setIcon(makeMarkerIcon(markerUuid === state.selectedUuid));
+    });
+    var marker = state.markers[state.selectedUuid];
+    if (marker && fromUser) {
+      marker.openPopup();
+      state.map.panTo(marker.getLatLng());
+    }
+  }
+
+  function responseMessage(response, fallback) {
+    if (!response) return fallback;
+    if (response.data && response.data.message) return response.data.message;
+    if (response.status) return fallback + ' (' + response.status + ')';
+    return fallback;
+  }
+
+  async function loadRentals() {
+    setLoading(true);
+    setMessage('Загрузка объявлений...', false);
+    setMapStatus('');
+    try {
+      var results = await Promise.all([
+        apiGet('/api/rental/search/', searchParams()),
+        apiGet('/api/user/points/', pointParams())
+      ]);
+      var search = results[0];
+      var points = results[1];
+      if (!search.ok) throw new Error(responseMessage(search, 'Не удалось загрузить объявления'));
+      if (!points.ok) throw new Error(responseMessage(points, 'Не удалось загрузить точки на карте'));
+
+      state.offers = (search.data && search.data.offers) || [];
+      state.points = (points.data && points.data.points) || [];
+      renderListings(state.offers);
+      renderMap(state.points, [
+        Number(points.data && points.data.lat_avg) || MOSCOW[0],
+        Number(points.data && points.data.lng_avg) || MOSCOW[1]
+      ]);
+      if (state.offers.length) {
+        setMessage('', false);
+        if (!state.selectedUuid) state.selectedUuid = state.offers[0].uuid;
+        selectOffer(state.selectedUuid, false);
+      } else if (state.auth && state.auth.user_uuid) {
+        setMessage('По этим фильтрам объявлений нет.', false);
+      } else {
+        setMessage('Авторизуйтесь через Telegram, чтобы увидеть доступные объявления.', false);
+      }
+      if (search.data && search.data.clarification) {
+        setMessage('Уточните тип снаряжения в фильтре.', false);
+      }
+    } catch (error) {
+      setMessage(error && error.message ? error.message : 'Не удалось загрузить прокат.', true);
+      renderListings([]);
+      renderMap([], MOSCOW);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadBotData() {
+    var response = await apiGet('/api/get_bot_data/', {});
+    if (response.ok && response.data && response.data.username) {
+      state.botUsername = response.data.username;
+      el.botLink.href = 'https://t.me/' + encodeURIComponent(state.botUsername);
+    }
+  }
+
+  function bindEvents() {
+    el.filterForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      state.selectedUuid = '';
+      loadRentals();
+    });
+    $('resetButton').addEventListener('click', function () {
+      el.filterForm.reset();
+      state.selectedUuid = '';
+      loadRentals();
+    });
+  }
+
+  async function init() {
+    el.filterForm = $('filterForm');
+    el.map = $('map');
+    el.mapStatus = $('mapStatus');
+    el.listingList = $('listingList');
+    el.resultCount = $('resultCount');
+    el.stateMessage = $('stateMessage');
+    el.botLink = $('botLink');
+
+    initFiltersFromUrl();
+    initMap();
+    bindEvents();
+    state.auth = await window.check_auth(false);
+    await loadBotData();
+    await loadRentals();
+  }
+
+  window.addEventListener('DOMContentLoaded', init);
+})();

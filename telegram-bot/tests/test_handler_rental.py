@@ -360,7 +360,9 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         buttons = [button for row in markup.inline_keyboard for button in row]
         map_buttons = [button for button in buttons if button.text == 'На карте']
         self.assertEqual(len(map_buttons), 1)
-        params = parse_qs(urlparse(map_buttons[0].url).query)
+        parsed_url = urlparse(map_buttons[0].url)
+        self.assertEqual(parsed_url.path, '/rent/')
+        params = parse_qs(parsed_url.query)
         self.assertEqual(params['rental'], ['on'])
         self.assertEqual(params['rental_uuid'], ['offer-uuid'])
         self.assertEqual(params['rental_query'], ['tent moscow'])
@@ -419,7 +421,9 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('В архив', [button.text for button in buttons])
         self.assertIn('На карте', [button.text for button in buttons])
         map_url = [button.url for button in buttons if button.text == 'На карте'][0]
-        params = parse_qs(urlparse(map_url).query)
+        parsed_url = urlparse(map_url)
+        self.assertEqual(parsed_url.path, '/rent/')
+        params = parse_qs(parsed_url.query)
         self.assertEqual(params['rental_equipment_type'], ['tent'])
         self.assertEqual(params['rental_date_from'], ['2026-07-01'])
         self.assertEqual(params['rental_price_max'], ['500.00'])
@@ -539,7 +543,9 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             for button in row
         ]
         map_url = [button.url for button in buttons if button.text == 'На карте'][0]
-        params = parse_qs(urlparse(map_url).query)
+        parsed_url = urlparse(map_url)
+        self.assertEqual(parsed_url.path, '/rent/')
+        params = parse_qs(parsed_url.query)
         self.assertEqual(params['rental_uuid'], ['offer-uuid'])
         self.assertEqual(params['rental_equipment_type'], ['snowboard'])
         self.assertEqual(params['rental_date_from'], ['2026-08-01'])

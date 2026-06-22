@@ -5,12 +5,11 @@ Status: slices 1-18 implemented; runtime deployment caught up
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 Current completed chain: [2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md](2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md)
 
-Active next slice: Rental Frontend MVP
-Active next `/new-go-slug`: `doverabot-rental-frontend-mvp`
+Active next slice: Rental Frontend Live Polish
+Active next `/new-go-slug`: `doverabot-rental-frontend-live-polish`
 Selected candidate chain: rental frontend redesign in
 [2026-06-22-doverabot-rental-frontend-redesign-chain.md](2026-06-22-doverabot-rental-frontend-redesign-chain.md).
-The 2026-06-22 decision refresh confirmed `doverabot-rental-frontend-mvp` as
-the next small product slice from current production state.
+The MVP slice is implemented and deployed; continue with live frontend polish.
 
 ## Chain Purpose
 

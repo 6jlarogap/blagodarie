@@ -158,7 +158,7 @@ class Rental(object):
             params.update(rental_price_max=price_max)
         if map_params.get('trusted_only'):
             params.update(rental_trusted_only='on')
-        return '%s/?%s' % (settings.MAP_HOST.rstrip('/'), urlencode(params))
+        return '%s/rent/?%s' % (settings.MAP_HOST.rstrip('/'), urlencode(params))
 
     @classmethod
     def stt_headers(cls):

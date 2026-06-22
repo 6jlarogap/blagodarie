@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Doverabot - прокат снаряжения</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIINfQp8N3p9SP+Ch5L6fxy5pDqZ4L2u2oA="
+        crossorigin="">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="rent-app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Doverabot</div>
+        <h1>Прокат снаряжения</h1>
+      </div>
+      <a class="telegram-link" id="botLink" href="https://t.me/DoveraBot" target="_blank" rel="noopener">
+        Telegram
+      </a>
+    </header>
+
+    <form class="filters" id="filterForm">
+      <label class="field field-query">
+        <span>Поиск</span>
+        <input id="filterQuery" name="rental_query" type="search" autocomplete="off"
+               placeholder="Палатка, спальник, место">
+      </label>
+      <label class="field">
+        <span>Тип</span>
+        <select id="filterEquipment" name="rental_equipment_type">
+          <option value="">Все</option>
+          <option value="tent">Палатка</option>
+          <option value="backpack">Рюкзак</option>
+          <option value="sleeping-bag">Спальник</option>
+          <option value="snowboard">Сноуборд</option>
+          <option value="splitboard">Сплитборд</option>
+          <option value="sup-board">SUP доска</option>
+          <option value="skis">Лыжи</option>
+          <option value="ski-boots">Лыжные ботинки</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>С</span>
+        <input id="filterDateFrom" name="rental_date_from" type="date">
+      </label>
+      <label class="field">
+        <span>До</span>
+        <input id="filterDateTo" name="rental_date_to" type="date">
+      </label>
+      <label class="field">
+        <span>Цена до</span>
+        <input id="filterPriceMax" name="rental_price_max" type="number" inputmode="decimal" min="0" step="1">
+      </label>
+      <label class="toggle">
+        <input id="filterTrustedOnly" name="rental_trusted_only" type="checkbox">
+        <span>Доверенные</span>
+      </label>
+      <div class="filter-actions">
+        <button class="button primary" type="submit">Найти</button>
+        <button class="button secondary" id="resetButton" type="button">Сброс</button>
+      </div>
+    </form>
+
+    <main class="workspace">
+      <section class="map-pane" aria-label="Карта проката">
+        <div id="map"></div>
+        <div class="map-status" id="mapStatus"></div>
+      </section>
+      <aside class="list-pane" aria-label="Объявления проката">
+        <div class="list-header">
+          <div>
+            <div class="eyebrow">Результаты</div>
+            <h2 id="resultTitle">Объявления</h2>
+          </div>
+          <div class="count-pill" id="resultCount">0</div>
+        </div>
+        <div class="state-message" id="stateMessage"></div>
+        <div class="listing-list" id="listingList"></div>
+      </aside>
+    </main>
+  </div>
+
+  <div class="modal" id="dialogModal">
+    <div class="modal-panel">
+      <button class="modal-close d-modal-close" type="button" aria-label="Закрыть">x</button>
+      <div id="dialogText"></div>
+    </div>
+  </div>
+
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+  <script defer src="../common/js/local_settings.js"></script>
+  <script defer src="../common/js/funcs.js"></script>
+  <script defer src="./code.js"></script>
+</body>
+</html>
