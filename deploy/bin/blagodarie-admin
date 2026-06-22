@@ -19,6 +19,14 @@ BOT_RUNTIME_SETTING_KEYS=(
   RENTAL_STT_MODE
   RENTAL_STT_CONTRACT
   RENTAL_STT_LANGUAGE
+  RENTAL_STT_TIMEOUT
+  RENTAL_DEBUG_LOG_CONVERSATION
+  RENTAL_DEBUG_LOG_TEXT_LIMIT
+  RENTAL_LLM_EXTRACTOR_URL
+  RENTAL_LLM_EXTRACTOR_TOKEN
+  RENTAL_LLM_EXTRACTOR_CONTRACT
+  RENTAL_LLM_EXTRACTOR_MODEL
+  RENTAL_LLM_EXTRACTOR_TIMEOUT
 )
 
 NGINX_SITES_SRC="$SRC/deploy/nginx/sites-available"
@@ -295,11 +303,11 @@ validate_bot_runtime_setting() {
   fi
 
   case "$key" in
-    RENTAL_STT_URL)
+    RENTAL_STT_URL|RENTAL_LLM_EXTRACTOR_URL)
       case "$value" in
         http://*|https://*) ;;
         *)
-          echo "RENTAL_STT_URL must start with http:// or https://" >&2
+          echo "$key must start with http:// or https://" >&2
           return 1
           ;;
       esac
@@ -313,11 +321,34 @@ validate_bot_runtime_setting() {
           ;;
       esac
       ;;
-    RENTAL_STT_CONTRACT|RENTAL_STT_LANGUAGE)
+    RENTAL_STT_CONTRACT|RENTAL_STT_LANGUAGE|RENTAL_LLM_EXTRACTOR_CONTRACT|RENTAL_LLM_EXTRACTOR_MODEL)
       case "$value" in
-        *[!A-Za-z0-9_.:-]*)
+        *[!A-Za-z0-9_.:/-]*)
           echo "$key contains unsupported characters" >&2
           return 1
+          ;;
+      esac
+      ;;
+    RENTAL_DEBUG_LOG_CONVERSATION)
+      case "$value" in
+        true|false|True|False|1|0|yes|no|on|off) ;;
+        *)
+          echo "RENTAL_DEBUG_LOG_CONVERSATION must be true or false" >&2
+          return 1
+          ;;
+      esac
+      ;;
+    RENTAL_DEBUG_LOG_TEXT_LIMIT|RENTAL_STT_TIMEOUT|RENTAL_LLM_EXTRACTOR_TIMEOUT)
+      case "$value" in
+        ''|*[!0-9]*)
+          echo "$key must be a positive integer" >&2
+          return 1
+          ;;
+        *)
+          if [ "$value" -le 0 ]; then
+            echo "$key must be a positive integer" >&2
+            return 1
+          fi
           ;;
       esac
       ;;
@@ -337,6 +368,14 @@ Allowed keys:
   RENTAL_STT_MODE
   RENTAL_STT_CONTRACT
   RENTAL_STT_LANGUAGE
+  RENTAL_STT_TIMEOUT
+  RENTAL_DEBUG_LOG_CONVERSATION
+  RENTAL_DEBUG_LOG_TEXT_LIMIT
+  RENTAL_LLM_EXTRACTOR_URL
+  RENTAL_LLM_EXTRACTOR_TOKEN
+  RENTAL_LLM_EXTRACTOR_CONTRACT
+  RENTAL_LLM_EXTRACTOR_MODEL
+  RENTAL_LLM_EXTRACTOR_TIMEOUT
 
 Values are written to the live bot settings file and are never printed.
 USAGE
@@ -417,9 +456,16 @@ lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
 updated = []
 replaced = False
 
+if key == "RENTAL_DEBUG_LOG_CONVERSATION":
+    rendered_value = "True" if value.lower() in {"true", "1", "yes", "on"} else "False"
+elif key in {"RENTAL_DEBUG_LOG_TEXT_LIMIT", "RENTAL_STT_TIMEOUT", "RENTAL_LLM_EXTRACTOR_TIMEOUT"}:
+    rendered_value = str(int(value))
+else:
+    rendered_value = repr(value)
+
 for line in lines:
     if pattern.match(line):
-        updated.append(f"{key} = {value!r}\n")
+        updated.append(f"{key} = {rendered_value}\n")
         replaced = True
     else:
         updated.append(line)
@@ -427,7 +473,7 @@ for line in lines:
 if not replaced:
     if updated and updated[-1].strip():
         updated.append("\n")
-    updated.append(f"{key} = {value!r}\n")
+    updated.append(f"{key} = {rendered_value}\n")
 
 path.write_text("".join(updated), encoding="utf-8")
 PY

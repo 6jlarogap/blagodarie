@@ -43,6 +43,54 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             'палатка',
         )
 
+    async def test_stt_timeout_uses_dedicated_long_timeout(self):
+        self.assertEqual(self.handler_rental.Rental.stt_timeout(), 300)
+
+        self.handler_rental.settings.RENTAL_STT_TIMEOUT = '180'
+        self.assertEqual(self.handler_rental.Rental.stt_timeout(), 180)
+
+        self.handler_rental.settings.RENTAL_STT_TIMEOUT = 'bad'
+        self.assertEqual(self.handler_rental.Rental.stt_timeout(), 300)
+
+    async def test_llm_extractor_payload_headers_timeout_and_parser(self):
+        self.handler_rental.settings.RENTAL_LLM_EXTRACTOR_TOKEN = 'llm-token'
+        self.handler_rental.settings.RENTAL_LLM_EXTRACTOR_MODEL = 'qwen3:latest'
+        self.handler_rental.settings.RENTAL_LLM_EXTRACTOR_TIMEOUT = '45'
+
+        payload = self.handler_rental.Rental.llm_extractor_payload(
+            'search',
+            'нужна палатка возле ВДНХ',
+            current_slots={'query': 'нужна палатка возле ВДНХ'},
+        )
+        slots = self.handler_rental.Rental.llm_slots_from_response({
+            'result': {
+                'slots': {
+                    'query': 'палатка',
+                    'date_from': '2026-07-01',
+                    'trusted_only': 'yes',
+                    'map_intent': False,
+                    'latitude': '55.8298',
+                    'longitude': '37.6320',
+                    'ignored': 'drop me',
+                },
+            },
+        }, 'search')
+
+        self.assertEqual(payload['contract'], 'doverabot_rental_llm_extractor_v1')
+        self.assertEqual(payload['mode'], 'search')
+        self.assertEqual(payload['model'], 'qwen3:latest')
+        self.assertIn('query', payload['schema'])
+        self.assertEqual(
+            self.handler_rental.Rental.llm_extractor_headers()['Authorization'],
+            'Bearer llm-token',
+        )
+        self.assertEqual(self.handler_rental.Rental.llm_extractor_timeout(), 45)
+        self.assertEqual(slots['query'], 'палатка')
+        self.assertEqual(slots['date_from'], '2026-07-01')
+        self.assertTrue(slots['trusted_only'])
+        self.assertEqual(slots['latitude'], 55.8298)
+        self.assertNotIn('ignored', slots)
+
     async def test_geocode_address_no_provider_returns_empty(self):
         self.handler_rental.settings.RENTAL_GEOCODING_URL = ''
 
@@ -273,6 +321,43 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(slots['available_to'], f'{year}-07-03')
         self.assertIn('500 рублей', slots['price_text'])
 
+    async def test_spoken_listing_extracts_preposition_place_before_price(self):
+        slots = self.handler_rental.Rental.extract_slots(
+            'Сдаю мэй на колесо на парадроме флайчи гем, за 1000 рублей.'
+        )
+
+        self.assertEqual(slots['address'], 'парадроме флайчи гем')
+        self.assertIn('1000 рублей', slots['price_text'])
+        self.assertEqual(
+            self.handler_rental.Rental.offer_missing_fields(slots),
+            ['availability'],
+        )
+
+    async def test_spoken_listing_does_not_treat_time_phrase_as_place(self):
+        slots = self.handler_rental.Rental.extract_slots(
+            'Сдаю палатку на выходные за 500 рублей.'
+        )
+
+        self.assertEqual(slots['address'], '')
+        self.assertEqual(slots['availability_text'], 'на выходные')
+        self.assertNotIn(
+            'availability',
+            self.handler_rental.Rental.offer_missing_fields(slots),
+        )
+
+    async def test_spoken_listing_extracts_freeform_availability(self):
+        examples = {
+            'Завтра после обеда': 'Завтра после обеда',
+            'По будням вечером': 'По будням вечером',
+            'В любой день': 'В любой день',
+            'До конца сезона': 'До конца сезона',
+        }
+
+        for phrase, expected in examples.items():
+            with self.subTest(phrase=phrase):
+                slots = self.handler_rental.Rental.extract_slots(phrase)
+                self.assertEqual(slots['availability_text'], expected)
+
     async def test_process_rental_offer_voice_without_transcript_reports_unrecognized(self):
         message = FakeMessage(content_type=ContentTypeStub.VOICE)
         message.voice = types.SimpleNamespace(file_id='voice-file-id', duration=7, mime_type='audio/ogg')
@@ -359,6 +444,97 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload['tgdesc']['uuid_pack'], 'offer-pack')
         self.assertTrue(state.cleared)
         self.assertEqual(message.replies[-1].text, 'Объявление проката сохранено')
+
+    async def test_process_rental_offer_collects_freeform_availability_followup(self):
+        message = FakeMessage(text='на выходные')
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+            'rental_slots': {
+                'title': 'Мэй на колесо',
+                'item_text': 'Мэй на колесо',
+                'description_text': 'Мэй на колесо',
+                'address': 'парадроме флайчи гем',
+                'price_text': '1000 рублей',
+            },
+            'rental_geocode_status': 'failed',
+        })
+        response = {
+            'offer': {
+                'uuid': 'offer-uuid',
+                'title': 'Мэй на колесо',
+                'description_text': 'Мэй на колесо',
+                'owner': {'uuid': 'requester-uuid'},
+            },
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'create_offer',
+            mock.AsyncMock(return_value=(200, response)),
+        ) as create_offer, mock.patch.object(
+            self.handler_rental.Rental,
+            'register_message',
+            mock.AsyncMock(return_value=(200, {})),
+        ), mock.patch.object(
+            self.handler_rental.Rental,
+            'show_offer',
+            mock.AsyncMock(),
+        ):
+            await self.handler_rental.process_rental_offer(message, state)
+
+        payload = create_offer.await_args.args[0]
+        self.assertEqual(payload['availability_text'], 'на выходные')
+        self.assertEqual(payload['address'], 'парадроме флайчи гем')
+        self.assertTrue(state.cleared)
+
+    async def test_process_rental_offer_uses_llm_extractor_slots(self):
+        message = FakeMessage(text='Есть мэй, подробности голосом выше')
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+        })
+        response = {
+            'offer': {
+                'uuid': 'offer-uuid',
+                'title': 'Мэй на колесо',
+                'description_text': 'Есть мэй, подробности голосом выше',
+                'owner': {'uuid': 'requester-uuid'},
+            },
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'llm_extract_slots',
+            mock.AsyncMock(return_value={
+                'title': 'Мэй на колесо',
+                'item_text': 'Мэй на колесо',
+                'address': 'парадром Флайчи Гем',
+                'availability_text': 'на выходные',
+                'price_text': '1000 рублей',
+            }),
+        ) as llm_extract_slots, mock.patch.object(
+            self.handler_rental.Rental,
+            'create_offer',
+            mock.AsyncMock(return_value=(200, response)),
+        ) as create_offer, mock.patch.object(
+            self.handler_rental.Rental,
+            'register_message',
+            mock.AsyncMock(return_value=(200, {})),
+        ), mock.patch.object(
+            self.handler_rental.Rental,
+            'show_offer',
+            mock.AsyncMock(),
+        ):
+            await self.handler_rental.process_rental_offer(message, state)
+
+        llm_extract_slots.assert_awaited_once()
+        payload = create_offer.await_args.args[0]
+        self.assertEqual(payload['title'], 'Мэй на колесо')
+        self.assertEqual(payload['address'], 'парадром Флайчи Гем')
+        self.assertEqual(payload['availability_text'], 'на выходные')
+        self.assertEqual(payload['price_text'], '1000 рублей')
+        self.assertTrue(state.cleared)
 
     async def test_offer_and_owner_text_include_quantity_when_multiple(self):
         offer = {
@@ -742,6 +918,41 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             price_max='500',
             trusted_only=True,
             map_intent=True,
+        )
+        self.assertTrue(state.cleared)
+        self.assertEqual(message.replies[-1].text, 'Ничего не найдено')
+
+    async def test_inline_rental_search_uses_llm_extractor_slots(self):
+        message = FakeMessage(text='/rent_search нужно что-то для ночевки около ВДНХ')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'llm_extract_slots',
+            mock.AsyncMock(return_value={
+                'query': 'палатка',
+                'address': 'ВДНХ',
+                'date_from': '2026-07-01',
+                'price_max': '700',
+                'trusted_only': True,
+                'has_context': True,
+            }),
+        ) as llm_extract_slots, mock.patch.object(
+            self.handler_rental.Rental,
+            'search_with_params',
+            mock.AsyncMock(return_value=(200, {'offers': []})),
+        ) as search_with_params:
+            await self.handler_rental.Rental.cmd_rent_search(message, state)
+
+        llm_extract_slots.assert_awaited_once()
+        search_with_params.assert_awaited_once_with(
+            'палатка',
+            'requester-uuid',
+            date_from='2026-07-01',
+            date_to='',
+            price_max='700',
+            trusted_only=True,
+            map_intent=False,
         )
         self.assertTrue(state.cleared)
         self.assertEqual(message.replies[-1].text, 'Ничего не найдено')

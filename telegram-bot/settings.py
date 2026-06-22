@@ -64,8 +64,18 @@ RENTAL_STT_URL = ''
 RENTAL_STT_TOKEN = ''
 RENTAL_STT_MODE = 'file_id'
 RENTAL_STT_LANGUAGE = 'ru'
+RENTAL_STT_TIMEOUT = 300
 RENTAL_DEBUG_LOG_CONVERSATION = False
 RENTAL_DEBUG_LOG_TEXT_LIMIT = 1200
+
+# Optional external structured extractor for rental listing/search text.
+# Contract `doverabot_rental_llm_extractor_v1` sends known slot keys and expects
+# a JSON response containing slots for mode `offer` or `search`.
+RENTAL_LLM_EXTRACTOR_CONTRACT = 'doverabot_rental_llm_extractor_v1'
+RENTAL_LLM_EXTRACTOR_URL = ''
+RENTAL_LLM_EXTRACTOR_TOKEN = ''
+RENTAL_LLM_EXTRACTOR_MODEL = ''
+RENTAL_LLM_EXTRACTOR_TIMEOUT = 30
 
 # Optional geocoding adapter for rental addresses.
 # Contract `doverabot_rental_geocoding_v1` sends {"query": "..."} JSON and

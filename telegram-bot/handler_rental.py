@@ -96,6 +96,35 @@ class Rental(object):
         ACTION_OWNER_ARCHIVE: 'archived',
     }
     OWNER_LIST_STATUSES = {'all', 'active', 'paused', 'archived'}
+    LLM_EXTRACTOR_CONTRACT = 'doverabot_rental_llm_extractor_v1'
+    LLM_OFFER_SLOT_KEYS = {
+        'title',
+        'item_text',
+        'description_text',
+        'price_text',
+        'availability_text',
+        'available_from',
+        'available_to',
+        'quantity_total',
+        'address',
+        'latitude',
+        'longitude',
+    }
+    LLM_SEARCH_SLOT_KEYS = {
+        'query',
+        'date_from',
+        'date_to',
+        'price_max',
+        'trusted_only',
+        'map_intent',
+        'address',
+        'latitude',
+        'longitude',
+        'has_context',
+    }
+    LLM_BOOL_SLOT_KEYS = {'trusted_only', 'map_intent', 'has_context'}
+    LLM_FLOAT_SLOT_KEYS = {'latitude', 'longitude'}
+    LLM_DATE_SLOT_KEYS = {'available_from', 'available_to', 'date_from', 'date_to'}
 
     MSG_CALLBACK_STALE = 'Эта кнопка устарела. Откройте прокат заново через /rent_search или /rent.'
     MSG_CALLBACK_AUTH = 'Не удалось проверить ваш профиль. Откройте бота командой /start и попробуйте еще раз.'
@@ -186,10 +215,208 @@ class Rental(object):
             )
         for key, value in fields.items():
             payload[key] = cls.debug_log_value(value)
-        logging.info(
-            'rental_debug %s',
-            json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str),
+        payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+        logging.info('rental_debug %s', payload_json)
+        print('rental_debug %s' % payload_json, flush=True)
+
+    @classmethod
+    def llm_extractor_headers(cls):
+        headers = {}
+        if getattr(settings, 'RENTAL_LLM_EXTRACTOR_TOKEN', ''):
+            headers['Authorization'] = 'Bearer %s' % settings.RENTAL_LLM_EXTRACTOR_TOKEN
+        return headers
+
+    @classmethod
+    def llm_extractor_timeout(cls):
+        try:
+            timeout = float(getattr(settings, 'RENTAL_LLM_EXTRACTOR_TIMEOUT', 30))
+        except (TypeError, ValueError):
+            timeout = 30
+        return timeout if timeout > 0 else 30
+
+    @classmethod
+    def llm_slot_keys(cls, mode):
+        return cls.LLM_SEARCH_SLOT_KEYS if mode == 'search' else cls.LLM_OFFER_SLOT_KEYS
+
+    @classmethod
+    def llm_extractor_payload(cls, mode, text, current_slots=None):
+        payload = dict(
+            contract=getattr(settings, 'RENTAL_LLM_EXTRACTOR_CONTRACT', cls.LLM_EXTRACTOR_CONTRACT),
+            mode=mode,
+            text=text,
+            language=getattr(settings, 'RENTAL_STT_LANGUAGE', 'ru'),
+            slots=current_slots or {},
+            schema=sorted(cls.llm_slot_keys(mode)),
         )
+        model = getattr(settings, 'RENTAL_LLM_EXTRACTOR_MODEL', '')
+        if model:
+            payload.update(model=model)
+        return payload
+
+    @classmethod
+    def normalize_llm_text_slot(cls, value):
+        if value in (None, '') or isinstance(value, (dict, list, tuple)):
+            return ''
+        return str(value).strip()
+
+    @classmethod
+    def normalize_llm_bool_slot(cls, value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {'true', '1', 'yes', 'on', 'да'}:
+                return True
+            if normalized in {'false', '0', 'no', 'off', 'нет'}:
+                return False
+        if isinstance(value, (int, float)):
+            return bool(value)
+        return False
+
+    @classmethod
+    def normalize_llm_float_slot(cls, value):
+        if value in (None, ''):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def llm_slots_from_response(cls, data, mode):
+        if not isinstance(data, dict):
+            return {}
+        candidate = data
+        for key in ('slots', mode, 'extraction', 'result', 'data'):
+            nested = data.get(key)
+            if not isinstance(nested, dict):
+                continue
+            if isinstance(nested.get('slots'), dict):
+                candidate = nested['slots']
+                break
+            candidate = nested
+            break
+        if not isinstance(candidate, dict):
+            return {}
+        result = {}
+        for key in cls.llm_slot_keys(mode):
+            if key not in candidate:
+                continue
+            value = candidate[key]
+            if key in cls.LLM_BOOL_SLOT_KEYS:
+                result[key] = cls.normalize_llm_bool_slot(value)
+                continue
+            if key in cls.LLM_FLOAT_SLOT_KEYS:
+                normalized_float = cls.normalize_llm_float_slot(value)
+                if normalized_float is not None:
+                    result[key] = normalized_float
+                continue
+            if key in cls.LLM_DATE_SLOT_KEYS:
+                normalized_date = cls.parse_search_date(str(value))
+                if normalized_date:
+                    result[key] = normalized_date
+                continue
+            normalized_text = cls.normalize_llm_text_slot(value)
+            if normalized_text:
+                result[key] = normalized_text
+        return result
+
+    @classmethod
+    def merge_llm_slots(cls, base_slots, llm_slots, mode, raw_text=''):
+        merged = dict(base_slots or {})
+        raw_text = (raw_text or '').strip()
+        refine_text_keys = {'title', 'item_text', 'query'}
+        for key, value in (llm_slots or {}).items():
+            current = merged.get(key)
+            if key in cls.LLM_BOOL_SLOT_KEYS:
+                if value and not current:
+                    merged[key] = True
+                continue
+            if key in cls.LLM_FLOAT_SLOT_KEYS:
+                if current is None:
+                    merged[key] = value
+                continue
+            if key in refine_text_keys:
+                current_text = str(current or '').strip()
+                if not current_text or current_text == raw_text or len(current_text) > 80:
+                    merged[key] = value
+                continue
+            if key == 'description_text':
+                if not current:
+                    merged[key] = value
+                continue
+            if current in (None, ''):
+                merged[key] = value
+        if mode == 'search':
+            merged['has_context'] = bool(
+                merged.get('has_context') or
+                merged.get('date_from') or
+                merged.get('date_to') or
+                merged.get('price_max') or
+                merged.get('trusted_only') or
+                merged.get('address') or
+                merged.get('latitude') is not None
+            )
+        return merged
+
+    @classmethod
+    async def llm_extract_slots(cls, mode, text, current_slots=None, message=None):
+        url = getattr(settings, 'RENTAL_LLM_EXTRACTOR_URL', '')
+        text = (text or '').strip()
+        if not url or not text:
+            return {}
+        payload = cls.llm_extractor_payload(mode, text, current_slots=current_slots)
+        timeout = aiohttp.ClientTimeout(total=cls.llm_extractor_timeout())
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, headers=cls.llm_extractor_headers(), json=payload) as resp:
+                    if resp.status >= 400:
+                        error_text = await resp.text()
+                        logging.warning('rental LLM extractor failed with status %s', resp.status)
+                        cls.log_debug(
+                            'llm_extractor_failed',
+                            message,
+                            mode=mode,
+                            status=resp.status,
+                            response=error_text,
+                        )
+                        return {}
+                    data = await resp.json(content_type=None)
+        except Exception:
+            logging.exception('rental LLM extractor request failed')
+            cls.log_debug('llm_extractor_exception', message, mode=mode)
+            return {}
+        slots = cls.llm_slots_from_response(data, mode)
+        cls.log_debug(
+            'llm_extractor_response',
+            message,
+            mode=mode,
+            slots=slots,
+            response=data,
+        )
+        return slots
+
+    @classmethod
+    async def extract_offer_slots(cls, text, message=None, current_slots=None):
+        base_slots = cls.extract_slots(text)
+        llm_slots = await cls.llm_extract_slots(
+            'offer',
+            text,
+            current_slots=cls.merge_offer_slots(current_slots or {}, base_slots),
+            message=message,
+        )
+        return cls.merge_llm_slots(base_slots, llm_slots, 'offer', raw_text=text)
+
+    @classmethod
+    async def extract_search_slots_with_llm(cls, text, message=None, current_slots=None):
+        base_slots = cls.extract_search_slots(text)
+        llm_slots = await cls.llm_extract_slots(
+            'search',
+            text,
+            current_slots=current_slots or base_slots,
+            message=message,
+        )
+        return cls.merge_llm_slots(base_slots, llm_slots, 'search', raw_text=text)
 
     @classmethod
     def get_deeplink(cls, offer_uuid):
@@ -275,6 +502,14 @@ class Rental(object):
         return str(result).strip()
 
     @classmethod
+    def stt_timeout(cls):
+        try:
+            timeout = float(getattr(settings, 'RENTAL_STT_TIMEOUT', 300))
+        except (TypeError, ValueError):
+            timeout = 300
+        return timeout if timeout > 0 else 300
+
+    @classmethod
     async def voice_transcript(cls, message):
         url = getattr(settings, 'RENTAL_STT_URL', '')
         if not url or not message.voice:
@@ -284,7 +519,7 @@ class Rental(object):
                 reason='missing_stt_url' if not url else 'missing_voice',
             )
             return ''
-        timeout = aiohttp.ClientTimeout(total=getattr(settings, 'HTTP_TIMEOUT', 60))
+        timeout = aiohttp.ClientTimeout(total=cls.stt_timeout())
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 request_kwargs = await cls.stt_request_kwargs(message)
@@ -654,6 +889,46 @@ class Rental(object):
         return text.strip(' \t\n\r,.;:-')
 
     @classmethod
+    def looks_like_spoken_address(cls, text):
+        text = (text or '').strip(' \t\n\r,.;:-')
+        if len(text) < 3:
+            return False
+        if re.search(
+                r'\b(?:выходн\w*|будн\w*|день|дня|дней|недел\w*|месяц\w*|час\w*)\b',
+                text,
+                flags=re.I,
+        ):
+            return False
+        return bool(re.search(
+            (
+                r'\b(?:парадром\w*|аэродром\w*|полигон\w*|парк\w*|метро|'
+                r'станци\w*|улиц\w*|проспект\w*|площад\w*|шоссе|район\w*|'
+                r'город\w*|деревн\w*|пос[её]л\w*|база\w*|клуб\w*|центр\w*|'
+                r'склон\w*|трасс\w*|лагер\w*|вднх|москва|минск|сочи|спб|'
+                r'санкт-петербург)\b'
+            ),
+            text,
+            flags=re.I,
+        ))
+
+    @classmethod
+    def extract_spoken_address(cls, text):
+        before_price = re.split(
+            r'\b(?:цена|стоимост\w*|оплат\w*|за\s+\d|руб\w*|₽)\b',
+            text or '',
+            maxsplit=1,
+            flags=re.I,
+        )[0]
+        prep = r'(?:в|на|у|около|рядом\s+с)'
+        pattern = r'\b%s\s+(.+?)(?=\s+\b%s\b|[,.;]|\n|$)' % (prep, prep)
+        candidates = []
+        for match in re.finditer(pattern, before_price, flags=re.I):
+            address = cls.clean_address_text(match.group(1))
+            if cls.looks_like_spoken_address(address):
+                candidates.append(address)
+        return candidates[-1] if candidates else ''
+
+    @classmethod
     def extract_address(cls, text):
         patterns = (
             r'(?:адрес|где|место)\s*[:\-]\s*([^\n]+)',
@@ -665,17 +940,39 @@ class Rental(object):
                 address = cls.clean_address_text(m.group(1))
                 if address:
                     return address
+        address = cls.extract_spoken_address(text)
+        if address:
+            return address
         return ''
 
     @classmethod
     def clean_availability_text(cls, text):
         text = re.split(
-            r'\b(?:цена|стоимост\w*|оплат\w*|адрес|место|забрать|самовывоз|выдача)\b',
+            r'\b(?:цена|стоимост\w*|оплат\w*|адрес|место|забрать|самовывоз|выдача)\b|\bза\s+\d+',
             text or '',
             maxsplit=1,
             flags=re.I,
         )[0]
         return text.strip(' \t\n\r,.;:-')
+
+    @classmethod
+    def extract_spoken_availability(cls, text):
+        text = (text or '').strip()
+        if not text:
+            return ''
+        patterns = (
+            r'\b(?:сегодня|завтра|послезавтра)\b[^\n,.;]*',
+            r'\b(?:на|в|по)\s+(?:выходн\w*|будн\w*)[^\n,.;]*',
+            r'\b(?:в\s+)?(?:любо[ей]|кажд\w+)\s+(?:время|день|дат\w*)[^\n,.;]*',
+            r'\b(?:всегда|постоянно|ежедневно|круглосуточно|уже\s+доступн\w*|сейчас\s+доступн\w*)[^\n,.;]*',
+            r'\b(?:до|на)\s+(?:конц\w+\s+)?(?:сезон\w*|лет\w*|зим\w*|осен\w*|весн\w*)[^\n,.;]*',
+        )
+        for pattern in patterns:
+            if m := re.search(pattern, text, flags=re.I):
+                availability = cls.clean_availability_text(m.group(0))
+                if availability:
+                    return availability
+        return ''
 
     @classmethod
     def extract_slots(cls, text):
@@ -703,6 +1000,8 @@ class Rental(object):
             availability_text = cls.clean_availability_text(m.group(1))
         elif date_values:
             availability_text = ' - '.join(date_values)
+        else:
+            availability_text = cls.extract_spoken_availability(text)
         return dict(
             title=title,
             item_text=title,
@@ -1699,8 +1998,8 @@ class Rental(object):
 
     @classmethod
     async def handle_search_text(cls, message, state, text):
-        slots = cls.extract_search_slots(text)
         data = await state.get_data()
+        slots = await cls.extract_search_slots_with_llm(text, message=message, current_slots=data)
         cls.log_debug(
             'search_slots',
             message,
@@ -2011,7 +2310,11 @@ async def process_rental_offer(message: Message, state: FSMContext):
     ):
         await message.reply(Rental.offer_prompt(), reply_markup=Misc.reply_markup_cancel_row())
         return
-    new_slots = Rental.extract_slots(text)
+    new_slots = await Rental.extract_offer_slots(
+        text,
+        message=message,
+        current_slots=data.get('rental_slots') or {},
+    )
     slots = Rental.merge_offer_slots(
         data.get('rental_slots') or {},
         new_slots,
