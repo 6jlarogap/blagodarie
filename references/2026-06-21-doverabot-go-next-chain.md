@@ -5,12 +5,13 @@ Status: slices 1-18 implemented; runtime deployment caught up
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 Current completed chain: [2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md](2026-06-21-doverabot-rental-runtime-deploy-unblock-chain.md)
 
-Active next slice: Rental Frontend Follow-Up Decision
-Active next `/new-go-slug`: `doverabot-rental-frontend-followup-decision`
+Active next slice: Rental Frontend Media Thumbnails
+Active next `/new-go-slug`: `doverabot-rental-frontend-media-thumbnails`
 Selected candidate chain: rental frontend redesign in
 [2026-06-22-doverabot-rental-frontend-redesign-chain.md](2026-06-22-doverabot-rental-frontend-redesign-chain.md).
-The live frontend polish slice is implemented and deployed; choose the next
-small follow-up slice.
+The frontend redesign chain selected media thumbnails as the next small
+source-owned `/rent/` follow-up before larger owner or reservation-history web
+controls.
 
 ## Chain Purpose
 

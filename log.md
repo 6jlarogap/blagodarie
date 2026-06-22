@@ -36,6 +36,13 @@
   `is-active` returned active for nginx/web/bot. Unrelated local tracked bot
   changes were temporarily stashed before deploy and restored afterward; the
   untracked `scripts/unblock-django-test-db.sh` helper remained unstaged.
+- Implemented `doverabot-rental-frontend-followup-decision`: selected
+  `doverabot-rental-frontend-media-thumbnails` as the active next slug because
+  the maintained `/rent/` frontend has map/list/URL behavior but listing cards
+  still lack the already-preserved Telegram offer media. Deferred owner web
+  controls, reservation-history web controls, and legacy map cleanup until the
+  renter-facing card surface has media parity. Runtime deploy not required for
+  this docs-only decision.
 
 ## 2026-06-21
 

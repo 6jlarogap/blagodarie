@@ -102,6 +102,9 @@ Current implementation:
 - The 2026-06-22 decision refresh confirmed the current frontend decision:
   build `/rent/` as a rental-first static frontend from maintained source, not
   as a generated-bundle patch to the legacy map.
+- The rental frontend redesign chain delivered `/rent/` maintained source,
+  nginx routing, bot map links to `/rent/`, listing/map sync, URL state,
+  viewport refresh, and direct `rental_uuid` behavior.
 
 Primary implementation areas:
 
@@ -139,12 +142,13 @@ Remaining product backlog:
 
 Continue the ordered go-next chain from [../references/2026-06-21-doverabot-go-next-chain.md](../references/2026-06-21-doverabot-go-next-chain.md).
 
-Active next `/new-go-slug`: `doverabot-rental-frontend-followup-decision`.
+Active next `/new-go-slug`: `doverabot-rental-frontend-media-thumbnails`.
 
 Selected candidate chain:
 [../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md](../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md).
 
-After that slice, print the selected next `/new-go-slug`.
+Reason: add offer media thumbnails to the maintained `/rent/` cards before
+larger owner or reservation-history web controls.
 
 Accepted prior-session decisions:
 

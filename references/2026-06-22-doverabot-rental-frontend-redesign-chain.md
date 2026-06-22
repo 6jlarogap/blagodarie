@@ -1,7 +1,7 @@
 # Doverabot Rental Frontend Redesign Chain
 
 Date: 2026-06-22
-Status: slice 3 implemented; active slug `doverabot-rental-frontend-followup-decision`
+Status: implemented; active next slug `doverabot-rental-frontend-media-thumbnails`
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 
 Slug queue:
@@ -110,8 +110,8 @@ Completion criteria:
 ## Slice 4: Rental Frontend Follow-Up Decision
 
 Slug: `doverabot-rental-frontend-followup-decision`
-Status: planned
-Next slug: to be selected by this slice.
+Status: implemented
+Next slug: `doverabot-rental-frontend-media-thumbnails`
 
 Scope:
 
@@ -128,6 +128,25 @@ Completion criteria:
 - The chain/project notes name the selected next slug and why.
 - The active next `/new-go-slug` is visible from the parent project note.
 - Any deferred candidates are recorded.
+
+## Follow-Up Decision
+
+Selected next slug: `doverabot-rental-frontend-media-thumbnails`.
+
+Reason: the new `/rent/` frontend now has maintained source, map/list sync,
+URL state, and direct offer selection, but listing cards still cannot show the
+Telegram-origin offer media already preserved by the rental backend. Media
+thumbnails are the smallest user-visible next step and improve renter confidence
+without adding owner dashboard or reservation-history web control scope.
+
+Deferred candidates:
+
+- `doverabot-rental-owner-web-controls`: useful later, but it introduces a new
+  authenticated owner-management surface.
+- `doverabot-rental-reservation-history-web-controls`: useful later, but it
+  expands into role-aware reservation actions and audit UX.
+- `doverabot-rental-legacy-map-cleanup`: defer until `/rent/` has media parity
+  and enough live use to confirm the legacy map no longer needs rental affordances.
 
 ## Run Strategy
 
