@@ -4,6 +4,7 @@
 
 import re
 import datetime
+import json
 from urllib.parse import urlencode
 from uuid import uuid4
 
@@ -48,6 +49,10 @@ class Rental(object):
 
     PROMPT_OFFER = (
         'Опишите, что сдаёте в прокат: предмет, где забрать, когда доступно, '
+        'цена и важные условия. Можно прислать текст, фото с подписью, видео или документ.'
+    )
+    PROMPT_OFFER_WITH_VOICE = (
+        'Опишите, что сдаёте в прокат: предмет, где забрать, когда доступно, '
         'цена и важные условия. Можно прислать текст, фото с подписью, видео, документ или голосовое.'
     )
     OFFER_MISSING_LABELS = {
@@ -57,7 +62,8 @@ class Rental(object):
         'price': 'цена или условия оплаты',
     }
     PROMPT_SEARCH = 'Что ищем в прокат? Укажите предмет, место или даты одним сообщением.'
-    PROMPT_SEARCH_CONTEXT = 'Где или на какие даты искать? Можно ответить голосом.'
+    PROMPT_SEARCH_CONTEXT = 'Где или на какие даты искать?'
+    PROMPT_SEARCH_CONTEXT_WITH_VOICE = 'Где или на какие даты искать? Можно ответить голосом.'
 
     ACTION_OWNER_ACCEPT = 'owner_accept'
     ACTION_PAYMENT_REPORTED = 'payment_reported'
@@ -125,6 +131,65 @@ class Rental(object):
     @classmethod
     def message_text(cls, message):
         return (message.text or message.caption or '').strip()
+
+    @classmethod
+    def offer_prompt(cls):
+        if getattr(settings, 'RENTAL_STT_URL', ''):
+            return cls.PROMPT_OFFER_WITH_VOICE
+        return cls.PROMPT_OFFER
+
+    @classmethod
+    def search_context_prompt(cls):
+        if getattr(settings, 'RENTAL_STT_URL', ''):
+            return cls.PROMPT_SEARCH_CONTEXT_WITH_VOICE
+        return cls.PROMPT_SEARCH_CONTEXT
+
+    @classmethod
+    def debug_log_enabled(cls):
+        return bool(getattr(settings, 'RENTAL_DEBUG_LOG_CONVERSATION', False))
+
+    @classmethod
+    def debug_log_value(cls, value):
+        limit = getattr(settings, 'RENTAL_DEBUG_LOG_TEXT_LIMIT', 1200)
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = 1200
+        if isinstance(value, dict):
+            return {
+                str(key): cls.debug_log_value(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [
+                cls.debug_log_value(item)
+                for item in value
+            ]
+        if isinstance(value, str) and limit > 0 and len(value) > limit:
+            return value[:limit] + '...'
+        return value
+
+    @classmethod
+    def log_debug(cls, event, message=None, **fields):
+        if not cls.debug_log_enabled():
+            return
+        payload = dict(event=event)
+        if message:
+            from_user = getattr(message, 'from_user', None)
+            chat = getattr(message, 'chat', None)
+            payload.update(
+                chat_id=getattr(chat, 'id', None),
+                message_id=getattr(message, 'message_id', None),
+                user_id=getattr(from_user, 'id', None),
+                username=getattr(from_user, 'username', ''),
+                content_type=getattr(message, 'content_type', ''),
+            )
+        for key, value in fields.items():
+            payload[key] = cls.debug_log_value(value)
+        logging.info(
+            'rental_debug %s',
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str),
+        )
 
     @classmethod
     def get_deeplink(cls, offer_uuid):
@@ -213,6 +278,11 @@ class Rental(object):
     async def voice_transcript(cls, message):
         url = getattr(settings, 'RENTAL_STT_URL', '')
         if not url or not message.voice:
+            cls.log_debug(
+                'stt_skipped',
+                message,
+                reason='missing_stt_url' if not url else 'missing_voice',
+            )
             return ''
         timeout = aiohttp.ClientTimeout(total=getattr(settings, 'HTTP_TIMEOUT', 60))
         try:
@@ -220,16 +290,41 @@ class Rental(object):
                 request_kwargs = await cls.stt_request_kwargs(message)
                 async with session.post(url, headers=cls.stt_headers(), **request_kwargs) as resp:
                     if resp.status >= 400:
+                        error_text = await resp.text()
                         logging.warning('rental STT failed with status %s', resp.status)
+                        cls.log_debug(
+                            'stt_failed',
+                            message,
+                            status=resp.status,
+                            response=error_text,
+                        )
                         return ''
                     try:
                         data = await resp.json(content_type=None)
                     except (ValueError, aiohttp.ContentTypeError):
-                        return (await resp.text()).strip()
+                        transcript = (await resp.text()).strip()
+                        cls.log_debug(
+                            'stt_response',
+                            message,
+                            status=resp.status,
+                            transcript=transcript,
+                            transcript_len=len(transcript),
+                        )
+                        return transcript
         except Exception:
             logging.exception('rental STT request failed')
+            cls.log_debug('stt_exception', message)
             return ''
-        return cls.stt_transcript_from_response(data)
+        transcript = cls.stt_transcript_from_response(data)
+        cls.log_debug(
+            'stt_response',
+            message,
+            status=resp.status,
+            transcript=transcript,
+            transcript_len=len(transcript),
+            response=data,
+        )
+        return transcript
 
     @classmethod
     async def message_or_voice_text(cls, message, allow_voice_placeholder=False):
@@ -415,6 +510,173 @@ class Rental(object):
             longitude=suggestion['longitude'],
         )
 
+    RU_MONTHS = {
+        'января': 1,
+        'январь': 1,
+        'февраля': 2,
+        'февраль': 2,
+        'марта': 3,
+        'март': 3,
+        'апреля': 4,
+        'апрель': 4,
+        'мая': 5,
+        'май': 5,
+        'июня': 6,
+        'июнь': 6,
+        'июля': 7,
+        'июль': 7,
+        'августа': 8,
+        'август': 8,
+        'сентября': 9,
+        'сентябрь': 9,
+        'октября': 10,
+        'октябрь': 10,
+        'ноября': 11,
+        'ноябрь': 11,
+        'декабря': 12,
+        'декабрь': 12,
+    }
+    RU_DAY_WORDS = {
+        'первого': 1,
+        'первое': 1,
+        'первый': 1,
+        'один': 1,
+        'второго': 2,
+        'второе': 2,
+        'второй': 2,
+        'два': 2,
+        'третьего': 3,
+        'третье': 3,
+        'третий': 3,
+        'три': 3,
+        'четвертого': 4,
+        'четвертое': 4,
+        'четвертый': 4,
+        'четыре': 4,
+        'пятого': 5,
+        'пятое': 5,
+        'пятый': 5,
+        'пять': 5,
+        'шестого': 6,
+        'шестое': 6,
+        'шестой': 6,
+        'шесть': 6,
+        'седьмого': 7,
+        'седьмое': 7,
+        'седьмой': 7,
+        'семь': 7,
+        'восьмого': 8,
+        'восьмое': 8,
+        'восьмой': 8,
+        'восемь': 8,
+        'девятого': 9,
+        'девятое': 9,
+        'девятый': 9,
+        'девять': 9,
+        'десятого': 10,
+        'десятое': 10,
+        'десятый': 10,
+        'десять': 10,
+    }
+
+    @classmethod
+    def parse_day_value(cls, raw):
+        raw = (raw or '').strip().lower().replace('ё', 'е')
+        if raw.isdigit():
+            day = int(raw)
+            return day if 1 <= day <= 31 else None
+        return cls.RU_DAY_WORDS.get(raw)
+
+    @classmethod
+    def parse_russian_date(cls, day_raw, month_raw, year_raw=''):
+        day = cls.parse_day_value(day_raw)
+        month = cls.RU_MONTHS.get((month_raw or '').strip().lower().replace('ё', 'е'))
+        if not day or not month:
+            return ''
+        today = datetime.date.today()
+        year = int(year_raw) if year_raw else today.year
+        try:
+            result = datetime.date(year, month, day)
+        except ValueError:
+            return ''
+        if not year_raw and result < today - datetime.timedelta(days=31):
+            try:
+                result = result.replace(year=year + 1)
+            except ValueError:
+                return ''
+        return result.isoformat()
+
+    @classmethod
+    def date_values_from_text(cls, text):
+        values = []
+        seen = set()
+
+        def add(value):
+            if value and value not in seen:
+                values.append(value)
+                seen.add(value)
+
+        for value in re.findall(r'\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4})\b', text):
+            add(cls.parse_search_date(value))
+
+        day_pattern = r'\d{1,2}|[а-яё]+'
+        month_pattern = '|'.join(sorted(map(re.escape, cls.RU_MONTHS), key=len, reverse=True))
+        range_pattern = (
+            r'\bс\s+(%s)(?:\s+(%s))?\s+(?:по|до|[-–])\s+(%s)\s+(%s)(?:\s+(\d{4}))?'
+            % (day_pattern, month_pattern, day_pattern, month_pattern)
+        )
+        for match in re.finditer(range_pattern, text, flags=re.I):
+            month_start = match.group(2) or match.group(4)
+            add(cls.parse_russian_date(match.group(1), month_start, match.group(5) or ''))
+            add(cls.parse_russian_date(match.group(3), match.group(4), match.group(5) or ''))
+
+        single_pattern = r'\b(%s)\s+(%s)(?:\s+(\d{4}))?\b' % (day_pattern, month_pattern)
+        for match in re.finditer(single_pattern, text, flags=re.I):
+            add(cls.parse_russian_date(match.group(1), match.group(2), match.group(3) or ''))
+
+        return values
+
+    @classmethod
+    def clean_address_text(cls, text):
+        text = (text or '').strip()
+        text = re.split(
+            r'\b(?:дат[аы]|доступн\w*|когда|сроки|цена|стоимост\w*|оплат\w*|руб\w*|₽)\b',
+            text,
+            maxsplit=1,
+            flags=re.I,
+        )[0]
+        text = re.sub(
+            r'^(?:можно|будет|это|в|на|у|около|рядом\s+с)\s+',
+            '',
+            text,
+            flags=re.I,
+        )
+        return text.strip(' \t\n\r,.;:-')
+
+    @classmethod
+    def extract_address(cls, text):
+        patterns = (
+            r'(?:адрес|где|место)\s*[:\-]\s*([^\n]+)',
+            r'(?:адрес|место|локация)\s+(?:это\s+)?([^\n,.;]+)',
+            r'(?:где\s+)?(?:забрать|самовывоз|выдача)\s*(?:можно\s*)?(?:[:\-]?\s*)?([^\n,.;]+)',
+        )
+        for pattern in patterns:
+            if m := re.search(pattern, text, flags=re.I):
+                address = cls.clean_address_text(m.group(1))
+                if address:
+                    return address
+        return ''
+
+    @classmethod
+    def clean_availability_text(cls, text):
+        text = re.split(
+            r'\b(?:цена|стоимост\w*|оплат\w*|адрес|место|забрать|самовывоз|выдача)\b',
+            text or '',
+            maxsplit=1,
+            flags=re.I,
+        )[0]
+        return text.strip(' \t\n\r,.;:-')
+
     @classmethod
     def extract_slots(cls, text):
         title = ''
@@ -426,9 +688,7 @@ class Rental(object):
         price_text = ''
         if m := re.search(r'((?:\d[\d\s\.,]*)\s*(?:руб\.?|р\.?|₽|usd|eur|byn|долл\.?)[^\n]*)', text, flags=re.I):
             price_text = m.group(1).strip()
-        address = ''
-        if m := re.search(r'(?:адрес|где|место)\s*[:\-]\s*([^\n]+)', text, flags=re.I):
-            address = m.group(1).strip()
+        address = cls.extract_address(text)
         quantity_total = ''
         if m := re.search(
                 r'(?:количество|кол-во|шт\.?)\s*[:\-]?\s*(\d+)|(\d+)\s*(?:шт\.?|штук|единиц)',
@@ -437,14 +697,10 @@ class Rental(object):
         ):
             quantity_total = m.group(1) or m.group(2) or ''
         latitude, longitude = Misc.check_location_str(text)
-        date_values = [
-            cls.parse_search_date(value)
-            for value in re.findall(r'\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4})\b', text)
-        ]
-        date_values = [value for value in date_values if value]
+        date_values = cls.date_values_from_text(text)
         availability_text = ''
-        if m := re.search(r'(?:даты|доступн\w*|когда|сроки)\s*[:\-]\s*([^\n]+)', text, flags=re.I):
-            availability_text = m.group(1).strip()
+        if m := re.search(r'(?:даты|доступн\w*|когда|сроки)\s*[:\-]?\s*([^\n]+)', text, flags=re.I):
+            availability_text = cls.clean_availability_text(m.group(1))
         elif date_values:
             availability_text = ' - '.join(date_values)
         return dict(
@@ -513,11 +769,7 @@ class Rental(object):
 
     @classmethod
     def extract_search_slots(cls, text):
-        date_values = [
-            cls.parse_search_date(value)
-            for value in re.findall(r'\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4})\b', text)
-        ]
-        date_values = [value for value in date_values if value]
+        date_values = cls.date_values_from_text(text)
         latitude, longitude = Misc.check_location_str(text)
         price_max = ''
         if m := re.search(
@@ -570,7 +822,7 @@ class Rental(object):
             user_uuid=response_sender['uuid'],
             uuid_pack=str(uuid4()),
         )
-        await message.reply(cls.PROMPT_OFFER, reply_markup=Misc.reply_markup_cancel_row())
+        await message.reply(cls.offer_prompt(), reply_markup=Misc.reply_markup_cancel_row())
 
     @classmethod
     async def cmd_rent_search(cls, message: Message, state: FSMContext):
@@ -1449,6 +1701,13 @@ class Rental(object):
     async def handle_search_text(cls, message, state, text):
         slots = cls.extract_search_slots(text)
         data = await state.get_data()
+        cls.log_debug(
+            'search_slots',
+            message,
+            text=text,
+            slots=slots,
+            state_data=data,
+        )
         query = data.get('query') or slots['query']
         context_text = data.get('context_text') or ''
         date_from = data.get('date_from') or slots['date_from']
@@ -1477,7 +1736,7 @@ class Rental(object):
                 address=address,
                 has_context=False,
             )
-            await message.reply(cls.PROMPT_SEARCH_CONTEXT, reply_markup=Misc.reply_markup_cancel_row())
+            await message.reply(cls.search_context_prompt(), reply_markup=Misc.reply_markup_cancel_row())
             return
         search_query = ('%s %s' % (query, context_text)).strip()
         if await cls.maybe_prompt_search_geocode(message, state, dict(
@@ -1730,7 +1989,19 @@ async def process_rental_offer(message: Message, state: FSMContext):
             reply_markup=Misc.reply_markup_cancel_row(),
         )
         return
-    text = await Rental.message_or_voice_text(message, allow_voice_placeholder=True)
+    text = await Rental.message_or_voice_text(message)
+    if message.content_type == ContentType.VOICE and not text:
+        logging.info(
+            'rental offer voice was not recognized, user_id=%s chat_id=%s message_id=%s',
+            message.from_user.id,
+            message.chat.id,
+            message.message_id,
+        )
+        await message.reply(
+            'Голосовое не распознано. Пришлите описание текстом или попробуйте другое голосовое.',
+            reply_markup=Misc.reply_markup_cancel_row(),
+        )
+        return
     if not text and message.content_type not in (
         ContentType.PHOTO,
         ContentType.VIDEO,
@@ -1738,16 +2009,25 @@ async def process_rental_offer(message: Message, state: FSMContext):
         ContentType.AUDIO,
         ContentType.VOICE,
     ):
-        await message.reply(Rental.PROMPT_OFFER, reply_markup=Misc.reply_markup_cancel_row())
+        await message.reply(Rental.offer_prompt(), reply_markup=Misc.reply_markup_cancel_row())
         return
+    new_slots = Rental.extract_slots(text)
     slots = Rental.merge_offer_slots(
         data.get('rental_slots') or {},
-        Rental.extract_slots(text),
+        new_slots,
     )
     for key in ('latitude', 'longitude'):
         if slots.get(key) is None and data.get(key) is not None:
             slots[key] = data[key]
     missing = Rental.offer_missing_fields(slots)
+    Rental.log_debug(
+        'offer_slots',
+        message,
+        text=text,
+        new_slots=new_slots,
+        merged_slots=slots,
+        missing=missing,
+    )
     if missing:
         await state.update_data(rental_slots=slots)
         await message.reply(

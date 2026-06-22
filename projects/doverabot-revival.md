@@ -36,6 +36,8 @@ Go-next chain: [../references/2026-06-21-doverabot-go-next-chain.md](../referenc
 
 Rental frontend redesign chain: [../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md](../references/2026-06-22-doverabot-rental-frontend-redesign-chain.md)
 
+Rental voice/STT recovery chain: [../references/2026-06-22-doverabot-rental-voice-stt-observability-recovery-chain.md](../references/2026-06-22-doverabot-rental-voice-stt-observability-recovery-chain.md)
+
 Next decision refresh chain: [../references/2026-06-21-doverabot-next-decision-refresh-chain.md](../references/2026-06-21-doverabot-next-decision-refresh-chain.md)
 
 Post-reservation decision refresh chain: [../references/2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md](../references/2026-06-21-doverabot-next-decision-refresh-after-reservation-history-chain.md)
@@ -105,6 +107,9 @@ Current implementation:
 - The rental frontend redesign chain delivered `/rent/` maintained source,
   nginx routing, bot map links to `/rent/`, listing/map sync, URL state,
   viewport refresh, and direct `rental_uuid` behavior.
+- The voice/STT recovery chain owns the previously uncommitted rental bot
+  changes for STT-aware prompts, opt-in debug logging, spoken date/address slot
+  extraction, and visible unrecognized-voice feedback.
 
 Primary implementation areas:
 

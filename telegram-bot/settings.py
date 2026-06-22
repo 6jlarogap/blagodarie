@@ -64,6 +64,8 @@ RENTAL_STT_URL = ''
 RENTAL_STT_TOKEN = ''
 RENTAL_STT_MODE = 'file_id'
 RENTAL_STT_LANGUAGE = 'ru'
+RENTAL_DEBUG_LOG_CONVERSATION = False
+RENTAL_DEBUG_LOG_TEXT_LIMIT = 1200
 
 # Optional geocoding adapter for rental addresses.
 # Contract `doverabot_rental_geocoding_v1` sends {"query": "..."} JSON and

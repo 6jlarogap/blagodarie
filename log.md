@@ -2,6 +2,12 @@
 
 ## 2026-06-22
 
+- Started `doverabot-rental-voice-stt-observability-recovery` to own the
+  previously uncommitted rental bot voice/STT changes in
+  `telegram-bot/handler_rental.py`, `telegram-bot/settings.py`, and
+  `telegram-bot/tests/test_handler_rental.py`. The active product next slug
+  remains `doverabot-rental-frontend-media-thumbnails`. Initial source checks
+  passed: `git diff --check`, focused rental bot tests, and bot compileall.
 - Implemented `agent-chain-orchestration-hardening`,
   `agent-parallel-integrity-rules`, `agent-unfinished-chain-recovery`,
   `agent-worktree-branch-strategy`, and `agent-dirty-worktree-guard` as a

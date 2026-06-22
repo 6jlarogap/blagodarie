@@ -1,4 +1,5 @@
 import types
+import datetime
 import unittest
 from urllib.parse import parse_qs, urlparse
 from unittest import mock
@@ -255,6 +256,42 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(slots['available_to'], '2026-07-03')
         self.assertIn('500 руб/день', slots['price_text'])
         self.assertEqual(slots['quantity_total'], '3')
+
+    async def test_spoken_listing_slots_extract_core_fields(self):
+        today = datetime.date.today()
+        year = today.year
+        if datetime.date(year, 7, 1) < today - datetime.timedelta(days=31):
+            year += 1
+        slots = self.handler_rental.Rental.extract_slots(
+            'Сдаю палатку MSR Hubba. Забрать на ВДНХ, '
+            'доступна с 1 по 3 июля, цена 500 рублей в день'
+        )
+
+        self.assertIn('палатку MSR Hubba', slots['title'])
+        self.assertEqual(slots['address'], 'ВДНХ')
+        self.assertEqual(slots['available_from'], f'{year}-07-01')
+        self.assertEqual(slots['available_to'], f'{year}-07-03')
+        self.assertIn('500 рублей', slots['price_text'])
+
+    async def test_process_rental_offer_voice_without_transcript_reports_unrecognized(self):
+        message = FakeMessage(content_type=ContentTypeStub.VOICE)
+        message.voice = types.SimpleNamespace(file_id='voice-file-id', duration=7, mime_type='audio/ogg')
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+        })
+        self.handler_rental.settings.RENTAL_STT_URL = ''
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'create_offer',
+            mock.AsyncMock(),
+        ) as create_offer:
+            await self.handler_rental.process_rental_offer(message, state)
+
+        create_offer.assert_not_awaited()
+        self.assertIn('Голосовое не распознано', message.replies[-1].text)
+        self.assertNotIn('rental_slots', state.data)
 
     async def test_process_rental_offer_prompts_for_missing_core_fields(self):
         message = FakeMessage(text='Палатка MSR Hubba')
