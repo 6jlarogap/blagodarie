@@ -2,6 +2,21 @@
 
 ## 2026-06-22
 
+- Implemented `doverabot-rental-medium-stt-adapter` source but runtime deploy
+  is blocked: added a Doverabot-owned localhost rental STT HTTP adapter using
+  faster-whisper `medium`, added `pip-rental-stt.txt`, extended the admin
+  wrapper with rental STT service install/restart/status/log commands, and kept
+  the safe `bot-runtime-setting` surface. Source commit: `321ee4e`. Checks
+  passed: `bash -n deploy/bin/blagodarie-admin`, adapter py_compile, focused
+  rental bot tests (39 tests; existing mocked geocoding failure log remains),
+  bot compileall, `git diff --check`, and graphify update. Runtime install
+  stopped before changing bot settings because
+  `sudo bash deploy/install-blagodarie-admin-workflow.sh` failed with
+  `sudo: A terminal is required to authenticate`, and the currently installed
+  wrapper rejected `sudo -n /usr/local/sbin/blagodarie-admin install-rental-stt`
+  with usage output because that command is not installed yet. Live runtime
+  settings for `RENTAL_STT_*` are still missing, and existing nginx/web/bot
+  services are active.
 - Implemented and deployed `vpn-slice-worker-chain`: added current-server-only
   VPN profiles with weekly subscription token rotation, subscription URL
   serving, sanitized Xray counter import with weekly/monthly rollups, runway

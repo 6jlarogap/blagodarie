@@ -2,7 +2,7 @@
 
 Date: 2026-06-22
 Slug: `doverabot-rental-medium-stt-adapter`
-Status: planned
+Status: source implemented, runtime blocked
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 
 ## Queue
@@ -47,8 +47,40 @@ the chain deployed.
 
 ## Verification
 
-Pending.
+- `bash -n deploy/bin/blagodarie-admin` -> OK.
+- `python3 -m py_compile telegram-bot/rental_stt_adapter.py` -> OK.
+- `python3 -m unittest discover telegram-bot/tests -p 'test_handler_rental.py'`
+  -> 39 tests OK; the existing mocked geocoding failure path logged the
+  expected `RuntimeError: lookup failed`.
+- `python3 -m compileall telegram-bot` -> OK.
+- `git diff --check` -> OK.
+- `uv tool run --from graphifyy graphify update .` -> OK.
+
+Source commit:
+
+- `321ee4e` `doverabot-rental-medium-stt-adapter`
 
 ## Operational Handoff
 
-Pending.
+Runtime deployment is blocked. The updated wrapper source is committed, but the
+live `/usr/local/sbin/blagodarie-admin` wrapper cannot be updated without sudo
+authentication:
+
+- `sudo bash deploy/install-blagodarie-admin-workflow.sh` -> failed:
+  `sudo: A terminal is required to authenticate`.
+- `sudo -n /usr/local/sbin/blagodarie-admin install-rental-stt` -> failed with
+  exit 2 because the currently installed wrapper does not yet include the new
+  `install-rental-stt` command.
+
+Current live state checked before stopping:
+
+- `sudo -n /usr/local/sbin/blagodarie-admin bot-runtime-setting status all` ->
+  `RENTAL_STT_URL=missing`, `RENTAL_STT_TOKEN=missing`,
+  `RENTAL_STT_MODE=missing`, `RENTAL_STT_CONTRACT=missing`,
+  `RENTAL_STT_LANGUAGE=missing`.
+- `sudo -n /usr/local/sbin/blagodarie-admin is-active` -> nginx, web, and bot
+  are active.
+
+Per the stop rule, the STT venv/service install, health check, runtime setting
+changes, STT restart, bot restart, and STT log checks were not run, and this
+chain is not marked deployed.
