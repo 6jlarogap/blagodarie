@@ -10,13 +10,14 @@
   passed: `bash -n deploy/bin/blagodarie-admin`, adapter py_compile, focused
   rental bot tests (39 tests; existing mocked geocoding failure log remains),
   bot compileall, `git diff --check`, and graphify update. Runtime install
-  stopped before changing bot settings because
-  `sudo bash deploy/install-blagodarie-admin-workflow.sh` failed with
-  `sudo: A terminal is required to authenticate`, and the currently installed
-  wrapper rejected `sudo -n /usr/local/sbin/blagodarie-admin install-rental-stt`
-  with usage output because that command is not installed yet. Live runtime
-  settings for `RENTAL_STT_*` are still missing, and existing nginx/web/bot
-  services are active.
+  resumed after the maintainer manually installed the updated wrapper; the STT
+  venv and unit installed, but `doverabot-rental-stt.service` cannot bind
+  `127.0.0.1:8765` because the port is already in use. `/healthz` on that port
+  returns an unrelated `claude-sonnet-4-6` JSON payload, and STT logs show
+  `OSError: [Errno 98] ... address already in use`. The failing STT service was
+  stopped, live `RENTAL_STT_*` settings remain missing, and nginx/web/bot are
+  active. The chain is not deployed until the port conflict is resolved or a
+  new approved localhost port is selected.
 - Implemented and deployed `vpn-slice-worker-chain`: added current-server-only
   VPN profiles with weekly subscription token rotation, subscription URL
   serving, sanitized Xray counter import with weekly/monthly rollups, runway

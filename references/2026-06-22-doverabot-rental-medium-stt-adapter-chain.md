@@ -2,7 +2,7 @@
 
 Date: 2026-06-22
 Slug: `doverabot-rental-medium-stt-adapter`
-Status: source implemented, runtime blocked
+Status: source implemented, runtime blocked by port conflict
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 
 ## Queue
@@ -62,25 +62,35 @@ Source commit:
 
 ## Operational Handoff
 
-Runtime deployment is blocked. The updated wrapper source is committed, but the
-live `/usr/local/sbin/blagodarie-admin` wrapper cannot be updated without sudo
-authentication:
+Runtime deployment is blocked by an existing listener on the required localhost
+port:
 
-- `sudo bash deploy/install-blagodarie-admin-workflow.sh` -> failed:
-  `sudo: A terminal is required to authenticate`.
-- `sudo -n /usr/local/sbin/blagodarie-admin install-rental-stt` -> failed with
-  exit 2 because the currently installed wrapper does not yet include the new
-  `install-rental-stt` command.
-
-Current live state checked before stopping:
-
+- The maintainer manually ran `sudo bash deploy/install-blagodarie-admin-workflow.sh`
+  after the initial sudo-auth blocker; the updated wrapper installed
+  successfully.
+- `sudo -n /usr/local/sbin/blagodarie-admin install-rental-stt` -> installed
+  the venv dependencies, wrote/enabled the systemd unit, and attempted to start
+  `doverabot-rental-stt.service`.
+- `sudo -n /usr/local/sbin/blagodarie-admin logs-rental-stt 80` -> the adapter
+  fails on startup with `OSError: [Errno 98] error while attempting to bind on
+  address ('127.0.0.1', 8765): [errno 98] address already in use`.
+- `curl --noproxy '*' -fsS http://127.0.0.1:8765/healthz` -> returned
+  `{"object": "list", "data": [{"id": "claude-sonnet-4-6"}]}`, which is not
+  the adapter health response and confirms the port is occupied by another
+  service.
+- `sudo -n ss -ltnp 'sport = :8765'` -> blocked by sudoers with
+  `sudo: interactive authentication is required`, so the owning PID was not
+  identifiable from this session.
+- `sudo -n systemctl stop doverabot-rental-stt.service` -> stopped the failing
+  restart loop.
+- `sudo -n /usr/local/sbin/blagodarie-admin status-rental-stt` -> inactive
+  (dead), last exit status 1 from the bind failure.
+- `sudo -n /usr/local/sbin/blagodarie-admin is-active` -> nginx, web, and bot
+  are active; rental STT is inactive.
 - `sudo -n /usr/local/sbin/blagodarie-admin bot-runtime-setting status all` ->
   `RENTAL_STT_URL=missing`, `RENTAL_STT_TOKEN=missing`,
   `RENTAL_STT_MODE=missing`, `RENTAL_STT_CONTRACT=missing`,
   `RENTAL_STT_LANGUAGE=missing`.
-- `sudo -n /usr/local/sbin/blagodarie-admin is-active` -> nginx, web, and bot
-  are active.
 
-Per the stop rule, the STT venv/service install, health check, runtime setting
-changes, STT restart, bot restart, and STT log checks were not run, and this
-chain is not marked deployed.
+Per the stop rule, live bot STT runtime settings were not changed, the bot was
+not restarted, and this chain is not marked deployed.
