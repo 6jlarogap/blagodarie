@@ -2,7 +2,7 @@
 
 Date: 2026-06-22
 Slug: `doverabot-rental-medium-stt-adapter`
-Status: source implemented, runtime blocked by port conflict
+Status: port change in progress
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 
 ## Queue
@@ -14,10 +14,10 @@ Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md
 - Add a Doverabot-owned localhost HTTP STT adapter for rental voice messages.
 - Use faster-whisper `medium` with Russian defaults and the existing
   `organizm_hermes_v1` bot STT contract.
-- Keep the adapter bound to `127.0.0.1:8765` and require multipart
+- Keep the adapter bound to `127.0.0.1:8766` and require multipart
   `voice`, `contract`, and optional `language`.
 - Configure live bot runtime settings for the localhost adapter:
-  `RENTAL_STT_URL=http://127.0.0.1:8765/transcribe`,
+  `RENTAL_STT_URL=http://127.0.0.1:8766/transcribe`,
   `RENTAL_STT_MODE=download`, and `RENTAL_STT_LANGUAGE=ru`.
 - Extend the admin wrapper with rental STT install, restart, status, and log
   commands.

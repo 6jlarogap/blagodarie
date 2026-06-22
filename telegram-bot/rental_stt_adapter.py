@@ -11,7 +11,7 @@ from aiohttp import web
 
 
 HOST = "127.0.0.1"
-PORT = 8765
+PORT = 8766
 CONTRACT = "organizm_hermes_v1"
 MODEL_NAME = "medium"
 DEFAULT_LANGUAGE = "ru"
