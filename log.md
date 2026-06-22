@@ -2,12 +2,18 @@
 
 ## 2026-06-22
 
-- Started `doverabot-rental-voice-stt-observability-recovery` to own the
-  previously uncommitted rental bot voice/STT changes in
-  `telegram-bot/handler_rental.py`, `telegram-bot/settings.py`, and
-  `telegram-bot/tests/test_handler_rental.py`. The active product next slug
-  remains `doverabot-rental-frontend-media-thumbnails`. Initial source checks
-  passed: `git diff --check`, focused rental bot tests, and bot compileall.
+- Implemented and deployed `doverabot-rental-voice-stt-observability-recovery`:
+  owned the previously uncommitted rental bot voice/STT changes, added
+  STT-aware rental prompts, opt-in structured debug logging, spoken Russian
+  date/address slot extraction, and visible unrecognized-voice feedback; added
+  focused mocked tests; committed source as `95283ce`. Checks passed:
+  `git diff --check`, focused rental bot tests, full mocked bot discovery
+  (97 tests), bot compileall, Django test-settings check, reindex, and graphify
+  update. Runtime deploy completed through `blagodarie-admin deploy`; the
+  existing Django `security.W002` warning remains, nginx syntax was OK,
+  nginx/web/bot are active, and recent web/bot log tails showed service restart
+  entries only. The active product next slug remains
+  `doverabot-rental-frontend-media-thumbnails`.
 - Implemented `agent-chain-orchestration-hardening`,
   `agent-parallel-integrity-rules`, `agent-unfinished-chain-recovery`,
   `agent-worktree-branch-strategy`, and `agent-dirty-worktree-guard` as a

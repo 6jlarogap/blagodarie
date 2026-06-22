@@ -2,7 +2,7 @@
 
 Date: 2026-06-22
 Slug: `doverabot-rental-voice-stt-observability-recovery`
-Status: implemented; pending runtime deploy
+Status: implemented and deployed
 Parent project: [projects/doverabot-revival.md](../projects/doverabot-revival.md)
 
 ## Recovery Purpose
@@ -61,15 +61,37 @@ Source checks:
 - `python3 -m unittest discover telegram-bot/tests -p 'test_handler_rental.py'`
   -> 39 tests OK; the existing mocked geocoding failure test logs the expected
   `RuntimeError: lookup failed`.
+- `python3 -m unittest discover telegram-bot/tests` -> 97 tests OK; existing
+  expected geocoding failure-path log and volatile `MemoryStorage` warning
+  remain.
 - `python3 -m compileall telegram-bot` -> OK.
+- `/srv/blagodarie/venv-app/bin/python manage.py check --settings=app.test_settings`
+  from `app/` -> OK, no issues.
+- `bash scripts/reindex.sh` -> OK.
+- `uv tool run --from graphifyy graphify update .` -> OK.
 
-Pending before final completion:
+## Operational Handoff
 
-- Full mocked bot discovery.
-- Django check through the deployment wrapper.
-- Reindex and graphify update.
-- Staged-only commit with this slug.
-- Runtime deploy/status/log checks because bot runtime code changed.
+Source commit:
+
+- `95283ce` `doverabot-rental-voice-stt-observability-recovery`
+
+Deploy checks:
+
+- `sudo -n /usr/local/sbin/blagodarie-admin check-django` -> passed with the
+  existing Django `security.W002` warning.
+- `sudo -n /usr/local/sbin/blagodarie-admin deploy-dry-run` -> completed and
+  showed source differences to sync.
+- `sudo -n /usr/local/sbin/blagodarie-admin deploy` -> completed; Django check
+  reported the existing `security.W002` warning and nginx syntax was OK.
+- `sudo -n /usr/local/sbin/blagodarie-admin is-active` -> nginx, web, and bot
+  all active.
+- `sudo -n /usr/local/sbin/blagodarie-admin status` -> nginx active, gunicorn
+  restarted at 2026-06-22 14:42:10 MSK, telegram-bot restarted at
+  2026-06-22 14:42:11 MSK.
+- Recent web and bot log tails showed service restart entries only.
+
+No migrations were added or required.
 
 ## Follow-Up Basket
 
