@@ -45,6 +45,7 @@ EXCLUDED_DIR_NAMES = {
     "tmp",
     "venv",
     "venv-app",
+    "venv-rental-stt",
 }
 EXCLUDED_PATH_PREFIXES = (
     "app/static/",

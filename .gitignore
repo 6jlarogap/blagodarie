@@ -12,6 +12,7 @@ id_rsa*
 /telegram-bot/ENV/
 /telegram-bot/tmp/
 /venv-app/
+/venv-rental-stt/
 
 # Python/runtime caches
 __pycache__/

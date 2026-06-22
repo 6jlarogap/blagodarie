@@ -7,6 +7,19 @@ MAINT_USER=vdrzd
 MAINT_GROUP=doverabot-maint
 SERVICE_USER=blagodarie
 SERVICE_GROUP=blagodarie
+BOT_SETTINGS_LOCAL="$DST/telegram-bot/settings_local.py"
+RENTAL_STT_SERVICE=doverabot-rental-stt.service
+RENTAL_STT_VENV="$DST/venv-rental-stt"
+RENTAL_STT_REQUIREMENTS="$DST/pip-rental-stt.txt"
+RENTAL_STT_ADAPTER="$DST/telegram-bot/rental_stt_adapter.py"
+RENTAL_STT_TMP_DIR="$DST/telegram-bot/tmp/rental-stt"
+BOT_RUNTIME_SETTING_KEYS=(
+  RENTAL_STT_URL
+  RENTAL_STT_TOKEN
+  RENTAL_STT_MODE
+  RENTAL_STT_CONTRACT
+  RENTAL_STT_LANGUAGE
+)
 
 NGINX_SITES_SRC="$SRC/deploy/nginx/sites-available"
 NGINX_SITES_AVAILABLE=/etc/nginx/sites-available
@@ -35,6 +48,7 @@ RSYNC_EXCLUDES=(
   --exclude '/telegram-bot/tmp/'
   --exclude '/telegram-bot-api/'
   --exclude '/venv-app/'
+  --exclude '/venv-rental-stt/'
   --exclude '**/__pycache__/'
   --exclude '*.pyc'
   --exclude '*.pyo'
@@ -67,6 +81,8 @@ FIND_EXCLUDES=(
   "$DST/telegram-bot-api/*"
   "$DST/venv-app"
   "$DST/venv-app/*"
+  "$DST/venv-rental-stt"
+  "$DST/venv-rental-stt/*"
 )
 
 find_prune_args() {
@@ -110,7 +126,8 @@ restore_protected_runtime() {
     "$DST/telegram-bot/ENV" \
     "$DST/telegram-bot/tmp" \
     "$DST/telegram-bot-api" \
-    "$DST/venv-app"; do
+    "$DST/venv-app" \
+    "$DST/venv-rental-stt"; do
     if [ -e "$runtime" ]; then
       chown -R "$SERVICE_USER:$SERVICE_GROUP" "$runtime"
     fi
@@ -189,6 +206,276 @@ install_nginx_sites() {
   systemctl reload nginx
 }
 
+write_rental_stt_service() {
+  install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 2770 "$RENTAL_STT_TMP_DIR"
+
+  cat > "/etc/systemd/system/$RENTAL_STT_SERVICE" <<UNIT
+[Unit]
+Description=Doverabot rental STT adapter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+Group=$SERVICE_GROUP
+WorkingDirectory=$DST
+Environment=PYTHONUNBUFFERED=1
+Environment=HF_HOME=$DST/telegram-bot/tmp/huggingface
+Environment=XDG_CACHE_HOME=$DST/telegram-bot/tmp/cache
+Environment=RENTAL_STT_TMP_DIR=$RENTAL_STT_TMP_DIR
+ExecStart=$RENTAL_STT_VENV/bin/python $RENTAL_STT_ADAPTER
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=$DST/telegram-bot/tmp
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+}
+
+install_rental_stt() {
+  require_workspace
+  sync_source
+
+  if [ ! -f "$RENTAL_STT_REQUIREMENTS" ]; then
+    echo "Missing rental STT requirements: $RENTAL_STT_REQUIREMENTS" >&2
+    exit 1
+  fi
+  if [ ! -f "$RENTAL_STT_ADAPTER" ]; then
+    echo "Missing rental STT adapter: $RENTAL_STT_ADAPTER" >&2
+    exit 1
+  fi
+
+  if [ ! -x "$RENTAL_STT_VENV/bin/python" ]; then
+    python3 -m venv "$RENTAL_STT_VENV"
+  fi
+  "$RENTAL_STT_VENV/bin/python" -m pip install --upgrade pip
+  "$RENTAL_STT_VENV/bin/python" -m pip install -r "$RENTAL_STT_REQUIREMENTS"
+
+  install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 2770 "$DST/telegram-bot/tmp"
+  install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 2770 "$DST/telegram-bot/tmp/cache"
+  install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 2770 "$DST/telegram-bot/tmp/huggingface"
+  install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 2770 "$RENTAL_STT_TMP_DIR"
+  chown -R "$SERVICE_USER:$SERVICE_GROUP" "$RENTAL_STT_VENV" "$DST/telegram-bot/tmp"
+
+  write_rental_stt_service
+  systemctl daemon-reload
+  systemctl enable "$RENTAL_STT_SERVICE"
+  systemctl restart "$RENTAL_STT_SERVICE"
+  systemctl --no-pager --plain is-active "$RENTAL_STT_SERVICE"
+}
+
+deploy_rental_stt() {
+  sync_source
+  systemctl restart "$RENTAL_STT_SERVICE"
+}
+
+is_allowed_bot_runtime_setting() {
+  local key="$1"
+  local allowed
+  for allowed in "${BOT_RUNTIME_SETTING_KEYS[@]}"; do
+    if [ "$key" = "$allowed" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+validate_bot_runtime_setting() {
+  local key="$1"
+  local value="$2"
+
+  if [ -z "$value" ]; then
+    echo "Refusing to set empty value for $key; use clear if this is intentional." >&2
+    return 1
+  fi
+
+  case "$key" in
+    RENTAL_STT_URL)
+      case "$value" in
+        http://*|https://*) ;;
+        *)
+          echo "RENTAL_STT_URL must start with http:// or https://" >&2
+          return 1
+          ;;
+      esac
+      ;;
+    RENTAL_STT_MODE)
+      case "$value" in
+        file_id|download) ;;
+        *)
+          echo "RENTAL_STT_MODE must be file_id or download" >&2
+          return 1
+          ;;
+      esac
+      ;;
+    RENTAL_STT_CONTRACT|RENTAL_STT_LANGUAGE)
+      case "$value" in
+        *[!A-Za-z0-9_.:-]*)
+          echo "$key contains unsupported characters" >&2
+          return 1
+          ;;
+      esac
+      ;;
+  esac
+}
+
+bot_runtime_setting_usage() {
+  cat >&2 <<'USAGE'
+Usage:
+  sudo -n /usr/local/sbin/blagodarie-admin bot-runtime-setting status [KEY|all]
+  sudo -n /usr/local/sbin/blagodarie-admin bot-runtime-setting set KEY VALUE
+  sudo -n /usr/local/sbin/blagodarie-admin bot-runtime-setting clear KEY
+
+Allowed keys:
+  RENTAL_STT_URL
+  RENTAL_STT_TOKEN
+  RENTAL_STT_MODE
+  RENTAL_STT_CONTRACT
+  RENTAL_STT_LANGUAGE
+
+Values are written to the live bot settings file and are never printed.
+USAGE
+}
+
+bot_runtime_setting() {
+  local action="${2:-}"
+  local key="${3:-}"
+  local value="${4:-}"
+
+  if [ ! -f "$BOT_SETTINGS_LOCAL" ]; then
+    echo "Missing live bot settings file: $BOT_SETTINGS_LOCAL" >&2
+    exit 1
+  fi
+
+  case "$action" in
+    status)
+      if [ -z "$key" ]; then
+        key=all
+      fi
+      if [ "$key" != "all" ] && ! is_allowed_bot_runtime_setting "$key"; then
+        echo "Unsupported bot runtime setting: $key" >&2
+        bot_runtime_setting_usage
+        exit 2
+      fi
+      python3 - "$BOT_SETTINGS_LOCAL" status "$key" "${BOT_RUNTIME_SETTING_KEYS[@]}" <<'PY'
+import ast
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+target = sys.argv[3]
+keys = sys.argv[4:]
+pattern = re.compile(r"^\s*(%s)\s*=" % "|".join(re.escape(key) for key in keys))
+values = {}
+
+for line in path.read_text(encoding="utf-8").splitlines():
+    match = pattern.match(line)
+    if not match:
+        continue
+    key = match.group(1)
+    raw = line.split("=", 1)[1].strip()
+    try:
+        value = ast.literal_eval(raw)
+    except (SyntaxError, ValueError):
+        value = raw
+    values[key] = value
+
+for key in keys:
+    if target != "all" and key != target:
+        continue
+    if key not in values:
+        status = "missing"
+    elif values[key] in ("", None):
+        status = "empty"
+    else:
+        status = "set"
+    print(f"{key}={status}")
+PY
+      ;;
+    set)
+      if [ $# -ne 4 ] || ! is_allowed_bot_runtime_setting "$key"; then
+        bot_runtime_setting_usage
+        exit 2
+      fi
+      validate_bot_runtime_setting "$key" "$value"
+      python3 - "$BOT_SETTINGS_LOCAL" set "$key" "$value" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+key = sys.argv[3]
+value = sys.argv[4]
+pattern = re.compile(r"^(\s*)%s\s*=" % re.escape(key))
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+updated = []
+replaced = False
+
+for line in lines:
+    if pattern.match(line):
+        updated.append(f"{key} = {value!r}\n")
+        replaced = True
+    else:
+        updated.append(line)
+
+if not replaced:
+    if updated and updated[-1].strip():
+        updated.append("\n")
+    updated.append(f"{key} = {value!r}\n")
+
+path.write_text("".join(updated), encoding="utf-8")
+PY
+      restore_protected_runtime
+      echo "$key=set"
+      ;;
+    clear)
+      if [ $# -ne 3 ] || ! is_allowed_bot_runtime_setting "$key"; then
+        bot_runtime_setting_usage
+        exit 2
+      fi
+      python3 - "$BOT_SETTINGS_LOCAL" set "$key" "" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+key = sys.argv[3]
+value = sys.argv[4]
+pattern = re.compile(r"^(\s*)%s\s*=" % re.escape(key))
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+updated = []
+replaced = False
+
+for line in lines:
+    if pattern.match(line):
+        updated.append(f"{key} = {value!r}\n")
+        replaced = True
+    else:
+        updated.append(line)
+
+if not replaced:
+    if updated and updated[-1].strip():
+        updated.append("\n")
+    updated.append(f"{key} = {value!r}\n")
+
+path.write_text("".join(updated), encoding="utf-8")
+PY
+      restore_protected_runtime
+      echo "$key=empty"
+      ;;
+    *)
+      bot_runtime_setting_usage
+      exit 2
+      ;;
+  esac
+}
+
 case "${1:-}" in
   deploy-dry-run)
     deploy_dry_run
@@ -211,6 +498,9 @@ case "${1:-}" in
   deploy-bot)
     sync_source
     systemctl restart telegram-bot.service
+    ;;
+  deploy-rental-stt)
+    deploy_rental_stt
     ;;
   deploy)
     sync_source
@@ -236,6 +526,9 @@ case "${1:-}" in
   install-nginx-sites)
     install_nginx_sites
     ;;
+  install-rental-stt)
+    install_rental_stt
+    ;;
   nginx-test)
     nginx -t
     ;;
@@ -250,6 +543,9 @@ case "${1:-}" in
   restart-bot)
     systemctl restart telegram-bot.service
     ;;
+  restart-rental-stt)
+    systemctl restart "$RENTAL_STT_SERVICE"
+    ;;
   restart-all)
     check_django
     nginx -t
@@ -258,10 +554,13 @@ case "${1:-}" in
     systemctl restart telegram-bot.service
     ;;
   status)
-    systemctl --no-pager --plain status nginx blagodarie-gunicorn.service telegram-bot.service
+    systemctl --no-pager --plain status nginx blagodarie-gunicorn.service telegram-bot.service "$RENTAL_STT_SERVICE"
     ;;
   is-active)
-    systemctl --no-pager --plain is-active nginx blagodarie-gunicorn.service telegram-bot.service
+    systemctl --no-pager --plain is-active nginx blagodarie-gunicorn.service telegram-bot.service "$RENTAL_STT_SERVICE"
+    ;;
+  status-rental-stt)
+    systemctl --no-pager --plain status "$RENTAL_STT_SERVICE"
     ;;
   logs-web)
     journalctl -u blagodarie-gunicorn.service -n "${2:-120}" --no-pager
@@ -271,6 +570,12 @@ case "${1:-}" in
     ;;
   logs-nginx)
     journalctl -u nginx.service -n "${2:-120}" --no-pager
+    ;;
+  logs-rental-stt)
+    journalctl -u "$RENTAL_STT_SERVICE" -n "${2:-120}" --no-pager
+    ;;
+  bot-runtime-setting)
+    bot_runtime_setting "$@"
     ;;
   *)
     cat >&2 <<'USAGE'
@@ -282,21 +587,27 @@ Commands:
   deploy-static        Sync and reload nginx
   deploy-web           Sync, Django check, restart web, reload nginx
   deploy-bot           Sync and restart Telegram bot
+  deploy-rental-stt    Sync and restart rental STT
   deploy               Sync, checks, reload nginx, restart web and bot
   check-django         Run manage.py check --deploy
   migrate              Run Django checks then migrations
   collectstatic        Run Django collectstatic
   install-nginx-sites  Install tracked nginx site configs, test, and reload nginx
+  install-rental-stt   Install/update rental STT venv and systemd unit
   nginx-test           Validate nginx config
   reload-nginx         Validate and reload nginx
   restart-web          Django check and restart gunicorn
   restart-bot          Restart Telegram bot
+  restart-rental-stt   Restart rental STT
   restart-all          Check/reload/restart nginx, web, and bot
   status               Show service status
-  is-active            Print nginx/web/bot active state
+  status-rental-stt    Show rental STT status
+  is-active            Print nginx/web/bot/rental STT active state
   logs-web [n]         Show recent web logs
   logs-bot [n]         Show recent bot logs
   logs-nginx [n]       Show recent nginx logs
+  logs-rental-stt [n]  Show recent rental STT logs
+  bot-runtime-setting  Check or set allowlisted live bot runtime settings
 USAGE
     exit 2
     ;;

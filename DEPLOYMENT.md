@@ -49,6 +49,9 @@ sudo -n /usr/local/sbin/blagodarie-admin nginx-test
 sudo -n /usr/local/sbin/blagodarie-admin is-active
 sudo -n /usr/local/sbin/blagodarie-admin logs-web 120
 sudo -n /usr/local/sbin/blagodarie-admin logs-bot 120
+sudo -n /usr/local/sbin/blagodarie-admin install-rental-stt
+sudo -n /usr/local/sbin/blagodarie-admin restart-rental-stt
+sudo -n /usr/local/sbin/blagodarie-admin logs-rental-stt 120
 ```
 
 ## Chain Success Handoff

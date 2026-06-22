@@ -17,7 +17,8 @@ stale_file="$(
           -o -name '.ruff_cache' -o -name '.tox' -o -name '.venv' -o -name '__pycache__' \
           -o -name 'build' -o -name 'dist' -o -name 'ENV' -o -name 'graphify-out' \
           -o -name 'media' -o -name 'migrations' -o -name 'node_modules' \
-          -o -name 'telegram-bot-api' -o -name 'tmp' -o -name 'venv' -o -name 'venv-app' \) \
+          -o -name 'telegram-bot-api' -o -name 'tmp' -o -name 'venv' -o -name 'venv-app' \
+          -o -name 'venv-rental-stt' \) \
        -o -path './app/static' -o -path './audit' \
        -o -path './frontend/graph_npm/dist' -o -path './frontend/map_npm/dist' \
        -o -path './frontend/mgraph/dist' \) -prune \
