@@ -77,3 +77,23 @@ non-ignored files. Positional slug arguments are rejected. Use `--runtime` when
 migrations or runtime code changed; it then runs `deploy-dry-run`, `sync`,
 `migrate`, `deploy`, and `is-active` through the `blagodarie-admin` wrapper.
 Record the result in `log.md` or the chain reference after the run.
+
+## Agent Chain Guardrails
+
+Reusable prompt, checklist, recovery, parallelism, branch/worktree, and dirty
+worktree rules are captured in
+`references/2026-06-22-agent-chain-operational-hardening-chain.md`.
+
+Operational defaults:
+
+1. Resume unfinished chains from the durable chain file, latest commits,
+   `log.md`, and current `git status`, not chat memory.
+2. Use one serial worker unless write sets, tests/state, and deploy paths are
+   all disjoint.
+3. Use branch-per-chain or a separate git worktree for long-running or parallel
+   work, then merge back to this deployment workspace before deploy.
+4. Before broad commit, sync, migrate, or deploy helpers, identify dirty tracked
+   and untracked files, mark ownership, and refuse the helper unless unrelated
+   files are excluded, cleared by their owner, or explicitly confirmed safe.
+5. With unrelated local dirt present, prefer manual staged-only commits for the
+   chain's owned files and record the foreign paths left untouched.

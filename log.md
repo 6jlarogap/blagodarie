@@ -2,6 +2,18 @@
 
 ## 2026-06-22
 
+- Implemented `agent-chain-orchestration-hardening`,
+  `agent-parallel-integrity-rules`, `agent-unfinished-chain-recovery`,
+  `agent-worktree-branch-strategy`, and `agent-dirty-worktree-guard` as a
+  docs/process hardening chain: added a reusable serial worker prompt template,
+  coordinator checklist, parallel-worker integrity rules, durable unfinished
+  recovery rules, branch/worktree deployment strategy, and dirty-worktree
+  preflight guard. Updated `DEPLOYMENT.md` to link the guardrails. Checks
+  passed: `bash scripts/reindex.sh`, graphify incremental update, `git diff
+  --check`, shell syntax checks for the handoff/deploy helpers, and
+  `python3 -m py_compile scripts/code_index.py`. Runtime deploy not required.
+  Existing foreign dirty bot files and untracked
+  `scripts/unblock-django-test-db.sh` were left untouched and unstaged.
 - Implemented `doverabot-next-decision-refresh`: re-read the saved rental
   frontend redesign chain and current runtime state, confirmed nginx,
   gunicorn, and telegram-bot active with `sudo -n
