@@ -37,6 +37,10 @@ class FSMRentalSearch(StatesGroup):
     ask = State()
 
 
+class FSMRentalIntro(StatesGroup):
+    ask = State()
+
+
 class FSMRentalContact(StatesGroup):
     ask = State()
 
@@ -54,6 +58,11 @@ class Rental(object):
     PROMPT_OFFER_WITH_VOICE = (
         'Опишите, что сдаёте в прокат: предмет, где забрать, когда доступно, '
         'цена и важные условия. Можно прислать текст, фото с подписью, видео, документ или голосовое.'
+    )
+    PROMPT_RENT_INTRO = (
+        'Прокат: напишите или скажите голосом одним сообщением.\n\n'
+        'Сдать: «сдам палатку на ВДНХ с 1 по 3 июля за 500 руб/день».\n'
+        'Найти: «ищу палатку на выходные возле ВДНХ».'
     )
     OFFER_MISSING_LABELS = {
         'item': 'что сдаете',
@@ -172,6 +181,38 @@ class Rental(object):
         if getattr(settings, 'RENTAL_STT_URL', ''):
             return cls.PROMPT_SEARCH_CONTEXT_WITH_VOICE
         return cls.PROMPT_SEARCH_CONTEXT
+
+    @classmethod
+    def command_args(cls, message, command):
+        text = cls.message_text(message)
+        return re.sub(
+            r'^\s*/%s(?:@\w+)?(?:\s+|$)' % re.escape(command),
+            '',
+            text,
+            count=1,
+            flags=re.IGNORECASE,
+        ).strip()
+
+    @classmethod
+    def classify_rent_intro(cls, text):
+        text = (text or '').strip().lower()
+        if not text:
+            return ''
+        offer_pattern = (
+            r'\b(сдам|сдаю|сдать|сдаётся|сдается|предлагаю|отдам|дам)\b|'
+            r'\b(у меня|есть)\b.*\b(прокат|аренд|сдам|сдаю|можно взять)\b|'
+            r'^есть\s+\S+'
+        )
+        search_pattern = (
+            r'\b(ищу|нужн[аоы]?|хочу взять|возьму|найди|найти|поиск|арендую|нужен)\b'
+        )
+        has_offer = bool(re.search(offer_pattern, text))
+        has_search = bool(re.search(search_pattern, text))
+        if has_offer and not has_search:
+            return 'offer'
+        if has_search and not has_offer:
+            return 'search'
+        return ''
 
     @classmethod
     def debug_log_enabled(cls):
@@ -1102,16 +1143,26 @@ class Rental(object):
 
     @classmethod
     async def cmd_rent(cls, message: Message, state: FSMContext):
-        await message.reply(
-            'Прокат снаряжения:\n'
-            '/rent_offer - создать объявление\n'
-            '/rent_search - найти снаряжение\n'
-            '/rent_my - мои объявления\n'
-            '/rent_history - мои брони'
-        )
+        text = cls.command_args(message, 'rent')
+        if text:
+            intent = cls.classify_rent_intro(text)
+            if intent == 'offer':
+                await cls.start_offer_flow(message, state, text)
+                return
+            if intent == 'search':
+                await state.set_state(FSMRentalSearch.ask)
+                await cls.handle_search_text(message, state, text)
+                return
+        await state.set_state(FSMRentalIntro.ask)
+        await message.reply(cls.PROMPT_RENT_INTRO, reply_markup=Misc.reply_markup_cancel_row())
 
     @classmethod
     async def cmd_rent_offer(cls, message: Message, state: FSMContext):
+        text = cls.command_args(message, 'rent_offer')
+        await cls.start_offer_flow(message, state, text)
+
+    @classmethod
+    async def start_offer_flow(cls, message: Message, state: FSMContext, text=''):
         status_sender, response_sender = await Misc.post_tg_user(message.from_user)
         if status_sender != 200:
             await message.reply(Misc.MSG_ERROR_API)
@@ -1121,11 +1172,73 @@ class Rental(object):
             user_uuid=response_sender['uuid'],
             uuid_pack=str(uuid4()),
         )
+        if text:
+            await cls.handle_offer_text(
+                message,
+                state,
+                response_sender,
+                await state.get_data(),
+                text,
+            )
+            return
         await message.reply(cls.offer_prompt(), reply_markup=Misc.reply_markup_cancel_row())
 
     @classmethod
+    async def handle_offer_text(cls, message, state, profile_from, data, text):
+        new_slots = await cls.extract_offer_slots(
+            text,
+            message=message,
+            current_slots=data.get('rental_slots') or {},
+        )
+        slots = cls.merge_offer_slots(
+            data.get('rental_slots') or {},
+            new_slots,
+        )
+        for key in ('latitude', 'longitude'):
+            if slots.get(key) is None and data.get(key) is not None:
+                slots[key] = data[key]
+        missing = cls.offer_missing_fields(slots)
+        cls.log_debug(
+            'offer_slots',
+            message,
+            text=text,
+            new_slots=new_slots,
+            merged_slots=slots,
+            missing=missing,
+        )
+        if missing:
+            await state.update_data(rental_slots=slots)
+            await message.reply(
+                cls.offer_missing_prompt(missing),
+                reply_markup=Misc.reply_markup_cancel_row(),
+            )
+            return
+        payload = dict(
+            user_uuid=profile_from['uuid'],
+            visibility='authenticated',
+            tgdesc=TgDesc.from_message(message, data['uuid_pack']),
+        )
+        payload.update({key: value for key, value in slots.items() if value not in (None, '')})
+        key = f'{Rcache.RENTAL_DESC_PREFIX}{Rcache.KEY_SEP}{data["uuid_pack"]}'
+        is_first = Misc.redis_is_key_first_up(key)
+        if is_first is None:
+            is_first = True
+        pending_offer = dict(
+            payload=payload,
+            rental_offer_uuid=data.get('rental_offer_uuid') or '',
+            source_chat_id=message.chat.id,
+            source_message_id=message.message_id,
+            cache_key=key,
+            is_first=is_first,
+            media_group_id=message.media_group_id,
+        )
+        if await cls.maybe_prompt_offer_geocode(message, state, slots, pending_offer):
+            return
+        await cls.save_offer_from_payload(message, state, profile_from, pending_offer)
+
+    @classmethod
     async def cmd_rent_search(cls, message: Message, state: FSMContext):
-        query = re.sub(r'^\s*/rent_search(?:@\w+)?\s*', '', message.text or '', flags=re.I).strip()
+        query = cls.command_args(message, 'rent_search')
         if query:
             await state.set_state(FSMRentalSearch.ask)
             await cls.handle_search_text(message, state, query)
@@ -2261,6 +2374,40 @@ class Rental(object):
         return success
 
 
+@router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMRentalIntro.ask))
+async def process_rental_intro(message: Message, state: FSMContext):
+    if await is_it_command(message, state):
+        return
+    text = await Rental.message_or_voice_text(message)
+    if message.content_type == ContentType.VOICE and not text:
+        logging.info(
+            'rental intro voice was not recognized, user_id=%s chat_id=%s message_id=%s',
+            message.from_user.id,
+            message.chat.id,
+            message.message_id,
+        )
+        await message.reply(
+            'Голосовое не распознано. Пришлите одним сообщением текстом или голосом: «ищу ...» или «сдам ...».',
+            reply_markup=Misc.reply_markup_cancel_row(),
+        )
+        return
+    if not text:
+        await message.reply(Rental.PROMPT_RENT_INTRO, reply_markup=Misc.reply_markup_cancel_row())
+        return
+    intent = Rental.classify_rent_intro(text)
+    if intent == 'offer':
+        await Rental.start_offer_flow(message, state, text)
+        return
+    if intent == 'search':
+        await state.set_state(FSMRentalSearch.ask)
+        await Rental.handle_search_text(message, state, text)
+        return
+    await message.reply(
+        'Не понял: вы хотите сдать вещь или найти в аренду? Напишите или скажите одним сообщением: «сдам ...» или «ищу ...».',
+        reply_markup=Misc.reply_markup_cancel_row(),
+    )
+
+
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMRentalOffer.ask))
 async def process_rental_offer(message: Message, state: FSMContext):
     if await is_it_command(message, state):
@@ -2310,56 +2457,7 @@ async def process_rental_offer(message: Message, state: FSMContext):
     ):
         await message.reply(Rental.offer_prompt(), reply_markup=Misc.reply_markup_cancel_row())
         return
-    new_slots = await Rental.extract_offer_slots(
-        text,
-        message=message,
-        current_slots=data.get('rental_slots') or {},
-    )
-    slots = Rental.merge_offer_slots(
-        data.get('rental_slots') or {},
-        new_slots,
-    )
-    for key in ('latitude', 'longitude'):
-        if slots.get(key) is None and data.get(key) is not None:
-            slots[key] = data[key]
-    missing = Rental.offer_missing_fields(slots)
-    Rental.log_debug(
-        'offer_slots',
-        message,
-        text=text,
-        new_slots=new_slots,
-        merged_slots=slots,
-        missing=missing,
-    )
-    if missing:
-        await state.update_data(rental_slots=slots)
-        await message.reply(
-            Rental.offer_missing_prompt(missing),
-            reply_markup=Misc.reply_markup_cancel_row(),
-        )
-        return
-    payload = dict(
-        user_uuid=profile_from['uuid'],
-        visibility='authenticated',
-        tgdesc=TgDesc.from_message(message, data['uuid_pack']),
-    )
-    payload.update({key: value for key, value in slots.items() if value not in (None, '')})
-    key = f'{Rcache.RENTAL_DESC_PREFIX}{Rcache.KEY_SEP}{data["uuid_pack"]}'
-    is_first = Misc.redis_is_key_first_up(key)
-    if is_first is None:
-        is_first = True
-    pending_offer = dict(
-        payload=payload,
-        rental_offer_uuid=data.get('rental_offer_uuid') or '',
-        source_chat_id=message.chat.id,
-        source_message_id=message.message_id,
-        cache_key=key,
-        is_first=is_first,
-        media_group_id=message.media_group_id,
-    )
-    if await Rental.maybe_prompt_offer_geocode(message, state, slots, pending_offer):
-        return
-    await Rental.save_offer_from_payload(message, state, profile_from, pending_offer)
+    await Rental.handle_offer_text(message, state, profile_from, data, text)
 
 
 @router.message(F.chat.type.in_((ChatType.PRIVATE,)), StateFilter(FSMRentalSearch.ask))

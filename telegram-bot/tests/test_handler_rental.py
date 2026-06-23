@@ -585,14 +585,117 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(params['rental_price_max'], ['600'])
         self.assertEqual(params['rental_trusted_only'], ['on'])
 
-    async def test_rent_hub_mentions_owner_listing_command(self):
+    async def test_cmd_rent_without_args_enters_voice_capable_intro(self):
         message = FakeMessage(text='/rent')
         state = FakeState()
 
         await self.handler_rental.Rental.cmd_rent(message, state)
 
-        self.assertIn('/rent_my', message.replies[-1].text)
-        self.assertIn('/rent_history', message.replies[-1].text)
+        self.assertIs(state.state, self.handler_rental.FSMRentalIntro.ask)
+        self.assertIn('одним сообщением', message.replies[-1].text)
+        self.assertIn('голос', message.replies[-1].text)
+
+    async def test_cmd_rent_inline_offer_starts_offer_flow(self):
+        message = FakeMessage(text='/rent сдам палатку на ВДНХ за 500 руб')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'start_offer_flow',
+            mock.AsyncMock(),
+        ) as start_offer_flow, mock.patch.object(
+            self.handler_rental.Rental,
+            'handle_search_text',
+            mock.AsyncMock(),
+        ) as handle_search_text:
+            await self.handler_rental.Rental.cmd_rent(message, state)
+
+        start_offer_flow.assert_awaited_once_with(
+            message,
+            state,
+            'сдам палатку на ВДНХ за 500 руб',
+        )
+        handle_search_text.assert_not_awaited()
+
+    async def test_cmd_rent_inline_search_starts_search_flow(self):
+        message = FakeMessage(text='/rent ищу палатку до 500 руб на завтра')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'handle_search_text',
+            mock.AsyncMock(),
+        ) as handle_search_text, mock.patch.object(
+            self.handler_rental.Rental,
+            'start_offer_flow',
+            mock.AsyncMock(),
+        ) as start_offer_flow:
+            await self.handler_rental.Rental.cmd_rent(message, state)
+
+        self.assertIs(state.state, self.handler_rental.FSMRentalSearch.ask)
+        handle_search_text.assert_awaited_once_with(
+            message,
+            state,
+            'ищу палатку до 500 руб на завтра',
+        )
+        start_offer_flow.assert_not_awaited()
+
+    async def test_process_rental_intro_routes_offer_voice_transcript(self):
+        message = FakeMessage(content_type=ContentTypeStub.VOICE)
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'message_or_voice_text',
+            mock.AsyncMock(return_value='сдам палатку на ВДНХ за 500 руб'),
+        ) as message_or_voice_text, mock.patch.object(
+            self.handler_rental.Rental,
+            'start_offer_flow',
+            mock.AsyncMock(),
+        ) as start_offer_flow:
+            await self.handler_rental.process_rental_intro(message, state)
+
+        message_or_voice_text.assert_awaited_once_with(message)
+        start_offer_flow.assert_awaited_once_with(
+            message,
+            state,
+            'сдам палатку на ВДНХ за 500 руб',
+        )
+
+    async def test_process_rental_intro_routes_search_text(self):
+        message = FakeMessage(text='ищу палатку до 500 руб')
+        state = FakeState()
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'handle_search_text',
+            mock.AsyncMock(),
+        ) as handle_search_text:
+            await self.handler_rental.process_rental_intro(message, state)
+
+        self.assertIs(state.state, self.handler_rental.FSMRentalSearch.ask)
+        handle_search_text.assert_awaited_once_with(message, state, 'ищу палатку до 500 руб')
+
+    async def test_process_rental_intro_ambiguous_keeps_intro_state(self):
+        message = FakeMessage(text='палатка ВДНХ')
+        state = FakeState()
+        state.state = self.handler_rental.FSMRentalIntro.ask
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'start_offer_flow',
+            mock.AsyncMock(),
+        ) as start_offer_flow, mock.patch.object(
+            self.handler_rental.Rental,
+            'handle_search_text',
+            mock.AsyncMock(),
+        ) as handle_search_text:
+            await self.handler_rental.process_rental_intro(message, state)
+
+        self.assertIs(state.state, self.handler_rental.FSMRentalIntro.ask)
+        self.assertIn('сдать вещь или найти', message.replies[-1].text)
+        start_offer_flow.assert_not_awaited()
+        handle_search_text.assert_not_awaited()
 
     async def test_cmd_rent_my_lists_owner_offers_with_controls(self):
         message = FakeMessage(text='/rent_my')
