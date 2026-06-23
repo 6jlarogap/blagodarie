@@ -1,5 +1,9 @@
 # Log
 
+## 2026-06-23
+
+- Implemented, committed, verified, and deployed `doverabot-rent-by-voice-implementation-handoff`: `/rent` now accepts bare text/voice follow-up through `FSMRentalIntro.ask`, routes `/rent сдам ...` into the owner listing path, routes `/rent ищу ...` into rental search, preserves `/rent_offer ...` and existing offer voice transcript handling through shared offer logic, and asks ambiguous intro text to choose/rephrase. Source commit: `c5759454707bd48529afba790de5487450453b18`. Checks passed: focused rental bot tests (`52 passed, 4 subtests`), full mocked bot tests (`110 passed, 4 subtests`), bot compileall, `git diff --check`, graphify update through `uv tool run --from graphifyy graphify update .`, Django check, wrapper `is-active`, and live workspace-vs-`/srv` file parity for the changed bot files. Runtime deploy completed through `blagodarie-admin deploy`; nginx, gunicorn, telegram-bot, and rental STT are active. Existing Django `security.W002` warning remains. Subagent fan-out helped identify the missing intro handler and stale `/rent` tests, but two read-only subagents consumed their full iteration budgets; the agent skill was updated with a stricter one-shot bounded-subagent pattern.
+
 ## 2026-06-22
 
 - Implemented and runtime-deployed `doverabot-rental-llm-extractor`: added a
