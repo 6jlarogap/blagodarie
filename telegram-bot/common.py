@@ -410,6 +410,10 @@ class KeyboardType(object):
     #
     RENTAL_GEOCODE = 85
 
+    # Черновик объявления проката: сохранить/править/медиа
+    #
+    RENTAL_OFFER_DRAFT = 86
+
     # Разделитель данных в call back data
     #
     SEP = '~'
@@ -2719,9 +2723,10 @@ class Misc(object):
         Если задан card_message_id, то не новая карточка, а править имеющуюся c id == card_message_id
         """
         count_meet_invited_ = await cls.count_meet_invited(profile['uuid'])
+        dob_line = '(%s)\n' % profile['dob'] if profile['dob'] else ''
         caption = (
             f'<b>{profile["first_name"]}</b>\n'
-            f'{"(" + profile["dob"] +")\n" if profile["dob"] else ""}'
+            f'{dob_line}'
             '\n'
             'Для возврата к игре выберите в меню бота или напишите команду /meet\n'
             '\n'

@@ -335,6 +335,7 @@ def install_dependency_stubs(stub_common=True):
             RENTAL_RESERVATION_ACTION = 83
             RENTAL_OWNER_ACTION = 84
             RENTAL_GEOCODE = 85
+            RENTAL_OFFER_DRAFT = 86
             SEP = '~'
 
         class RcacheStub:
@@ -389,8 +390,28 @@ def install_dependency_stubs(stub_common=True):
 
         class TgDescStub:
             @staticmethod
-            def from_message(_message, uuid_pack):
-                return {'uuid_pack': uuid_pack, 'file_type': 'text'}
+            def from_message(message, uuid_pack):
+                file_type = 'text'
+                file_id = ''
+                for candidate in ('photo', 'audio', 'video', 'document', 'voice'):
+                    content = getattr(message, candidate, None)
+                    if not content:
+                        continue
+                    file_type = candidate
+                    if candidate == 'photo' and isinstance(content, list) and content:
+                        file_id = getattr(content[-1], 'file_id', '')
+                    else:
+                        file_id = getattr(content, 'file_id', '')
+                    break
+                return {
+                    'uuid_pack': uuid_pack,
+                    'file_type': file_type,
+                    'file_id': file_id,
+                    'media_group_id': getattr(message, 'media_group_id', '') or '',
+                    'message_id': getattr(message, 'message_id', 0),
+                    'chat_id': getattr(getattr(message, 'chat', None), 'id', 0),
+                    'caption': getattr(message, 'caption', '') or '',
+                }
 
         common.Misc = MiscStub
         common.KeyboardType = KeyboardTypeStub

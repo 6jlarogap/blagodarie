@@ -158,6 +158,13 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             mock.AsyncMock(),
         ) as create_offer:
             await self.handler_rental.process_rental_offer(message, state)
+            create_offer.assert_not_awaited()
+            self.assertIn('Черновик объявления', message.replies[-1].text)
+            self.assertNotIn('pending_rental_geocode', state.data)
+
+            callback = FakeCallback('86~confirm')
+            callback.message = message
+            await self.handler_rental.cbq_rental_offer_draft(callback, state)
 
         create_offer.assert_not_awaited()
         self.assertIn('Нашлись варианты координат', message.replies[-1].text)
@@ -378,7 +385,26 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Голосовое не распознано', message.replies[-1].text)
         self.assertNotIn('rental_slots', state.data)
 
-    async def test_process_rental_offer_prompts_for_missing_core_fields(self):
+    async def test_process_rental_offer_media_without_caption_asks_for_dictation_first(self):
+        message = FakeMessage(content_type=ContentTypeStub.PHOTO)
+        message.photo = [types.SimpleNamespace(file_id='photo-large')]
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+        })
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'create_offer',
+            mock.AsyncMock(),
+        ) as create_offer:
+            await self.handler_rental.process_rental_offer(message, state)
+
+        create_offer.assert_not_awaited()
+        self.assertIn('Расскажите одним голосовым или текстом', message.replies[-1].text)
+        self.assertNotIn('rental_slots', state.data)
+
+    async def test_process_rental_offer_shows_prefilled_draft_for_missing_core_fields(self):
         message = FakeMessage(text='Палатка MSR Hubba')
         state = FakeState({
             'user_uuid': 'requester-uuid',
@@ -393,13 +419,19 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             await self.handler_rental.process_rental_offer(message, state)
 
         create_offer.assert_not_awaited()
-        self.assertIn('Уточните', message.replies[-1].text)
+        self.assertIn('Я услышал', message.replies[-1].text)
+        self.assertIn('Черновик объявления', message.replies[-1].text)
+        self.assertIn('Не хватает', message.replies[-1].text)
         self.assertIn('где забрать', message.replies[-1].text)
         self.assertIn('когда доступно', message.replies[-1].text)
         self.assertIn('цена', message.replies[-1].text)
         self.assertEqual(state.data['rental_slots']['title'], 'Палатка MSR Hubba')
+        self.assertEqual(state.data['rental_offer_missing_fields'], ['place', 'availability', 'price'])
+        buttons = [button for row in message.replies[-1].reply_markup.inline_keyboard for button in row]
+        self.assertIn('✅ Сохранить черновик', [button.text for button in buttons])
+        self.assertIn('✏️ Исправить или дополнить', [button.text for button in buttons])
 
-    async def test_process_rental_offer_collects_followup_and_sends_final_payload(self):
+    async def test_confirmed_rental_offer_sends_final_payload_and_enters_media_mode(self):
         message = FakeMessage(text='место: ВДНХ\nдаты: 2026-07-01 2026-07-03\nцена: 500 руб/день\nколичество: 3')
         state = FakeState({
             'user_uuid': 'requester-uuid',
@@ -413,6 +445,7 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         response = {
             'offer': {
                 'uuid': 'offer-uuid',
+                'status': 'active',
                 'title': 'Палатка MSR Hubba',
                 'description_text': 'Палатка MSR Hubba',
                 'owner': {'uuid': 'requester-uuid'},
@@ -427,12 +460,14 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             self.handler_rental.Rental,
             'register_message',
             mock.AsyncMock(return_value=(200, {})),
-        ), mock.patch.object(
-            self.handler_rental.Rental,
-            'show_offer',
-            mock.AsyncMock(),
         ):
             await self.handler_rental.process_rental_offer(message, state)
+            create_offer.assert_not_awaited()
+            self.assertIn('Черновик объявления', message.replies[-1].text)
+
+            callback = FakeCallback('86~confirm')
+            callback.message = message
+            await self.handler_rental.cbq_rental_offer_draft(callback, state)
 
         payload = create_offer.await_args.args[0]
         self.assertEqual(payload['title'], 'Палатка MSR Hubba')
@@ -442,10 +477,50 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('500 руб/день', payload['price_text'])
         self.assertEqual(payload['quantity_total'], '3')
         self.assertEqual(payload['tgdesc']['uuid_pack'], 'offer-pack')
-        self.assertTrue(state.cleared)
-        self.assertEqual(message.replies[-1].text, 'Объявление проката сохранено')
+        self.assertEqual(payload['status'], 'active')
+        self.assertFalse(state.cleared)
+        self.assertIs(state.state, self.handler_rental.FSMRentalOffer.ask)
+        self.assertTrue(state.data['rental_offer_media_mode'])
+        self.assertEqual(state.data['rental_offer_uuid'], 'offer-uuid')
+        self.assertIn('Теперь можно прикрепить фото', message.replies[-1].text)
+        self.assertTrue(callback.answered)
 
-    async def test_process_rental_offer_collects_freeform_availability_followup(self):
+    async def test_confirmed_incomplete_rental_offer_is_saved_as_draft(self):
+        message = FakeMessage(text='Палатка MSR Hubba')
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+        })
+        response = {
+            'offer': {
+                'uuid': 'offer-uuid',
+                'status': 'draft',
+                'title': 'Палатка MSR Hubba',
+                'owner': {'uuid': 'requester-uuid'},
+            },
+        }
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'create_offer',
+            mock.AsyncMock(return_value=(200, response)),
+        ) as create_offer, mock.patch.object(
+            self.handler_rental.Rental,
+            'register_message',
+            mock.AsyncMock(return_value=(200, {})),
+        ):
+            await self.handler_rental.process_rental_offer(message, state)
+            callback = FakeCallback('86~confirm')
+            callback.message = message
+            await self.handler_rental.cbq_rental_offer_draft(callback, state)
+
+        payload = create_offer.await_args.args[0]
+        self.assertEqual(payload['status'], 'draft')
+        self.assertIn('Объявление сохранено как черновик', message.replies[-1].text)
+        self.assertIn('где забрать', message.replies[-1].text)
+        self.assertTrue(state.data['rental_offer_media_mode'])
+
+    async def test_process_rental_offer_preview_collects_freeform_availability_followup(self):
         message = FakeMessage(text='на выходные')
         state = FakeState({
             'user_uuid': 'requester-uuid',
@@ -459,49 +534,25 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
             },
             'rental_geocode_status': 'failed',
         })
-        response = {
-            'offer': {
-                'uuid': 'offer-uuid',
-                'title': 'Мэй на колесо',
-                'description_text': 'Мэй на колесо',
-                'owner': {'uuid': 'requester-uuid'},
-            },
-        }
 
         with mock.patch.object(
             self.handler_rental.Rental,
             'create_offer',
-            mock.AsyncMock(return_value=(200, response)),
-        ) as create_offer, mock.patch.object(
-            self.handler_rental.Rental,
-            'register_message',
-            mock.AsyncMock(return_value=(200, {})),
-        ), mock.patch.object(
-            self.handler_rental.Rental,
-            'show_offer',
             mock.AsyncMock(),
-        ):
+        ) as create_offer:
             await self.handler_rental.process_rental_offer(message, state)
 
-        payload = create_offer.await_args.args[0]
-        self.assertEqual(payload['availability_text'], 'на выходные')
-        self.assertEqual(payload['address'], 'парадроме флайчи гем')
-        self.assertTrue(state.cleared)
+        create_offer.assert_not_awaited()
+        self.assertEqual(state.data['rental_slots']['availability_text'], 'на выходные')
+        self.assertEqual(state.data['rental_slots']['address'], 'парадроме флайчи гем')
+        self.assertIn('Все ключевые поля заполнены', message.replies[-1].text)
 
-    async def test_process_rental_offer_uses_llm_extractor_slots(self):
+    async def test_process_rental_offer_uses_llm_extractor_slots_in_draft_preview(self):
         message = FakeMessage(text='Есть мэй, подробности голосом выше')
         state = FakeState({
             'user_uuid': 'requester-uuid',
             'uuid_pack': 'offer-pack',
         })
-        response = {
-            'offer': {
-                'uuid': 'offer-uuid',
-                'title': 'Мэй на колесо',
-                'description_text': 'Есть мэй, подробности голосом выше',
-                'owner': {'uuid': 'requester-uuid'},
-            },
-        }
 
         with mock.patch.object(
             self.handler_rental.Rental,
@@ -516,25 +567,41 @@ class RentalHandlerTests(unittest.IsolatedAsyncioTestCase):
         ) as llm_extract_slots, mock.patch.object(
             self.handler_rental.Rental,
             'create_offer',
-            mock.AsyncMock(return_value=(200, response)),
-        ) as create_offer, mock.patch.object(
-            self.handler_rental.Rental,
-            'register_message',
-            mock.AsyncMock(return_value=(200, {})),
-        ), mock.patch.object(
-            self.handler_rental.Rental,
-            'show_offer',
             mock.AsyncMock(),
-        ):
+        ) as create_offer:
             await self.handler_rental.process_rental_offer(message, state)
 
         llm_extract_slots.assert_awaited_once()
-        payload = create_offer.await_args.args[0]
-        self.assertEqual(payload['title'], 'Мэй на колесо')
-        self.assertEqual(payload['address'], 'парадром Флайчи Гем')
-        self.assertEqual(payload['availability_text'], 'на выходные')
-        self.assertEqual(payload['price_text'], '1000 рублей')
-        self.assertTrue(state.cleared)
+        create_offer.assert_not_awaited()
+        self.assertEqual(state.data['rental_slots']['title'], 'Мэй на колесо')
+        self.assertEqual(state.data['rental_slots']['address'], 'парадром Флайчи Гем')
+        self.assertEqual(state.data['rental_slots']['availability_text'], 'на выходные')
+        self.assertEqual(state.data['rental_slots']['price_text'], '1000 рублей')
+        self.assertIn('Мэй на колесо', message.replies[-1].text)
+
+    async def test_saved_rental_offer_accepts_followup_photo_media(self):
+        message = FakeMessage(content_type=ContentTypeStub.PHOTO)
+        message.photo = [types.SimpleNamespace(file_id='photo-small'), types.SimpleNamespace(file_id='photo-large')]
+        state = FakeState({
+            'user_uuid': 'requester-uuid',
+            'uuid_pack': 'offer-pack',
+            'rental_offer_uuid': 'offer-uuid',
+            'rental_offer_media_mode': True,
+        })
+
+        with mock.patch.object(
+            self.handler_rental.Rental,
+            'put_offer',
+            mock.AsyncMock(return_value=(200, {'offer': {'uuid': 'offer-uuid'}})),
+        ) as put_offer:
+            await self.handler_rental.process_rental_offer(message, state)
+
+        payload = put_offer.await_args.args[0]
+        self.assertEqual(payload['offer_uuid'], 'offer-uuid')
+        self.assertEqual(payload['tgdesc']['file_type'], 'photo')
+        self.assertEqual(payload['tgdesc']['file_id'], 'photo-large')
+        self.assertFalse(payload['is_first'])
+        self.assertIn('Медиа прикреплено', message.replies[-1].text)
 
     async def test_offer_and_owner_text_include_quantity_when_multiple(self):
         offer = {

@@ -52,12 +52,14 @@ class FSMRentalPaymentProof(StatesGroup):
 class Rental(object):
 
     PROMPT_OFFER = (
-        'Опишите, что сдаёте в прокат: предмет, где забрать, когда доступно, '
-        'цена и важные условия. Можно прислать текст, фото с подписью, видео или документ.'
+        'Опишите одним сообщением: что сдаёте, где забрать, когда доступно, '
+        'цена/залог/условия. Потом я покажу черновик, вы подтвердите или поправите, '
+        'и после сохранения можно будет добавить фото/видео.'
     )
     PROMPT_OFFER_WITH_VOICE = (
-        'Опишите, что сдаёте в прокат: предмет, где забрать, когда доступно, '
-        'цена и важные условия. Можно прислать текст, фото с подписью, видео, документ или голосовое.'
+        'Расскажите одним голосовым или текстом: что сдаёте, где забрать, когда доступно, '
+        'цена/залог/условия. Потом я покажу черновик, вы подтвердите или поправите, '
+        'и после сохранения можно будет добавить фото/видео.'
     )
     PROMPT_RENT_INTRO = (
         'Прокат: напишите или скажите голосом одним сообщением.\n\n'
@@ -92,7 +94,25 @@ class Rental(object):
     ACTION_OWNER_ARCHIVE = 'archive'
     ACTION_GEOCODE_USE = 'use'
     ACTION_GEOCODE_SKIP = 'skip'
+    ACTION_OFFER_DRAFT_CONFIRM = 'confirm'
+    ACTION_OFFER_DRAFT_EDIT = 'edit'
+    ACTION_OFFER_DRAFT_CANCEL = 'cancel'
+    ACTION_OFFER_DRAFT_MEDIA = 'media'
+    ACTION_OFFER_DRAFT_DONE = 'done'
     GEOCODE_FLOWS = {'offer', 'search'}
+    ACTIONS_OFFER_DRAFT = {
+        ACTION_OFFER_DRAFT_CONFIRM,
+        ACTION_OFFER_DRAFT_EDIT,
+        ACTION_OFFER_DRAFT_CANCEL,
+        ACTION_OFFER_DRAFT_MEDIA,
+        ACTION_OFFER_DRAFT_DONE,
+    }
+    OFFER_MEDIA_CONTENT_TYPES = (
+        ContentType.PHOTO,
+        ContentType.VIDEO,
+        ContentType.DOCUMENT,
+        ContentType.AUDIO,
+    )
     ACTIONS_OWNER = {
         ACTION_OWNER_LIST,
         ACTION_OWNER_ACTIVATE,
@@ -1098,6 +1118,242 @@ class Rental(object):
         return 'Уточните: %s.' % '; '.join(labels)
 
     @classmethod
+    def offer_debug_id(cls, data_or_uuid):
+        if isinstance(data_or_uuid, dict):
+            value = data_or_uuid.get('uuid_pack') or ''
+        else:
+            value = data_or_uuid or ''
+        return str(value)[:8]
+
+    @classmethod
+    def bounded_text(cls, value, limit=900):
+        value = str(value or '').strip()
+        if limit and len(value) > limit:
+            return value[:limit].rstrip() + '...'
+        return value
+
+    @classmethod
+    def append_heard_text(cls, current, new_text):
+        current = (current or '').strip()
+        new_text = (new_text or '').strip()
+        if not new_text:
+            return current
+        if not current:
+            return new_text
+        if new_text in current:
+            return current
+        return '%s\n%s' % (current, new_text)
+
+    @classmethod
+    def offer_missing_labels(cls, missing):
+        labels = []
+        for item in (missing or []):
+            label = cls.OFFER_MISSING_LABELS.get(item, item)
+            if label:
+                labels.append(str(label))
+        return labels
+
+    @classmethod
+    def offer_draft_field_lines(cls, slots):
+        slots = slots or {}
+        lines = []
+        item = slots.get('item_text') or slots.get('title') or ''
+        if item:
+            lines.append('- Предмет: %s' % html.quote(cls.bounded_text(item, 180)))
+        if slots.get('address'):
+            lines.append('- Где: %s' % html.quote(cls.bounded_text(slots['address'], 180)))
+        elif slots.get('latitude') is not None and slots.get('longitude') is not None:
+            lines.append('- Где: %s, %s' % (slots['latitude'], slots['longitude']))
+        availability = slots.get('availability_text') or ''
+        if slots.get('available_from') or slots.get('available_to'):
+            dates = '%s - %s' % (slots.get('available_from') or '?', slots.get('available_to') or '?')
+            availability = ('%s %s' % (availability, dates)).strip()
+        if availability:
+            lines.append('- Когда: %s' % html.quote(cls.bounded_text(availability, 180)))
+        price = slots.get('price_text') or ''
+        if not price and slots.get('price_amount'):
+            price = '%s %s %s' % (
+                slots.get('price_amount') or '',
+                slots.get('price_currency') or '',
+                slots.get('price_period') or '',
+            )
+        if price:
+            lines.append('- Цена: %s' % html.quote(cls.bounded_text(price, 180)))
+        quantity = slots.get('quantity_total') or ''
+        if str(quantity) not in ('', '1'):
+            lines.append('- Количество: %s' % html.quote(str(quantity)))
+        description = cls.bounded_text(slots.get('description_text') or '', 360)
+        if description:
+            lines.append('- Описание: %s' % html.quote(description))
+        return lines
+
+    @classmethod
+    def text_offer_draft_preview(cls, heard_text, slots, missing, debug_id=''):
+        heard_text = cls.bounded_text(heard_text, 900)
+        if heard_text:
+            result = 'Я услышал:\n“%s”\n\n' % html.quote(heard_text)
+        else:
+            result = 'Я пока не получил текст описания.\n\n'
+        result += 'Черновик объявления:\n'
+        field_lines = cls.offer_draft_field_lines(slots)
+        result += '\n'.join(field_lines or ['- пока нет распознанных полей'])
+        if missing:
+            result += '\n\nНе хватает: %s.' % html.quote('; '.join(cls.offer_missing_labels(missing)))
+            result += '\nМожно прислать исправление голосом/текстом или сохранить как черновик.'
+        else:
+            result += '\n\nВсе ключевые поля заполнены.'
+            result += '\nМожно сохранить или прислать исправление голосом/текстом.'
+        result += '\nПосле сохранения я попрошу фото/видео/документы.'
+        if debug_id:
+            result += '\n\nКод черновика: %s' % html.quote(debug_id)
+        return result
+
+    @classmethod
+    def offer_draft_callback_data(cls, action):
+        return '%s%s%s' % (
+            KeyboardType.RENTAL_OFFER_DRAFT,
+            KeyboardType.SEP,
+            action,
+        )
+
+    @classmethod
+    def parse_offer_draft_callback_data(cls, callback):
+        parts = (callback.data or '').split(KeyboardType.SEP)
+        if (
+            len(parts) != 2 or
+            parts[0] != str(KeyboardType.RENTAL_OFFER_DRAFT) or
+            parts[1] not in cls.ACTIONS_OFFER_DRAFT
+        ):
+            return ''
+        return parts[1]
+
+    @classmethod
+    def markup_offer_draft(cls, missing=None):
+        missing = missing or []
+        save_text = '✅ Сохранить черновик' if missing else '✅ Всё верно / сохранить'
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text=save_text,
+                callback_data=cls.offer_draft_callback_data(cls.ACTION_OFFER_DRAFT_CONFIRM),
+            )],
+            [InlineKeyboardButton(
+                text='✏️ Исправить или дополнить',
+                callback_data=cls.offer_draft_callback_data(cls.ACTION_OFFER_DRAFT_EDIT),
+            )],
+            [InlineKeyboardButton(
+                text='❌ Отмена',
+                callback_data=cls.offer_draft_callback_data(cls.ACTION_OFFER_DRAFT_CANCEL),
+            )],
+        ])
+
+    @classmethod
+    def markup_offer_media(cls):
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text='📎 Добавить фото/видео',
+                callback_data=cls.offer_draft_callback_data(cls.ACTION_OFFER_DRAFT_MEDIA),
+            )],
+            [InlineKeyboardButton(
+                text='✅ Готово без медиа',
+                callback_data=cls.offer_draft_callback_data(cls.ACTION_OFFER_DRAFT_DONE),
+            )],
+        ])
+
+    @classmethod
+    def text_offer_media_prompt(cls, offer, missing=None, flow_id=''):
+        status_value = (offer or {}).get('status') or 'active'
+        if status_value == 'draft':
+            result = 'Объявление сохранено как черновик.'
+            missing_labels = cls.offer_missing_labels(missing or [])
+            if missing_labels:
+                result += ' Не хватает: %s.' % '; '.join(missing_labels)
+            result += ' Активировать его можно позже через /rent_my.'
+        else:
+            result = 'Объявление проката сохранено.'
+        result += '\n\nТеперь можно прикрепить фото, видео, документ или аудио: просто отправьте сюда медиа. Когда закончите, нажмите «Готово».'
+        debug_id = cls.offer_debug_id(flow_id)
+        if debug_id:
+            result += '\n\nКод черновика: %s' % html.quote(debug_id)
+        return result
+
+    @classmethod
+    async def reply_offer_draft_preview(cls, message, state, data, heard_text, slots, missing, new_slots=None):
+        heard_text = cls.append_heard_text(data.get('rental_offer_heard_text'), heard_text)
+        source_tgdesc = data.get('rental_offer_source_tgdesc')
+        source_chat_id = data.get('rental_offer_source_chat_id') or message.chat.id
+        source_message_id = data.get('rental_offer_source_message_id') or message.message_id
+        source_media_group_id = data.get('rental_offer_source_media_group_id') or message.media_group_id
+        update_source = not source_tgdesc or message.content_type in (
+            ContentType.PHOTO,
+            ContentType.VIDEO,
+            ContentType.DOCUMENT,
+            ContentType.AUDIO,
+            ContentType.VOICE,
+        )
+        if update_source:
+            source_tgdesc = TgDesc.from_message(message, data['uuid_pack'])
+            source_chat_id = message.chat.id
+            source_message_id = message.message_id
+            source_media_group_id = message.media_group_id
+        debug_id = cls.offer_debug_id(data)
+        await state.update_data(
+            rental_slots=slots,
+            rental_offer_heard_text=heard_text,
+            rental_offer_missing_fields=missing,
+            rental_offer_draft_status='preview',
+            rental_offer_source_tgdesc=source_tgdesc,
+            rental_offer_source_chat_id=source_chat_id,
+            rental_offer_source_message_id=source_message_id,
+            rental_offer_source_media_group_id=source_media_group_id,
+        )
+        cls.log_debug(
+            'offer_draft_preview',
+            message,
+            flow_id=data.get('uuid_pack'),
+            debug_id=debug_id,
+            heard_len=len(heard_text or ''),
+            new_slots=new_slots or {},
+            merged_slots=slots,
+            missing=missing,
+            prompt_type='draft_preview',
+        )
+        await message.reply(
+            cls.text_offer_draft_preview(heard_text, slots, missing, debug_id=debug_id),
+            reply_markup=cls.markup_offer_draft(missing),
+        )
+
+    @classmethod
+    def pending_offer_from_draft(cls, message, profile_from, data, slots, missing):
+        status_value = 'draft' if missing else 'active'
+        source_message_id = data.get('rental_offer_source_message_id') or message.message_id
+        payload = dict(
+            user_uuid=profile_from['uuid'],
+            visibility='authenticated',
+            status=status_value,
+            tgdesc=data.get('rental_offer_source_tgdesc') or TgDesc.from_message(message, data['uuid_pack']),
+        )
+        payload.update({key: value for key, value in (slots or {}).items() if value not in (None, '')})
+        return dict(
+            payload=payload,
+            rental_offer_uuid=data.get('rental_offer_uuid') or '',
+            source_chat_id=data.get('rental_offer_source_chat_id') or message.chat.id,
+            source_message_id=source_message_id,
+            cache_key='%s%s%s%s%s' % (
+                Rcache.RENTAL_DESC_PREFIX,
+                Rcache.KEY_SEP,
+                data['uuid_pack'],
+                Rcache.KEY_SEP,
+                source_message_id,
+            ),
+            is_first=True,
+            media_group_id=data.get('rental_offer_source_media_group_id') or '',
+            after_save='await_media',
+            saved_status=status_value,
+            missing=missing or [],
+            flow_id=data.get('uuid_pack'),
+        )
+
+    @classmethod
     def parse_search_date(cls, raw):
         raw = (raw or '').strip()
         for date_format in ('%Y-%m-%d', '%d.%m.%Y'):
@@ -1201,40 +1457,22 @@ class Rental(object):
         cls.log_debug(
             'offer_slots',
             message,
+            flow_id=data.get('uuid_pack'),
+            debug_id=cls.offer_debug_id(data),
             text=text,
             new_slots=new_slots,
             merged_slots=slots,
             missing=missing,
         )
-        if missing:
-            await state.update_data(rental_slots=slots)
-            await message.reply(
-                cls.offer_missing_prompt(missing),
-                reply_markup=Misc.reply_markup_cancel_row(),
-            )
-            return
-        payload = dict(
-            user_uuid=profile_from['uuid'],
-            visibility='authenticated',
-            tgdesc=TgDesc.from_message(message, data['uuid_pack']),
+        await cls.reply_offer_draft_preview(
+            message,
+            state,
+            data,
+            text,
+            slots,
+            missing,
+            new_slots=new_slots,
         )
-        payload.update({key: value for key, value in slots.items() if value not in (None, '')})
-        key = f'{Rcache.RENTAL_DESC_PREFIX}{Rcache.KEY_SEP}{data["uuid_pack"]}'
-        is_first = Misc.redis_is_key_first_up(key)
-        if is_first is None:
-            is_first = True
-        pending_offer = dict(
-            payload=payload,
-            rental_offer_uuid=data.get('rental_offer_uuid') or '',
-            source_chat_id=message.chat.id,
-            source_message_id=message.message_id,
-            cache_key=key,
-            is_first=is_first,
-            media_group_id=message.media_group_id,
-        )
-        if await cls.maybe_prompt_offer_geocode(message, state, slots, pending_offer):
-            return
-        await cls.save_offer_from_payload(message, state, profile_from, pending_offer)
 
     @classmethod
     async def cmd_rent_search(cls, message: Message, state: FSMContext):
@@ -2076,6 +2314,58 @@ class Rental(object):
         return True
 
     @classmethod
+    async def attach_offer_media(cls, message, state, profile_from, data):
+        offer_uuid = data.get('rental_offer_uuid') or ''
+        if not offer_uuid:
+            await message.reply('Черновик уже не найден. Откройте создание заново через /rent_offer.')
+            await state.clear()
+            return
+        pack_id = message.media_group_id or message.message_id
+        cache_key = '%s%s%s%smedia%s%s' % (
+            Rcache.RENTAL_DESC_PREFIX,
+            Rcache.KEY_SEP,
+            data.get('uuid_pack') or offer_uuid,
+            Rcache.KEY_SEP,
+            Rcache.KEY_SEP,
+            pack_id,
+        )
+        is_first = Misc.redis_is_key_first_up(cache_key)
+        if is_first is None:
+            is_first = True
+        payload = dict(
+            user_uuid=profile_from['uuid'],
+            offer_uuid=offer_uuid,
+            tgdesc=TgDesc.from_message(message, data.get('uuid_pack') or str(uuid4())),
+            is_first=False,
+        )
+        status, response = await cls.put_offer(payload)
+        cls.log_debug(
+            'offer_media_attached',
+            message,
+            flow_id=data.get('uuid_pack'),
+            debug_id=cls.offer_debug_id(data),
+            offer_uuid=offer_uuid,
+            status=status,
+            file_type=(payload.get('tgdesc') or {}).get('file_type'),
+            media_group_id=message.media_group_id,
+            prompt_type='media_attach',
+        )
+        if status != 200:
+            await message.reply((response or {}).get('message') or 'Не удалось прикрепить медиа')
+            return
+        if not is_first:
+            return
+        if message.media_group_id:
+            wait_last = await Misc.redis_wait_last_in_pack(cache_key)
+            if wait_last is False:
+                return
+        await state.update_data(rental_offer_uuid=offer_uuid, rental_offer_media_mode=True)
+        await message.reply(
+            'Медиа прикреплено к объявлению. Можно отправить ещё или нажать «Готово».',
+            reply_markup=cls.markup_offer_media(),
+        )
+
+    @classmethod
     async def save_offer_from_payload(cls, message, state, profile_from, pending_offer):
         payload = dict(pending_offer['payload'])
         if pending_offer.get('rental_offer_uuid'):
@@ -2092,8 +2382,19 @@ class Rental(object):
             await message.reply((response or {}).get('message') or 'Не удалось сохранить объявление')
             await state.clear()
             return
+        offer = response['offer']
+        cls.log_debug(
+            'offer_saved',
+            message,
+            flow_id=pending_offer.get('flow_id'),
+            debug_id=cls.offer_debug_id(pending_offer.get('flow_id')),
+            offer_uuid=offer['uuid'],
+            offer_status=offer.get('status') or pending_offer.get('saved_status'),
+            missing=pending_offer.get('missing') or [],
+            prompt_type='saved_media_prompt' if pending_offer.get('after_save') == 'await_media' else 'saved',
+        )
         await cls.register_message(
-            response['offer']['uuid'],
+            offer['uuid'],
             'owner_offer',
             pending_offer['source_chat_id'],
             pending_offer['source_message_id'],
@@ -2105,9 +2406,28 @@ class Rental(object):
             wait_last = await Misc.redis_wait_last_in_pack(pending_offer['cache_key'])
             if wait_last is False:
                 return
+        if pending_offer.get('after_save') == 'await_media':
+            await state.set_state(FSMRentalOffer.ask)
+            await state.update_data(
+                rental_offer_uuid=offer['uuid'],
+                rental_offer_media_mode=True,
+                rental_offer_saved_status=offer.get('status') or pending_offer.get('saved_status') or 'active',
+                pending_rental_offer={},
+                pending_rental_geocode={},
+                rental_geocode_status='confirmed' if offer.get('latitude') is not None else '',
+            )
+            await message.reply(
+                cls.text_offer_media_prompt(
+                    offer,
+                    missing=pending_offer.get('missing') or [],
+                    flow_id=pending_offer.get('flow_id') or '',
+                ),
+                reply_markup=cls.markup_offer_media(),
+            )
+            return
         await state.clear()
         await message.reply('Объявление проката сохранено')
-        await cls.show_offer(message, profile_from, response['offer'])
+        await cls.show_offer(message, profile_from, offer)
 
     @classmethod
     async def handle_search_text(cls, message, state, text):
@@ -2417,6 +2737,20 @@ async def process_rental_offer(message: Message, state: FSMContext):
     if status_from != 200 or profile_from['uuid'] != data.get('user_uuid'):
         await state.clear()
         return
+    if data.get('rental_offer_media_mode'):
+        if message.content_type in Rental.OFFER_MEDIA_CONTENT_TYPES:
+            await Rental.attach_offer_media(message, state, profile_from, data)
+            return
+        done_text = Rental.message_text(message).lower()
+        if done_text in ('готово', 'готово без медиа', 'без медиа', 'всё', 'все'):
+            await state.clear()
+            await message.reply('Готово. Управлять объявлениями можно через /rent_my.')
+            return
+        await message.reply(
+            'Объявление уже сохранено. Пришлите фото/видео/документ/аудио или нажмите «Готово».',
+            reply_markup=Rental.markup_offer_media(),
+        )
+        return
     if message.content_type == ContentType.LOCATION and message.location:
         slots = Rental.merge_offer_slots(data.get('rental_slots') or {}, dict(
             latitude=message.location.latitude,
@@ -2428,11 +2762,14 @@ async def process_rental_offer(message: Message, state: FSMContext):
             longitude=message.location.longitude,
             rental_slots=slots,
         )
-        await message.reply(
-            Rental.offer_missing_prompt(missing)
-            if missing else
-            'Локация сохранена. Теперь пришлите описание предмета, сроков и цены.',
-            reply_markup=Misc.reply_markup_cancel_row(),
+        await Rental.reply_offer_draft_preview(
+            message,
+            state,
+            data,
+            'Геолокация: %s, %s' % (message.location.latitude, message.location.longitude),
+            slots,
+            missing,
+            new_slots=dict(latitude=message.location.latitude, longitude=message.location.longitude),
         )
         return
     text = await Rental.message_or_voice_text(message)
@@ -2443,18 +2780,19 @@ async def process_rental_offer(message: Message, state: FSMContext):
             message.chat.id,
             message.message_id,
         )
+        Rental.log_debug(
+            'offer_voice_unrecognized',
+            message,
+            flow_id=data.get('uuid_pack'),
+            debug_id=Rental.offer_debug_id(data),
+            prompt_type='voice_unrecognized',
+        )
         await message.reply(
             'Голосовое не распознано. Пришлите описание текстом или попробуйте другое голосовое.',
             reply_markup=Misc.reply_markup_cancel_row(),
         )
         return
-    if not text and message.content_type not in (
-        ContentType.PHOTO,
-        ContentType.VIDEO,
-        ContentType.DOCUMENT,
-        ContentType.AUDIO,
-        ContentType.VOICE,
-    ):
+    if not text:
         await message.reply(Rental.offer_prompt(), reply_markup=Misc.reply_markup_cancel_row())
         return
     await Rental.handle_offer_text(message, state, profile_from, data, text)
@@ -2472,6 +2810,73 @@ async def process_rental_search(message: Message, state: FSMContext):
         )
         return
     await Rental.handle_search_text(message, state, query)
+
+
+@router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
+        KeyboardType.RENTAL_OFFER_DRAFT,
+        KeyboardType.SEP,
+    )))
+async def cbq_rental_offer_draft(callback: CallbackQuery, state: FSMContext):
+    action = Rental.parse_offer_draft_callback_data(callback)
+    if not action:
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_STALE)
+        return
+    data = await state.get_data()
+    status_from, profile_from = await Misc.post_tg_user(callback.from_user)
+    if (
+        status_from != 200 or
+        not data.get('user_uuid') or
+        profile_from['uuid'] != data.get('user_uuid')
+    ):
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_AUTH)
+        return
+    if action == Rental.ACTION_OFFER_DRAFT_CANCEL:
+        await state.clear()
+        await callback.message.reply('Черновик объявления отменён.')
+        await callback.answer('Отменено')
+        return
+    if action == Rental.ACTION_OFFER_DRAFT_EDIT:
+        await state.set_state(FSMRentalOffer.ask)
+        await state.update_data(rental_offer_draft_status='editing')
+        await callback.message.reply(
+            'Пришлите исправление или дополнение голосом/текстом: например «цена 1500, залог 5000».'
+        )
+        await callback.answer('Жду исправление')
+        return
+    if action == Rental.ACTION_OFFER_DRAFT_DONE:
+        if not data.get('rental_offer_uuid'):
+            await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_STALE)
+            return
+        await state.clear()
+        await callback.message.reply('Готово. Управлять объявлениями можно через /rent_my.')
+        await callback.answer('Готово')
+        return
+    if action == Rental.ACTION_OFFER_DRAFT_MEDIA:
+        if not data.get('rental_offer_uuid'):
+            await Rental.answer_callback_notice(callback, 'Сначала сохраните черновик объявления.')
+            return
+        await state.set_state(FSMRentalOffer.ask)
+        await state.update_data(rental_offer_media_mode=True)
+        await callback.message.reply(
+            'Пришлите фото, видео, документ или аудио следующим сообщением.',
+            reply_markup=Rental.markup_offer_media(),
+        )
+        await callback.answer('Жду медиа')
+        return
+    if data.get('rental_offer_media_mode'):
+        await callback.answer('Объявление уже сохранено')
+        return
+    slots = dict(data.get('rental_slots') or {})
+    if not slots:
+        await Rental.answer_callback_notice(callback, Rental.MSG_CALLBACK_STALE)
+        return
+    missing = data.get('rental_offer_missing_fields') or Rental.offer_missing_fields(slots)
+    pending_offer = Rental.pending_offer_from_draft(callback.message, profile_from, data, slots, missing)
+    if await Rental.maybe_prompt_offer_geocode(callback.message, state, slots, pending_offer):
+        await callback.answer('Проверьте координаты')
+        return
+    await Rental.save_offer_from_payload(callback.message, state, profile_from, pending_offer)
+    await callback.answer('Сохранено')
 
 
 @router.callback_query(F.data.regexp(Misc.RE_KEY_SEP % (
