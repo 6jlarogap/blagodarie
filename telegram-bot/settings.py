@@ -71,11 +71,21 @@ RENTAL_DEBUG_LOG_TEXT_LIMIT = 1200
 # Optional external structured extractor for rental listing/search text.
 # Contract `doverabot_rental_llm_extractor_v1` sends known slot keys and expects
 # a JSON response containing slots for mode `offer` or `search`.
+# The recommended source-only local adapter binds to 127.0.0.1:8767 and is
+# configured later through `blagodarie-admin` only after the live rollout gate.
 RENTAL_LLM_EXTRACTOR_CONTRACT = 'doverabot_rental_llm_extractor_v1'
 RENTAL_LLM_EXTRACTOR_URL = ''
 RENTAL_LLM_EXTRACTOR_TOKEN = ''
 RENTAL_LLM_EXTRACTOR_MODEL = ''
 RENTAL_LLM_EXTRACTOR_TIMEOUT = 30
+# Adapter provider/runtime env is intentionally not imported by the bot. The
+# future extractor service reads these from its systemd EnvironmentFile:
+# RENTAL_LLM_PROVIDER_URL, RENTAL_LLM_PROVIDER_API_KEY,
+# RENTAL_LLM_PROVIDER_MODEL, RENTAL_LLM_PROVIDER_TIMEOUT,
+# RENTAL_LLM_PROVIDER_MAX_TIMEOUT, RENTAL_LLM_PROVIDER_TEMPERATURE,
+# RENTAL_LLM_PROVIDER_MAX_TOKENS, RENTAL_LLM_EXTRACTOR_PORT,
+# RENTAL_LLM_EXTRACTOR_MAX_TEXT_CHARS, RENTAL_LLM_EXTRACTOR_LOG_TEXT_LIMIT.
+# Do not put real provider tokens into logs, docs, or this source tree.
 
 # Optional geocoding adapter for rental addresses.
 # Contract `doverabot_rental_geocoding_v1` sends {"query": "..."} JSON and

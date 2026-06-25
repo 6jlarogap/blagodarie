@@ -13,6 +13,11 @@ RENTAL_STT_VENV="$DST/venv-rental-stt"
 RENTAL_STT_REQUIREMENTS="$DST/pip-rental-stt.txt"
 RENTAL_STT_ADAPTER="$DST/telegram-bot/rental_stt_adapter.py"
 RENTAL_STT_TMP_DIR="$DST/telegram-bot/tmp/rental-stt"
+RENTAL_LLM_EXTRACTOR_SERVICE=doverabot-rental-llm-extractor.service
+RENTAL_LLM_EXTRACTOR_VENV="$DST/venv-rental-llm-extractor"
+RENTAL_LLM_EXTRACTOR_REQUIREMENTS="$DST/pip-rental-llm-extractor.txt"
+RENTAL_LLM_EXTRACTOR_ADAPTER="$DST/telegram-bot/rental_llm_extractor_adapter.py"
+RENTAL_LLM_EXTRACTOR_ENV_FILE=/etc/default/doverabot-rental-llm-extractor
 BOT_RUNTIME_SETTING_KEYS=(
   RENTAL_STT_URL
   RENTAL_STT_TOKEN
@@ -27,6 +32,18 @@ BOT_RUNTIME_SETTING_KEYS=(
   RENTAL_LLM_EXTRACTOR_CONTRACT
   RENTAL_LLM_EXTRACTOR_MODEL
   RENTAL_LLM_EXTRACTOR_TIMEOUT
+)
+LLM_EXTRACTOR_ENV_KEYS=(
+  RENTAL_LLM_PROVIDER_URL
+  RENTAL_LLM_PROVIDER_API_KEY
+  RENTAL_LLM_PROVIDER_MODEL
+  RENTAL_LLM_PROVIDER_TIMEOUT
+  RENTAL_LLM_PROVIDER_MAX_TIMEOUT
+  RENTAL_LLM_PROVIDER_TEMPERATURE
+  RENTAL_LLM_PROVIDER_MAX_TOKENS
+  RENTAL_LLM_EXTRACTOR_PORT
+  RENTAL_LLM_EXTRACTOR_MAX_TEXT_CHARS
+  RENTAL_LLM_EXTRACTOR_LOG_TEXT_LIMIT
 )
 
 NGINX_SITES_SRC="$SRC/deploy/nginx/sites-available"
@@ -57,6 +74,7 @@ RSYNC_EXCLUDES=(
   --exclude '/telegram-bot-api/'
   --exclude '/venv-app/'
   --exclude '/venv-rental-stt/'
+  --exclude '/venv-rental-llm-extractor/'
   --exclude '**/__pycache__/'
   --exclude '*.pyc'
   --exclude '*.pyo'
@@ -91,6 +109,8 @@ FIND_EXCLUDES=(
   "$DST/venv-app/*"
   "$DST/venv-rental-stt"
   "$DST/venv-rental-stt/*"
+  "$DST/venv-rental-llm-extractor"
+  "$DST/venv-rental-llm-extractor/*"
 )
 
 find_prune_args() {
@@ -135,7 +155,8 @@ restore_protected_runtime() {
     "$DST/telegram-bot/tmp" \
     "$DST/telegram-bot-api" \
     "$DST/venv-app" \
-    "$DST/venv-rental-stt"; do
+    "$DST/venv-rental-stt" \
+    "$DST/venv-rental-llm-extractor"; do
     if [ -e "$runtime" ]; then
       chown -R "$SERVICE_USER:$SERVICE_GROUP" "$runtime"
     fi
@@ -280,6 +301,73 @@ install_rental_stt() {
 deploy_rental_stt() {
   sync_source
   systemctl restart "$RENTAL_STT_SERVICE"
+}
+
+write_rental_llm_extractor_service() {
+  if [ ! -f "$RENTAL_LLM_EXTRACTOR_ENV_FILE" ]; then
+    install -o root -g "$SERVICE_GROUP" -m 0640 /dev/null "$RENTAL_LLM_EXTRACTOR_ENV_FILE"
+  else
+    chown root:"$SERVICE_GROUP" "$RENTAL_LLM_EXTRACTOR_ENV_FILE"
+    chmod 0640 "$RENTAL_LLM_EXTRACTOR_ENV_FILE"
+  fi
+
+  cat > "/etc/systemd/system/$RENTAL_LLM_EXTRACTOR_SERVICE" <<UNIT
+[Unit]
+Description=Doverabot rental LLM extractor adapter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+Group=$SERVICE_GROUP
+WorkingDirectory=$DST
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-$RENTAL_LLM_EXTRACTOR_ENV_FILE
+ExecStart=$RENTAL_LLM_EXTRACTOR_VENV/bin/python $RENTAL_LLM_EXTRACTOR_ADAPTER
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=$DST/telegram-bot/tmp
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+}
+
+install_rental_llm_extractor() {
+  require_workspace
+  sync_source
+
+  if [ ! -f "$RENTAL_LLM_EXTRACTOR_REQUIREMENTS" ]; then
+    echo "Missing rental LLM extractor requirements: $RENTAL_LLM_EXTRACTOR_REQUIREMENTS" >&2
+    exit 1
+  fi
+  if [ ! -f "$RENTAL_LLM_EXTRACTOR_ADAPTER" ]; then
+    echo "Missing rental LLM extractor adapter: $RENTAL_LLM_EXTRACTOR_ADAPTER" >&2
+    exit 1
+  fi
+
+  if [ ! -x "$RENTAL_LLM_EXTRACTOR_VENV/bin/python" ]; then
+    python3 -m venv "$RENTAL_LLM_EXTRACTOR_VENV"
+  fi
+  "$RENTAL_LLM_EXTRACTOR_VENV/bin/python" -m pip install --upgrade pip
+  "$RENTAL_LLM_EXTRACTOR_VENV/bin/python" -m pip install -r "$RENTAL_LLM_EXTRACTOR_REQUIREMENTS"
+
+  chown -R "$SERVICE_USER:$SERVICE_GROUP" "$RENTAL_LLM_EXTRACTOR_VENV"
+
+  write_rental_llm_extractor_service
+  systemctl daemon-reload
+  systemctl enable "$RENTAL_LLM_EXTRACTOR_SERVICE"
+  systemctl restart "$RENTAL_LLM_EXTRACTOR_SERVICE"
+  systemctl --no-pager --plain is-active "$RENTAL_LLM_EXTRACTOR_SERVICE"
+}
+
+deploy_rental_llm_extractor() {
+  sync_source
+  systemctl restart "$RENTAL_LLM_EXTRACTOR_SERVICE"
 }
 
 is_allowed_bot_runtime_setting() {
@@ -522,6 +610,239 @@ PY
   esac
 }
 
+is_allowed_llm_extractor_env_setting() {
+  local key="$1"
+  local allowed
+  for allowed in "${LLM_EXTRACTOR_ENV_KEYS[@]}"; do
+    if [ "$key" = "$allowed" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+validate_llm_extractor_env_setting() {
+  local key="$1"
+  local value="$2"
+
+  if [ -z "$value" ]; then
+    echo "Refusing to set empty value for $key; use clear if this is intentional." >&2
+    return 1
+  fi
+
+  python3 - "$key" "$value" <<'PY'
+import re
+import sys
+
+key = sys.argv[1]
+value = sys.argv[2]
+
+if "\n" in value or "\r" in value:
+    print(f"{key} contains unsupported newline", file=sys.stderr)
+    raise SystemExit(1)
+
+if key == "RENTAL_LLM_PROVIDER_URL":
+    if not (value.startswith("http://") or value.startswith("https://")):
+        print(f"{key} must start with http:// or https://", file=sys.stderr)
+        raise SystemExit(1)
+elif key == "RENTAL_LLM_PROVIDER_MODEL":
+    if not re.fullmatch(r"[A-Za-z0-9_.:/@+\-]+", value):
+        print(f"{key} contains unsupported characters", file=sys.stderr)
+        raise SystemExit(1)
+elif key in {"RENTAL_LLM_EXTRACTOR_PORT", "RENTAL_LLM_PROVIDER_MAX_TOKENS", "RENTAL_LLM_EXTRACTOR_MAX_TEXT_CHARS", "RENTAL_LLM_EXTRACTOR_LOG_TEXT_LIMIT"}:
+    try:
+        number = int(value)
+    except ValueError:
+        print(f"{key} must be a positive integer", file=sys.stderr)
+        raise SystemExit(1)
+    if number <= 0:
+        print(f"{key} must be a positive integer", file=sys.stderr)
+        raise SystemExit(1)
+    if key == "RENTAL_LLM_EXTRACTOR_PORT" and number > 65535:
+        print(f"{key} must be between 1 and 65535", file=sys.stderr)
+        raise SystemExit(1)
+elif key in {"RENTAL_LLM_PROVIDER_TIMEOUT", "RENTAL_LLM_PROVIDER_MAX_TIMEOUT"}:
+    try:
+        number = float(value)
+    except ValueError:
+        print(f"{key} must be a positive number", file=sys.stderr)
+        raise SystemExit(1)
+    if number <= 0:
+        print(f"{key} must be a positive number", file=sys.stderr)
+        raise SystemExit(1)
+elif key == "RENTAL_LLM_PROVIDER_TEMPERATURE":
+    try:
+        number = float(value)
+    except ValueError:
+        print(f"{key} must be a non-negative number", file=sys.stderr)
+        raise SystemExit(1)
+    if number < 0:
+        print(f"{key} must be a non-negative number", file=sys.stderr)
+        raise SystemExit(1)
+PY
+}
+
+rental_llm_env_usage() {
+  cat >&2 <<'USAGE'
+Usage:
+  sudo -n /usr/local/sbin/blagodarie-admin rental-llm-env status [KEY|all]
+  sudo -n /usr/local/sbin/blagodarie-admin rental-llm-env set KEY VALUE
+  sudo -n /usr/local/sbin/blagodarie-admin rental-llm-env clear KEY
+
+Allowed keys for /etc/default/doverabot-rental-llm-extractor:
+  RENTAL_LLM_PROVIDER_URL
+  RENTAL_LLM_PROVIDER_API_KEY
+  RENTAL_LLM_PROVIDER_MODEL
+  RENTAL_LLM_PROVIDER_TIMEOUT
+  RENTAL_LLM_PROVIDER_MAX_TIMEOUT
+  RENTAL_LLM_PROVIDER_TEMPERATURE
+  RENTAL_LLM_PROVIDER_MAX_TOKENS
+  RENTAL_LLM_EXTRACTOR_PORT
+  RENTAL_LLM_EXTRACTOR_MAX_TEXT_CHARS
+  RENTAL_LLM_EXTRACTOR_LOG_TEXT_LIMIT
+
+Values are written to the extractor EnvironmentFile and are never printed.
+Secret values such as RENTAL_LLM_PROVIDER_API_KEY are reported only as redacted set/missing/empty status.
+USAGE
+}
+
+ensure_rental_llm_env_file() {
+  if [ ! -f "$RENTAL_LLM_EXTRACTOR_ENV_FILE" ]; then
+    install -o root -g "$SERVICE_GROUP" -m 0640 /dev/null "$RENTAL_LLM_EXTRACTOR_ENV_FILE"
+  else
+    chown root:"$SERVICE_GROUP" "$RENTAL_LLM_EXTRACTOR_ENV_FILE"
+    chmod 0640 "$RENTAL_LLM_EXTRACTOR_ENV_FILE"
+  fi
+}
+
+rental_llm_env_setting() {
+  local action="${2:-}"
+  local key="${3:-}"
+  local value="${4:-}"
+
+  case "$action" in
+    status)
+      if [ -z "$key" ]; then
+        key=all
+      fi
+      if [ "$key" != "all" ] && ! is_allowed_llm_extractor_env_setting "$key"; then
+        echo "Unsupported rental LLM env setting: $key" >&2
+        rental_llm_env_usage
+        exit 2
+      fi
+      python3 - "$RENTAL_LLM_EXTRACTOR_ENV_FILE" status "$key" "${LLM_EXTRACTOR_ENV_KEYS[@]}" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+target = sys.argv[3]
+keys = sys.argv[4:]
+secret_markers = ("api_key", "authorization", "password", "secret", "token")
+pattern = re.compile(r"^\s*(%s)\s*=" % "|".join(re.escape(key) for key in keys))
+values = {}
+
+if path.exists():
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = pattern.match(line)
+        if not match:
+            continue
+        key = match.group(1)
+        raw = line.split("=", 1)[1].strip()
+        values[key] = raw
+
+for key in keys:
+    if target != "all" and key != target:
+        continue
+    if key not in values:
+        status = "missing"
+    elif values[key] in ("", "''", '""'):
+        status = "empty"
+    else:
+        status = "set"
+    suffix = " (redacted)" if status == "set" and any(marker in key.lower() for marker in secret_markers) else ""
+    print(f"{key}={status}{suffix}")
+PY
+      ;;
+    set)
+      if [ $# -ne 4 ] || ! is_allowed_llm_extractor_env_setting "$key"; then
+        rental_llm_env_usage
+        exit 2
+      fi
+      validate_llm_extractor_env_setting "$key" "$value"
+      ensure_rental_llm_env_file
+      python3 - "$RENTAL_LLM_EXTRACTOR_ENV_FILE" "$key" "$value" <<'PY'
+import re
+import shlex
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+key = sys.argv[2]
+value = sys.argv[3]
+pattern = re.compile(r"^(\s*)%s\s*=" % re.escape(key))
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True) if path.exists() else []
+updated = []
+replaced = False
+rendered_value = shlex.quote(value)
+
+for line in lines:
+    if pattern.match(line):
+        updated.append(f"{key}={rendered_value}\n")
+        replaced = True
+    else:
+        updated.append(line)
+
+if not replaced:
+    if updated and updated[-1].strip():
+        updated.append("\n")
+    updated.append(f"{key}={rendered_value}\n")
+
+path.write_text("".join(updated), encoding="utf-8")
+PY
+      echo "$key=set"
+      ;;
+    clear)
+      if [ $# -ne 3 ] || ! is_allowed_llm_extractor_env_setting "$key"; then
+        rental_llm_env_usage
+        exit 2
+      fi
+      ensure_rental_llm_env_file
+      python3 - "$RENTAL_LLM_EXTRACTOR_ENV_FILE" "$key" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+key = sys.argv[2]
+pattern = re.compile(r"^(\s*)%s\s*=" % re.escape(key))
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True) if path.exists() else []
+updated = []
+replaced = False
+
+for line in lines:
+    if pattern.match(line):
+        updated.append(f"{key}=\n")
+        replaced = True
+    else:
+        updated.append(line)
+
+if not replaced:
+    if updated and updated[-1].strip():
+        updated.append("\n")
+    updated.append(f"{key}=\n")
+
+path.write_text("".join(updated), encoding="utf-8")
+PY
+      echo "$key=empty"
+      ;;
+    *)
+      rental_llm_env_usage
+      exit 2
+      ;;
+  esac
+}
+
 case "${1:-}" in
   deploy-dry-run)
     deploy_dry_run
@@ -547,6 +868,9 @@ case "${1:-}" in
     ;;
   deploy-rental-stt)
     deploy_rental_stt
+    ;;
+  deploy-rental-llm-extractor)
+    deploy_rental_llm_extractor
     ;;
   deploy)
     sync_source
@@ -575,6 +899,9 @@ case "${1:-}" in
   install-rental-stt)
     install_rental_stt
     ;;
+  install-rental-llm-extractor)
+    install_rental_llm_extractor
+    ;;
   nginx-test)
     nginx -t
     ;;
@@ -592,6 +919,9 @@ case "${1:-}" in
   restart-rental-stt)
     systemctl restart "$RENTAL_STT_SERVICE"
     ;;
+  restart-rental-llm-extractor)
+    systemctl restart "$RENTAL_LLM_EXTRACTOR_SERVICE"
+    ;;
   restart-all)
     check_django
     nginx -t
@@ -608,6 +938,12 @@ case "${1:-}" in
   status-rental-stt)
     systemctl --no-pager --plain status "$RENTAL_STT_SERVICE"
     ;;
+  status-rental-llm-extractor)
+    systemctl --no-pager --plain status "$RENTAL_LLM_EXTRACTOR_SERVICE"
+    ;;
+  is-active-rental-llm-extractor)
+    systemctl --no-pager --plain is-active "$RENTAL_LLM_EXTRACTOR_SERVICE"
+    ;;
   logs-web)
     journalctl -u blagodarie-gunicorn.service -n "${2:-120}" --no-pager
     ;;
@@ -620,8 +956,14 @@ case "${1:-}" in
   logs-rental-stt)
     journalctl -u "$RENTAL_STT_SERVICE" -n "${2:-120}" --no-pager
     ;;
+  logs-rental-llm-extractor)
+    journalctl -u "$RENTAL_LLM_EXTRACTOR_SERVICE" -n "${2:-120}" --no-pager
+    ;;
   bot-runtime-setting)
     bot_runtime_setting "$@"
+    ;;
+  rental-llm-env)
+    rental_llm_env_setting "$@"
     ;;
   *)
     cat >&2 <<'USAGE'
@@ -634,26 +976,39 @@ Commands:
   deploy-web           Sync, Django check, restart web, reload nginx
   deploy-bot           Sync and restart Telegram bot
   deploy-rental-stt    Sync and restart rental STT
+  deploy-rental-llm-extractor
+                       Sync and restart rental LLM extractor
   deploy               Sync, checks, reload nginx, restart web and bot
   check-django         Run manage.py check --deploy
   migrate              Run Django checks then migrations
   collectstatic        Run Django collectstatic
   install-nginx-sites  Install tracked nginx site configs, test, and reload nginx
   install-rental-stt   Install/update rental STT venv and systemd unit
+  install-rental-llm-extractor
+                       Install/update rental LLM extractor venv and systemd unit
   nginx-test           Validate nginx config
   reload-nginx         Validate and reload nginx
   restart-web          Django check and restart gunicorn
   restart-bot          Restart Telegram bot
   restart-rental-stt   Restart rental STT
+  restart-rental-llm-extractor
+                       Restart rental LLM extractor
   restart-all          Check/reload/restart nginx, web, and bot
   status               Show service status
   status-rental-stt    Show rental STT status
+  status-rental-llm-extractor
+                       Show rental LLM extractor status
   is-active            Print nginx/web/bot/rental STT active state
+  is-active-rental-llm-extractor
+                       Print rental LLM extractor active state
   logs-web [n]         Show recent web logs
   logs-bot [n]         Show recent bot logs
   logs-nginx [n]       Show recent nginx logs
   logs-rental-stt [n]  Show recent rental STT logs
+  logs-rental-llm-extractor [n]
+                       Show recent rental LLM extractor logs
   bot-runtime-setting  Check or set allowlisted live bot runtime settings
+  rental-llm-env       Check or set allowlisted rental LLM adapter env settings
 USAGE
     exit 2
     ;;

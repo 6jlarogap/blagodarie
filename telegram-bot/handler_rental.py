@@ -159,6 +159,7 @@ class Rental(object):
     LLM_BOOL_SLOT_KEYS = {'trusted_only', 'map_intent', 'has_context'}
     LLM_FLOAT_SLOT_KEYS = {'latitude', 'longitude', 'price_amount'}
     LLM_DATE_SLOT_KEYS = {'available_from', 'available_to', 'date_from', 'date_to'}
+    SECRET_LOG_KEY_MARKERS = {'authorization', 'api_key', 'token', 'secret', 'password'}
 
     MSG_CALLBACK_STALE = 'Эта кнопка устарела. Откройте прокат заново через /rent_search или /rent.'
     MSG_CALLBACK_AUTH = 'Не удалось проверить ваш профиль. Откройте бота командой /start и попробуйте еще раз.'
@@ -244,7 +245,10 @@ class Rental(object):
         return bool(getattr(settings, 'RENTAL_DEBUG_LOG_CONVERSATION', False))
 
     @classmethod
-    def debug_log_value(cls, value):
+    def debug_log_value(cls, value, key=''):
+        lower_key = str(key or '').lower()
+        if any(marker in lower_key for marker in cls.SECRET_LOG_KEY_MARKERS):
+            return '[redacted]'
         limit = getattr(settings, 'RENTAL_DEBUG_LOG_TEXT_LIMIT', 1200)
         try:
             limit = int(limit)
@@ -252,12 +256,12 @@ class Rental(object):
             limit = 1200
         if isinstance(value, dict):
             return {
-                str(key): cls.debug_log_value(item)
-                for key, item in value.items()
+                str(item_key): cls.debug_log_value(item, key=item_key)
+                for item_key, item in value.items()
             }
         if isinstance(value, (list, tuple)):
             return [
-                cls.debug_log_value(item)
+                cls.debug_log_value(item, key=key)
                 for item in value
             ]
         if isinstance(value, str) and limit > 0 and len(value) > limit:
@@ -280,7 +284,7 @@ class Rental(object):
                 content_type=getattr(message, 'content_type', ''),
             )
         for key, value in fields.items():
-            payload[key] = cls.debug_log_value(value)
+            payload[key] = cls.debug_log_value(value, key=key)
         payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
         logging.info('rental_debug %s', payload_json)
         print('rental_debug %s' % payload_json, flush=True)

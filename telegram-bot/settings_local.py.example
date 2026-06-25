@@ -5,6 +5,22 @@ FRONTEND_HOST = 'https://blagoroda.org'
 GENESIS_HOST = 'https://genesis.blagoroda.org'
 GROUP_HOST = 'https://group.blagoroda.org'
 
+# Optional rental voice/STT and LLM extractor overrides. Keep disabled unless a
+# live rollout gate installs and verifies the localhost adapter services.
+# RENTAL_STT_URL = 'http://127.0.0.1:8766/transcribe'
+# RENTAL_STT_MODE = 'download'
+# RENTAL_STT_LANGUAGE = 'ru'
+# RENTAL_STT_TIMEOUT = 300
+# RENTAL_DEBUG_LOG_CONVERSATION = False
+# RENTAL_DEBUG_LOG_TEXT_LIMIT = 1200
+# RENTAL_LLM_EXTRACTOR_URL = 'http://127.0.0.1:8767/extract'
+# RENTAL_LLM_EXTRACTOR_TOKEN = ''
+# RENTAL_LLM_EXTRACTOR_CONTRACT = 'doverabot_rental_llm_extractor_v1'
+# RENTAL_LLM_EXTRACTOR_MODEL = ''
+# RENTAL_LLM_EXTRACTOR_TIMEOUT = 30
+# Adapter provider values (URL/API key/model/timeouts/text caps) are runtime env,
+# managed by `blagodarie-admin rental-llm-env`, not Python settings.
+
 # Админитраторы бота, их telegram ids
 #
 BOT_ADMINS = (12345, 67890,)
