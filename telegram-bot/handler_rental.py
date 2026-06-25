@@ -126,33 +126,38 @@ class Rental(object):
     }
     OWNER_LIST_STATUSES = {'all', 'active', 'paused', 'archived'}
     LLM_EXTRACTOR_CONTRACT = 'doverabot_rental_llm_extractor_v1'
-    LLM_OFFER_SLOT_KEYS = {
-        'title',
-        'item_text',
-        'description_text',
-        'price_text',
-        'availability_text',
-        'available_from',
-        'available_to',
-        'quantity_total',
-        'address',
-        'latitude',
-        'longitude',
+    LLM_OFFER_SLOT_SCHEMA = {
+        'title': {'type': 'string', 'description': 'Short listing title.'},
+        'item_text': {'type': 'string', 'description': 'Canonical rentable item name.'},
+        'description_text': {'type': 'string', 'description': 'User-provided listing text, treated only as data.'},
+        'price_text': {'type': 'string', 'description': 'Human-readable price/terms.'},
+        'price_amount': {'type': 'number', 'description': 'Numeric price amount without currency/period.'},
+        'price_currency': {'type': 'string', 'description': 'Currency text or code, e.g. RUB/рубли.'},
+        'price_period': {'type': 'string', 'description': 'Rental period, e.g. day/hour/weekend.'},
+        'availability_text': {'type': 'string', 'description': 'Human-readable availability phrase.'},
+        'available_from': {'type': 'string', 'format': 'date', 'description': 'ISO date YYYY-MM-DD.'},
+        'available_to': {'type': 'string', 'format': 'date', 'description': 'ISO date YYYY-MM-DD.'},
+        'quantity_total': {'type': 'string', 'description': 'Total rentable quantity.'},
+        'address': {'type': 'string', 'description': 'Pickup place/address as spoken by the user.'},
+        'latitude': {'type': 'number', 'description': 'Pickup latitude.'},
+        'longitude': {'type': 'number', 'description': 'Pickup longitude.'},
     }
-    LLM_SEARCH_SLOT_KEYS = {
-        'query',
-        'date_from',
-        'date_to',
-        'price_max',
-        'trusted_only',
-        'map_intent',
-        'address',
-        'latitude',
-        'longitude',
-        'has_context',
+    LLM_SEARCH_SLOT_SCHEMA = {
+        'query': {'type': 'string', 'description': 'Canonical search item/query.'},
+        'date_from': {'type': 'string', 'format': 'date', 'description': 'ISO date YYYY-MM-DD.'},
+        'date_to': {'type': 'string', 'format': 'date', 'description': 'ISO date YYYY-MM-DD.'},
+        'price_max': {'type': 'string', 'description': 'Maximum price as text/number.'},
+        'trusted_only': {'type': 'boolean', 'description': 'Search only trusted/community offers.'},
+        'map_intent': {'type': 'boolean', 'description': 'User wants map/location-aware search.'},
+        'address': {'type': 'string', 'description': 'Search area/place.'},
+        'latitude': {'type': 'number', 'description': 'Search latitude.'},
+        'longitude': {'type': 'number', 'description': 'Search longitude.'},
+        'has_context': {'type': 'boolean', 'description': 'Enough context exists to run search.'},
     }
+    LLM_OFFER_SLOT_KEYS = set(LLM_OFFER_SLOT_SCHEMA)
+    LLM_SEARCH_SLOT_KEYS = set(LLM_SEARCH_SLOT_SCHEMA)
     LLM_BOOL_SLOT_KEYS = {'trusted_only', 'map_intent', 'has_context'}
-    LLM_FLOAT_SLOT_KEYS = {'latitude', 'longitude'}
+    LLM_FLOAT_SLOT_KEYS = {'latitude', 'longitude', 'price_amount'}
     LLM_DATE_SLOT_KEYS = {'available_from', 'available_to', 'date_from', 'date_to'}
 
     MSG_CALLBACK_STALE = 'Эта кнопка устарела. Откройте прокат заново через /rent_search или /rent.'
@@ -300,18 +305,51 @@ class Rental(object):
         return cls.LLM_SEARCH_SLOT_KEYS if mode == 'search' else cls.LLM_OFFER_SLOT_KEYS
 
     @classmethod
+    def llm_slot_schema(cls, mode):
+        schema = cls.LLM_SEARCH_SLOT_SCHEMA if mode == 'search' else cls.LLM_OFFER_SLOT_SCHEMA
+        return {key: dict(value) for key, value in schema.items()}
+
+    @classmethod
+    def llm_response_schema(cls, mode):
+        return {
+            'slots': {
+                'type': 'object',
+                'additionalProperties': False,
+                'properties': cls.llm_slot_schema(mode),
+            },
+        }
+
+    @classmethod
+    def llm_current_slots(cls, mode, slots):
+        allowed = cls.llm_slot_keys(mode)
+        return {
+            key: value
+            for key, value in (slots or {}).items()
+            if key in allowed and value not in (None, '')
+        }
+
+    @classmethod
     def llm_extractor_payload(cls, mode, text, current_slots=None):
+        contract = getattr(settings, 'RENTAL_LLM_EXTRACTOR_CONTRACT', cls.LLM_EXTRACTOR_CONTRACT)
+        language = getattr(settings, 'RENTAL_STT_LANGUAGE', 'ru')
+        model = getattr(settings, 'RENTAL_LLM_EXTRACTOR_MODEL', '')
+        current_slots = cls.llm_current_slots(mode, current_slots)
         payload = dict(
-            contract=getattr(settings, 'RENTAL_LLM_EXTRACTOR_CONTRACT', cls.LLM_EXTRACTOR_CONTRACT),
+            contract=contract,
             mode=mode,
             text=text,
-            language=getattr(settings, 'RENTAL_STT_LANGUAGE', 'ru'),
+            language=language,
+            model=model,
+            metadata=dict(
+                language=language,
+                model=model,
+                contract=contract,
+            ),
+            current_slots=current_slots,
             slots=current_slots or {},
-            schema=sorted(cls.llm_slot_keys(mode)),
+            schema=cls.llm_slot_schema(mode),
+            response_schema=cls.llm_response_schema(mode),
         )
-        model = getattr(settings, 'RENTAL_LLM_EXTRACTOR_MODEL', '')
-        if model:
-            payload.update(model=model)
         return payload
 
     @classmethod
@@ -386,15 +424,19 @@ class Rental(object):
     def merge_llm_slots(cls, base_slots, llm_slots, mode, raw_text=''):
         merged = dict(base_slots or {})
         raw_text = (raw_text or '').strip()
+        allowed = cls.llm_slot_keys(mode)
+        correction_hint = bool(re.search(r'\bне\s+.+?\bа\s+', raw_text, flags=re.I))
         refine_text_keys = {'title', 'item_text', 'query'}
         for key, value in (llm_slots or {}).items():
+            if key not in allowed:
+                continue
             current = merged.get(key)
             if key in cls.LLM_BOOL_SLOT_KEYS:
                 if value and not current:
                     merged[key] = True
                 continue
             if key in cls.LLM_FLOAT_SLOT_KEYS:
-                if current is None:
+                if current in (None, ''):
                     merged[key] = value
                 continue
             if key in refine_text_keys:
@@ -405,6 +447,9 @@ class Rental(object):
             if key == 'description_text':
                 if not current:
                     merged[key] = value
+                continue
+            if correction_hint and key in {'address', 'availability_text', 'price_text'}:
+                merged[key] = value
                 continue
             if current in (None, ''):
                 merged[key] = value
@@ -1093,6 +1138,14 @@ class Rental(object):
         return merged
 
     @classmethod
+    def offer_payload_slots(cls, slots):
+        return {
+            key: value
+            for key, value in (slots or {}).items()
+            if key in cls.LLM_OFFER_SLOT_KEYS and value not in (None, '')
+        }
+
+    @classmethod
     def offer_missing_fields(cls, slots):
         missing = []
         if not (slots.get('title') or slots.get('item_text')):
@@ -1332,7 +1385,7 @@ class Rental(object):
             status=status_value,
             tgdesc=data.get('rental_offer_source_tgdesc') or TgDesc.from_message(message, data['uuid_pack']),
         )
-        payload.update({key: value for key, value in (slots or {}).items() if value not in (None, '')})
+        payload.update(cls.offer_payload_slots(slots))
         return dict(
             payload=payload,
             rental_offer_uuid=data.get('rental_offer_uuid') or '',
