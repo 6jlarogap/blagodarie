@@ -53,6 +53,7 @@ class ContentTypeStub:
     DOCUMENT = 'document'
     AUDIO = 'audio'
     LOCATION = 'location'
+    PINNED_MESSAGE = 'pinned_message'
 
 
 class ChatTypeStub:
@@ -221,6 +222,9 @@ def install_dependency_stubs(stub_common=True):
     types_mod.InlineKeyboardMarkup = InlineKeyboardMarkupStub
     types_mod.InlineKeyboardButton = InlineKeyboardButtonStub
     types_mod.BufferedInputFile = lambda *args, **kwargs: (args, kwargs)
+    types_mod.MessageOriginUser = type('MessageOriginUser', (), {})
+    types_mod.MessageOriginHiddenUser = type('MessageOriginHiddenUser', (), {})
+    types_mod.LinkPreviewOptions = lambda **kwargs: kwargs
     sys.modules['aiogram.types'] = types_mod
 
     types_login_url = types.ModuleType('aiogram.types.login_url')
@@ -318,6 +322,10 @@ def install_dependency_stubs(stub_common=True):
         save=lambda *_save_args, **_save_kwargs: None,
     )
     sys.modules['qrcode'] = qrcode_mod
+
+    pymorphy3_mod = types.ModuleType('pymorphy3')
+    pymorphy3_mod.MorphAnalyzer = lambda: object()
+    sys.modules['pymorphy3'] = pymorphy3_mod
 
     pil_mod = types.ModuleType('PIL')
     pil_mod.__path__ = []
@@ -462,9 +470,11 @@ class FakeMessage:
             username='requester',
             first_name='Requester',
             last_name='',
+            is_bot=False,
         )
         self.chat = types.SimpleNamespace(id=2002, type=ChatTypeStub.PRIVATE)
         self.message_id = 3003
+        self.forward_origin = None
         self.photo = None
         self.audio = None
         self.video = None

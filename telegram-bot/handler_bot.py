@@ -537,6 +537,7 @@ async def cmd_start(message: Message, state: FSMContext):
 
     status_sender, response_sender = await Misc.post_tg_user(message.from_user)
     if status_sender != 200:
+        await message.reply(Misc.MSG_ERROR_API)
         return
     if m := re.search(r'^(t|th)\-([0-9a-z]{10})$', arg, flags=re.I):
         status_to, profile_to = await Misc.get_user_by_sid(m.group(2))
@@ -881,6 +882,7 @@ async def message_to_bot(message: Message, state: FSMContext):
 
     status_from, response_from = await Misc.post_tg_user(tg_user_sender)
     if status_from != 200:
+        await message.reply(Misc.MSG_ERROR_API)
         return
 
     message_text = getattr(message, 'text', '') and message.text.strip() or ''
@@ -888,6 +890,7 @@ async def message_to_bot(message: Message, state: FSMContext):
         logging.debug(f"Processing forwarded message - Forwarded from: {tg_user_forwarded.username} (ID: {tg_user_forwarded.id}), Forwarded by: {tg_user_sender.username} (ID: {tg_user_sender.id}), Message: {message_text}")
         status_to, response_to = await Misc.post_tg_user(tg_user_forwarded)
         if status_to != 200:
+            await message.reply(Misc.MSG_ERROR_API)
             return
         await Misc.show_card(
             profile=response_to,
@@ -1289,11 +1292,13 @@ async def process_agree_to_rules(message: Message, state: FSMContext):
     )), StateFilter(FSMagreeToRules))
 async def cbq_agree_to_rules(callback: CallbackQuery, state: FSMContext):
     status_sender, response_sender = await Misc.post_tg_user(callback.from_user)
-    if status_sender == 200:
-        await Misc.show_card(
-            profile=response_sender,
-            profile_sender=response_sender,
-            tg_user_sender=callback.from_user,
-        )
+    if status_sender != 200:
+        await callback.answer(Misc.MSG_ERROR_API, show_alert=True)
+        return
+    await Misc.show_card(
+        profile=response_sender,
+        profile_sender=response_sender,
+        tg_user_sender=callback.from_user,
+    )
     await state.clear()
     await callback.answer()
