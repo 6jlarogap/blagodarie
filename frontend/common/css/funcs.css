@@ -19,8 +19,7 @@
   max-width: min(92vw, 720px);
 }
 .d-modal-close,
-.f-modal-close,
-.menu__close {
+.f-modal-close {
   cursor: pointer;
   float: right;
   font-size: 28px;
@@ -30,14 +29,40 @@
   position: fixed;
   z-index: 9999;
   inset: 0;
+  overflow: auto;
   background: rgba(0, 0, 0, 0.2);
 }
 .menu-wrapper--active { display: block; }
 .menu {
+  position: relative;
+  box-sizing: border-box;
   background: #fff;
   margin: 8vh auto;
   padding: 16px;
   max-width: min(92vw, 420px);
+}
+.menu__title {
+  padding-right: 44px;
+  overflow-wrap: anywhere;
+}
+.menu__close-wrap {
+  position: absolute;
+  z-index: 1;
+  top: 2px;
+  right: 2px;
+}
+.menu__close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 32px;
+  line-height: 1;
+  touch-action: manipulation;
 }
 .menu__btn,
 .menu__btn__trust,
@@ -45,4 +70,17 @@
 .m-modal-button {
   margin: 4px;
   padding: 8px 12px;
+}
+@media (max-width: 480px) {
+  .menu {
+    margin: 8px auto;
+    padding: 12px;
+    max-width: calc(100vw - 16px);
+  }
+  .menu__btn,
+  .menu__btn__trust {
+    min-height: 44px;
+    max-width: 100%;
+    white-space: normal;
+  }
 }

@@ -8,7 +8,7 @@
 
     <!-- Для авторизации страницы через телеграм бот: js, css (начало) -->
     <script type="text/javascript" src="/js/clipboard-lite.js?v=20260617T025615Z"></script>
-    <link type="text/css" rel="stylesheet" href="/css/funcs.cfeff327ed20d9fb.css?v=20260617T025615Z" />
+    <link type="text/css" rel="stylesheet" href="/css/funcs.cfeff327ed20d9fb.css?v=20260720T055656Z" />
     <!--    js/local_settings.js может и не быть (ничего страшного).
             Для запуска функций в funcs.js из других доменов
     -->
@@ -96,6 +96,9 @@
     <!-- Меню с кнопками -->
     <div class="menu-wrapper">
         <div class="menu">
+            <div class="menu__close-wrap">
+                <button type="button" class="menu__close" aria-label="Закрыть">&times;</button>
+            </div>
             <h3 class="menu__title"><span class="menu__title-span"></span></h3>
             <div class="menu__btns">
                 <div class="btn--trust--wrap display--none">
@@ -109,9 +112,6 @@
                 </div>
                 <button class="menu__btn btn--collapse display--none"><span class="btn--collapse--caption">Свернуть/Развернуть</span></button>
                 <button class="menu__btn btn--goto-gen display--none">Перейти</button>
-            </div>
-            <div class="menu__close-wrap">
-                <div class="menu__close"></div>
             </div>
         </div>
     </div>
