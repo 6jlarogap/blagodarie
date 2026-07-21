@@ -1,4 +1,4 @@
-import datetime, string, random, os, binascii, time
+import datetime, string, random, os, binascii, time, logging
 import urllib.request, urllib.error, urllib.parse
 from urllib.parse import urlencode
 import json, re, hashlib
@@ -6,9 +6,10 @@ from decimal import Decimal
 from uuid import uuid4, UUID
 
 from django.conf import settings
-from django.db import models, transaction, IntegrityError
+from django.db import models, transaction, IntegrityError, connection
 from django.db.models import Sum, F, Prefetch
 from django.db.models.query_utils import Q
+from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 
@@ -214,6 +215,13 @@ class Oauth(BaseModelInsertUpdateTimestamp):
 
     class Meta:
         unique_together = ('provider', 'uid')
+        constraints = (
+            models.UniqueConstraint(
+                Lower('username'),
+                condition=Q(provider='telegram') & ~Q(username=''),
+                name='users_oauth_unique_tg_username_ci',
+            ),
+        )
 
     def get_display_name(self):
         return self.display_name or \
@@ -373,6 +381,7 @@ class Profile(PhotoModel, GeoPointAddressModel):
     acq_count = models.PositiveIntegerField(_("Число тех кто с ним (с ней) знаком)"), default=0)
     invite_meet_count = models.PositiveIntegerField(_("Число тех, кого он пригласил)"), default=0)
     did_bot_start = models.BooleanField(_("Стартовал телеграм бот"), default=False)
+    pending_tg_username = models.CharField(max_length=32, null=True, unique=True)
     is_org = models.BooleanField(_("Организация"), default=False)
     ability = models.ForeignKey('contact.Ability', verbose_name=_("Способность"), null=True, on_delete=models.SET_NULL)
     # Для родни:
@@ -395,6 +404,13 @@ class Profile(PhotoModel, GeoPointAddressModel):
 
     class Meta:
         ordering = ('user__first_name', )
+        constraints = (
+            models.CheckConstraint(
+                condition=Q(pending_tg_username__isnull=True) |
+                          Q(pending_tg_username=Lower('pending_tg_username')),
+                name='users_profile_pending_tg_username_lower',
+            ),
+        )
 
     def __str__(self):
         return self.user.first_name or str(self.pk)
@@ -470,6 +486,7 @@ class Profile(PhotoModel, GeoPointAddressModel):
                 dod=self.dod and self.dod.str_safe() or None,
                 comment=self.comment or '',
                 did_meet=self.did_meet,
+                pending_tg_username=self.pending_tg_username,
                 has_tgdesc=self.tgdesc.exists(),
                 has_bank=self.has_bank(),
                 r_sympa_username=self.r_sympa.username if self.r_sympa else None,
@@ -758,9 +775,164 @@ class Profile(PhotoModel, GeoPointAddressModel):
                 result['mother'] = human
         return result
 
+
+class TelegramRelationRecheckNotice(BaseModelInsertTimestamp):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    tg_username = models.CharField(max_length=32)
+    attempts = models.PositiveIntegerField(default=0)
+    delivered_timestamp = models.BigIntegerField(default=0, db_index=True)
+
+    class Meta:
+        unique_together = ('user', 'profile')
+
 class CreateUserMixin(object):
 
     MSG_FAILED_CREATE_USER = 'Не удалось создать пользователя с уникальным именем. Попробуйте еще раз.'
+
+    TG_USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{5,32}$')
+
+    @classmethod
+    def normalize_tg_username(cls, username):
+        return (username or '').strip().lstrip('@').lower()
+
+    @classmethod
+    def validate_tg_username(cls, username):
+        username = cls.normalize_tg_username(username)
+        return username if cls.TG_USERNAME_RE.fullmatch(username) else ''
+
+    def deliver_relation_recheck_notices(self, user):
+        try:
+            with transaction.atomic():
+                notices = list(TelegramRelationRecheckNotice.objects.select_for_update().filter(
+                    user=user,
+                    delivered_timestamp=0,
+                ).order_by('pk')[:50])
+                if not notices:
+                    return
+                usernames = ', '.join('@' + notice.tg_username for notice in notices)
+                message = (
+                    'Эти профили теперь подтверждены: %s. Проверьте их и, если нужно, '
+                    'создайте отношения заново, отправив имя боту.'
+                ) % usernames
+                delivered = self.send_to_telegram(message, user=user)
+                updates = {'attempts': F('attempts') + 1}
+                if delivered:
+                    updates['delivered_timestamp'] = int(time.time())
+                TelegramRelationRecheckNotice.objects.filter(
+                    pk__in=[notice.pk for notice in notices]
+                ).update(**updates)
+        except Exception:
+            logging.exception('Failed to deliver Telegram relation recheck notices')
+
+    def validate_pending_profile(self, profile):
+        has_identity = Oauth.objects.filter(user=profile.user).exists()
+        has_token = Token.objects.filter(user=profile.user).exists()
+        if profile.owner_id or profile.user.is_active or has_identity or has_token:
+            raise ServiceException('Нельзя автоматически подтвердить повреждённый ожидающий профиль')
+
+    def reset_pending_relations(self, profile, tg_username):
+        CurrentState = get_model('contact', 'CurrentState')
+        user_id = profile.user_id
+        states = CurrentState.objects.filter(Q(user_from_id=user_id) | Q(user_to_id=user_id))
+        related_ids = set(states.values_list('user_from_id', flat=True))
+        related_ids.update(states.exclude(user_to_id=None).values_list('user_to_id', flat=True))
+        related_ids.update(Profile.objects.filter(r_sympa_id=user_id).values_list('user_id', flat=True))
+        if profile.r_sympa_id:
+            related_ids.add(profile.r_sympa_id)
+        related_ids.discard(user_id)
+
+        recipients = set()
+        for related in Profile.objects.filter(user_id__in=related_ids).only('user_id', 'owner_id'):
+            recipients.add(related.owner_id or related.user_id)
+        for recipient_id in recipients:
+            TelegramRelationRecheckNotice.objects.get_or_create(
+                user_id=recipient_id,
+                profile=profile,
+                defaults={'tg_username': tg_username},
+            )
+
+        states.delete()
+        Profile.objects.filter(r_sympa_id=user_id).update(r_sympa=None)
+        if profile.r_sympa_id:
+            profile.r_sympa_id = None
+
+        affected_ids = related_ids | {user_id}
+        for affected in Profile.objects.filter(user_id__in=affected_ids):
+            affected.recount_sum_thanks_count()
+            affected.recount_invite_meet_count()
+            affected.recount_trust_fame()
+
+    def reconcile_telegram_identity(self, *, uid, username='', last_name='', first_name='', photo=''):
+        uid = str(uid)
+        username = self.normalize_tg_username(username)
+        if connection.vendor == 'postgresql':
+            with connection.cursor() as cursor:
+                # ponytail: global identity lock; shard by UID/alias if Telegram auth throughput grows.
+                cursor.execute(
+                    'SELECT pg_advisory_xact_lock(hashtext(%s))',
+                    ['telegram_identity_reconciliation'],
+                )
+
+        oauth = Oauth.objects.select_for_update(of=('self',)).select_related('user', 'user__profile').filter(
+            provider=Oauth.PROVIDER_TELEGRAM,
+            uid=uid,
+        ).first()
+        pending = None
+        if username:
+            pending = Profile.objects.select_for_update().filter(
+                pending_tg_username=username,
+            ).select_related('user').first()
+
+        identity_created = oauth is None
+        if oauth:
+            user = oauth.user
+            profile = user.profile
+            if pending and pending.pk != profile.pk:
+                self.validate_pending_profile(pending)
+                self.reset_pending_relations(pending, username)
+                pending.pending_tg_username = None
+                pending.save(update_fields=('pending_tg_username', 'r_sympa'))
+        else:
+            if pending:
+                self.validate_pending_profile(pending)
+                profile = pending
+                user = profile.user
+                self.reset_pending_relations(profile, username)
+                profile.pending_tg_username = None
+                profile.save(update_fields=('pending_tg_username', 'r_sympa'))
+            else:
+                user = self.create_user(last_name=last_name, first_name=first_name)
+                profile = user.profile
+            oauth = Oauth.objects.create(
+                provider=Oauth.PROVIDER_TELEGRAM,
+                uid=uid,
+                user=user,
+            )
+
+        if username:
+            Oauth.objects.select_for_update().filter(
+                provider=Oauth.PROVIDER_TELEGRAM,
+                username__iexact=username,
+            ).exclude(pk=oauth.pk).update(username='')
+
+        values = {
+            'last_name': last_name or '',
+            'first_name': first_name or '',
+            'username': username,
+            'photo': photo or '',
+        }
+        changed = []
+        for field, value in values.items():
+            if getattr(oauth, field) != value:
+                setattr(oauth, field, value)
+                changed.append(field)
+        if changed:
+            oauth.update_timestamp = int(time.time())
+            oauth.save(update_fields=tuple(changed) + ('update_timestamp',))
+
+        transaction.on_commit(lambda: self.deliver_relation_recheck_notices(user))
+        return oauth, user, profile, identity_created
 
     def create_user(self,
         # Keyword only parameters

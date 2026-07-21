@@ -888,7 +888,7 @@ async def message_to_bot(message: Message, state: FSMContext):
     message_text = getattr(message, 'text', '') and message.text.strip() or ''
     if is_forward_from_other:
         logging.debug(f"Processing forwarded message - Forwarded from: {tg_user_forwarded.username} (ID: {tg_user_forwarded.id}), Forwarded by: {tg_user_sender.username} (ID: {tg_user_sender.id}), Message: {message_text}")
-        status_to, response_to = await Misc.post_tg_user(tg_user_forwarded)
+        status_to, response_to = await Misc.post_tg_user(tg_user_forwarded, did_bot_start=False)
         if status_to != 200:
             await message.reply(Misc.MSG_ERROR_API)
             return
@@ -916,6 +916,17 @@ async def message_to_bot(message: Message, state: FSMContext):
     # not forwarded or forwarded from me
 
     a_found = []
+    if re.fullmatch(r'@[A-Za-z0-9_]{5,32}', message_text):
+        status, profile = await Misc.get_or_create_tg_username(message_text[1:])
+        if status != 200:
+            await message.reply(Misc.MSG_ERROR_API)
+            return
+        await Misc.show_card(
+            profile=profile,
+            profile_sender=response_from,
+            tg_user_sender=tg_user_sender,
+        )
+        return
     if message_text.startswith('/'):
         await message.reply('Не известная команда')
         return

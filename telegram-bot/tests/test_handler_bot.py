@@ -36,6 +36,57 @@ class PrivateEntryFeedbackTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([reply.text for reply in message.replies], [self.handler_bot.Misc.MSG_ERROR_API])
 
+    async def test_standalone_username_gets_or_creates_and_shows_card(self):
+        message = FakeMessage(text='@Pending_Name')
+        sender = {'user_id': 1, 'uuid': 'sender-uuid'}
+        target = {'user_id': 2, 'uuid': 'target-uuid', 'pending_tg_username': 'pending_name'}
+
+        with mock.patch.object(
+            self.handler_bot.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(200, sender)),
+        ), mock.patch.object(
+            self.handler_bot.Misc,
+            'get_or_create_tg_username',
+            mock.AsyncMock(return_value=(200, target)),
+        ) as get_or_create, mock.patch.object(
+            self.handler_bot.Misc,
+            'show_card',
+            mock.AsyncMock(),
+        ) as show_card:
+            await self.handler_bot.message_to_bot(message, FakeState())
+
+        get_or_create.assert_awaited_once_with('Pending_Name')
+        show_card.assert_awaited_once_with(
+            profile=target,
+            profile_sender=sender,
+            tg_user_sender=message.from_user,
+        )
+
+    async def test_embedded_or_multiple_usernames_never_create_pending_profile(self):
+        sender = {'user_id': 1, 'uuid': 'sender-uuid'}
+        for text in ('hello @pending_name', '@pending_name @other_name'):
+            message = FakeMessage(text=text)
+            with mock.patch.object(
+                self.handler_bot.Misc,
+                'post_tg_user',
+                mock.AsyncMock(return_value=(200, sender)),
+            ), mock.patch.object(
+                self.handler_bot.Misc,
+                'get_or_create_tg_username',
+                mock.AsyncMock(),
+            ) as get_or_create, mock.patch.object(
+                self.handler_bot.Misc,
+                'api_request',
+                mock.AsyncMock(return_value=(200, [])),
+            ), mock.patch.object(
+                self.handler_bot.Misc,
+                'text_search_phrase',
+                return_value='',
+            ):
+                await self.handler_bot.message_to_bot(message, FakeState())
+            get_or_create.assert_not_awaited()
+
     async def test_cmd_start_deeplink_auth_failure_replies_with_api_error(self):
         message = FakeMessage(text='/start abcdefghij')
 
@@ -75,6 +126,7 @@ class PrivateEntryFeedbackTests(unittest.IsolatedAsyncioTestCase):
             await self.handler_bot.message_to_bot(message, FakeState())
 
         self.assertEqual(post_tg_user.await_count, 2)
+        self.assertEqual(post_tg_user.await_args_list[1].kwargs, {'did_bot_start': False})
         show_card.assert_not_awaited()
         self.assertEqual([reply.text for reply in message.replies], [self.handler_bot.Misc.MSG_ERROR_API])
 

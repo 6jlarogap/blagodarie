@@ -852,6 +852,8 @@ class Misc(object):
         if not response_to:
             return ''
         reply = f'<b>{html.quote(response_to["first_name"])}</b>\n'
+        if response_to.get('pending_tg_username'):
+            reply += '<i>Неподтверждённое имя Telegram: @%s</i>\n' % response_to['pending_tg_username']
         if (comment := response_to.get('comment', '').strip()) and comment:
             reply += f'{comment}\n'
         if not response_to.get('is_org'):
@@ -916,6 +918,8 @@ class Misc(object):
            response_from['r_sympa_username'] and response_from['r_sympa_username'] == response_to['username'] or \
            not response_to['did_meet']:
             keys += ['@%s' % tgd['tg_username'] for tgd in response_to.get('tg_data', []) if tgd['tg_username']]
+            if response_to.get('pending_tg_username'):
+                keys.append('@' + response_to['pending_tg_username'])
             keys += [key['value'] for key in response_to.get('keys', [])]
             keys.append(cls.get_deeplink(response_to))
             if response_to.get('username'):
@@ -1028,6 +1032,14 @@ class Misc(object):
             if status_photo == 200:
                 response_sender = response_photo
         return status_sender, response_sender
+
+    @classmethod
+    async def get_or_create_tg_username(cls, username):
+        return await cls.api_request(
+            path='/api/profile',
+            method='post',
+            data={'tg_token': settings.TOKEN, 'pending_tg_username': username},
+        )
 
 
     @classmethod
@@ -1512,7 +1524,7 @@ class Misc(object):
                     )
                     buttons.append([inline_btn_ability, inline_btn_wish,])
 
-        if not is_own_account and \
+        if not profile.get('pending_tg_username') and not is_own_account and \
            (not response_relations or response_relations['to_from']['attitude'] != Attitude.MISTRUST):
             dict_message = dict(
                 keyboard_type=KeyboardType.SEND_MESSAGE,

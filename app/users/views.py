@@ -560,83 +560,42 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
     def process_input(self, rd):
         photo_url = rd.get('photo_url', '')
         keep_user_data = rd.get('keep_user_data')
-        try:
-            oauth = Oauth.objects.select_related('user', 'user__profile').get(
-                provider = Oauth.PROVIDER_TELEGRAM,
-                uid=rd['id'],
-            )
-            # При повторном логине проверяется, не изменились ли данные пользователя
-            #
-            user = oauth.user
-            profile = user.profile
-
-            oauth_tg_field_map = dict(
-                last_name='last_name',
-                first_name='first_name',
-                username='username',
-                photo='photo_url',
-            )
-            changed = False
-            for f in oauth_tg_field_map:
-                if getattr(oauth, f) != rd.get(oauth_tg_field_map[f], ''):
-                    changed = True
-                    break
-            if changed:
-                for f in oauth_tg_field_map:
-                    setattr(oauth, f, rd.get(oauth_tg_field_map[f], ''))
-                oauth.update_timestamp = int(time.time())
-                oauth.save()
-
-            was_not_active = False
-            if not user.is_active:
+        previous = Oauth.objects.filter(
+            provider=Oauth.PROVIDER_TELEGRAM,
+            uid=rd['id'],
+        ).values('photo', 'user__is_active').first()
+        oauth, user, profile, identity_created = self.reconcile_telegram_identity(
+            uid=rd['id'],
+            username=rd.get('username', ''),
+            last_name=rd.get('last_name', ''),
+            first_name=rd.get('first_name', ''),
+            photo=photo_url,
+        )
+        was_not_active = not user.is_active
+        changed = False
+        if was_not_active:
+            user.is_active = True
+            changed = True
+        if user.last_name:
+            user.last_name = ''
+            changed = True
+        if identity_created or was_not_active or not keep_user_data:
+            first_name = Profile.make_first_name(rd.get('last_name', ''), rd.get('first_name', ''))
+            if user.first_name != first_name:
+                user.first_name = first_name
                 changed = True
-                user.is_active = True
-                was_not_active = True
-            if user.last_name != '':
-                user.last_name = ''
-                changed = True
-            if was_not_active or not keep_user_data:
-                first_name = Profile.make_first_name(
-                    rd.get('last_name', ''),
-                    rd.get('first_name', ''),
-                )
-                if user.first_name != first_name:
-                    user.first_name = first_name
-                    changed = True
-            if changed:
-                user.save()
+        if changed:
+            user.save()
 
-            if was_not_active and profile.is_notified:
-                fio = profile.user.first_name or 'Без имени'
-                message = "Cвязанный профиль '%s' восстановлен" % fio
-                self.send_to_telegram(message, user=user)
+        if was_not_active and not identity_created and profile.is_notified:
+            message = "Cвязанный профиль '%s' восстановлен" % (user.first_name or 'Без имени')
+            transaction.on_commit(lambda: self.send_to_telegram(message, user=user))
 
-        except Oauth.DoesNotExist:
-            last_name = rd.get('last_name', '')
-            first_name = rd.get('first_name', '')
-            user = self.create_user(
-                last_name=last_name,
-                first_name=first_name,
-            )
-            profile = user.profile
-            oauth = Oauth.objects.create(
-                provider = Oauth.PROVIDER_TELEGRAM,
-                uid=rd['id'],
-                user=user,
-                last_name=last_name,
-                first_name=first_name,
-                username=rd.get('username', ''),
-                photo=photo_url,
-            )
         token, created_token = Token.objects.get_or_create(user=user)
 
         if photo_url:
-            put_photo_from_url = False
-            if not profile.photo:
-                put_photo_from_url = True
-            elif not keep_user_data and oauth.photo != photo_url:
-                put_photo_from_url = True
-            if put_photo_from_url:
+            photo_changed = not previous or previous['photo'] != photo_url
+            if not profile.photo or (not keep_user_data and photo_changed):
                 profile.put_photo_from_url(photo_url)
         return dict(
             user_id=user.pk,
@@ -1124,7 +1083,7 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
                 try:
                     oauth = Oauth.objects.select_related(
                             'user', 'user__profile', 'user__profile__ability'
-                        ).get(uid=request.GET['tg_uid'])
+                        ).get(provider=Oauth.PROVIDER_TELEGRAM, uid=request.GET['tg_uid'])
                 except Oauth.DoesNotExist:
                     raise ServiceException('Telegram user with uid=%s not found' % request.GET['tg_uid'])
                 profile = oauth.user.profile
@@ -1174,7 +1133,7 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
                         user_pks.add(user.pk)
             elif request.GET.get('tg_username'):
                 data = []
-                usernames = request.GET['tg_username'].split(',')
+                usernames = [self.normalize_tg_username(value) for value in request.GET['tg_username'].split(',')]
                 user_pks = set()
                 q = Q()
                 for username in usernames:
@@ -1194,6 +1153,17 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
                         item.update(tg_data=profile.tg_data())
                         data.append(item)
                         user_pks.add(user.pk)
+                for profile in Profile.objects.select_related('user').filter(
+                    pending_tg_username__in=usernames,
+                ):
+                    if profile.user_id not in user_pks:
+                        item = profile.data_dict(request)
+                        item.update(profile.parents_dict(request))
+                        item.update(profile.data_WAK())
+                        item.update(profile.owner_dict())
+                        item.update(tg_data=[])
+                        data.append(item)
+                        user_pks.add(profile.user_id)
             elif request.GET.get('query_ability') or \
                  request.GET.get('query_wish') or \
                  request.GET.get('query_person') or \
@@ -1342,45 +1312,23 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
         """
         Сделать, если не существует, нового пользователя по telegram id
         """
-        profile = None
         data = dict()
         if request.data.get('tg_token') != settings.TELEGRAM_BOT_TOKEN:
             raise ServiceException('Неверный токен телеграм бота')
         last_name=request.data.get('last_name', '')
         first_name=request.data.get('first_name', '')
-        try:
-            oauth = Oauth.objects.get(
-                provider=Oauth.PROVIDER_TELEGRAM,
-                uid=request.data['tg_uid'],
-            )
-            user = oauth.user
-            profile = user.profile
-            if user.is_active or request.data.get('activate'):
-                save_ = False
-                for f in ('last_name', 'first_name', 'username', ):
-                    input_val = request.data.get(f, '')
-                    if getattr(oauth, f) != input_val:
-                        setattr(oauth, f, input_val)
-                        save_ = True
-                if save_:
-                    oauth.update_timestamp = int(time.time())
-                    oauth.save()
-
-        except Oauth.DoesNotExist:
-            user = self.create_user(
-                last_name=last_name,
-                first_name=first_name,
-            )
-            profile = user.profile
-            oauth = Oauth.objects.create(
-                provider = Oauth.PROVIDER_TELEGRAM,
-                uid=request.data.get('tg_uid'),
-                user=user,
-                last_name=last_name,
-                first_name=first_name,
-                username=request.data.get('username', ''),
-            )
+        oauth, user, profile, identity_created = self.reconcile_telegram_identity(
+            uid=request.data['tg_uid'],
+            username=request.data.get('username', ''),
+            last_name=last_name,
+            first_name=first_name,
+        )
+        if identity_created:
             token, created_token = Token.objects.get_or_create(user=user)
+            user.last_name = ''
+            user.first_name = Profile.make_first_name(last_name, first_name)
+            user.is_active = True
+            user.save()
             self.save_photo(request, profile)
             data.update(created=True)
 
@@ -1403,6 +1351,54 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
         data.update(profile.data_WAK())
         return data
 
+    def post_pending_tg_username(self, request):
+        if request.data.get('tg_token') != settings.TELEGRAM_BOT_TOKEN:
+            raise ServiceException('Неверный токен телеграм бота')
+        username = self.validate_tg_username(request.data.get('pending_tg_username'))
+        if not username:
+            raise ServiceException('Неверное имя пользователя Telegram')
+        if connection.vendor == 'postgresql':
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    'SELECT pg_advisory_xact_lock(hashtext(%s))',
+                    ['telegram_identity_reconciliation'],
+                )
+
+        oauths = Oauth.objects.select_for_update(of=('self',)).filter(
+            provider=Oauth.PROVIDER_TELEGRAM,
+            username__iexact=username,
+        ).select_related('user__profile')
+        if oauths.count() > 1:
+            raise ServiceException('Имя Telegram связано с несколькими профилями')
+        oauth = oauths.first()
+        created = False
+        if oauth:
+            profile = oauth.user.profile
+        else:
+            profile = Profile.objects.select_for_update().filter(
+                pending_tg_username=username,
+            ).select_related('user').first()
+            if not profile:
+                try:
+                    with transaction.atomic():
+                        user = self.create_user(first_name='@' + username, is_active=False)
+                        profile = user.profile
+                        profile.pending_tg_username = username
+                        profile.save(update_fields=('pending_tg_username',))
+                        created = True
+                except IntegrityError:
+                    profile = Profile.objects.select_related('user').get(
+                        pending_tg_username=username,
+                    )
+
+        data = profile.data_dict(request)
+        data.update(profile.parents_dict(request))
+        data.update(profile.data_WAK())
+        data.update(profile.owner_dict())
+        data.update(tg_data=profile.tg_data())
+        data.update(created=created)
+        return data
+
     @transaction.atomic
     def post(self, request):
         try:
@@ -1410,6 +1406,9 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
             status_code = status.HTTP_200_OK
             if request.data.get('tg_token') and request.data.get('tg_uid'):
                 data = self.post_tg_data(request)
+                raise SkipException
+            if request.data.get('tg_token') and request.data.get('pending_tg_username'):
+                data = self.post_pending_tg_username(request)
                 raise SkipException
 
             # Запрос на создание owned user из телеграма ?:
@@ -1560,6 +1559,8 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
     def put(self, request):
         status_code = 200
         try:
+            if 'pending_tg_username' in request.data:
+                raise ServiceException('Ожидающее имя Telegram нельзя изменять вручную')
             got_tg_token = False
             if request.data.get('tg_token'):
                 if request.data['tg_token'] != settings.TELEGRAM_BOT_TOKEN:
@@ -1750,6 +1751,8 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
                 if not request.user.is_authenticated:
                     raise NotAuthenticated
                 user, profile = self.check_user_or_owned_uuid(request, need_uuid=False)
+            if profile.pending_tg_username:
+                raise ServiceException('Ожидающий профиль нельзя удалить до подтверждения Telegram')
             if profile.owner:
                 profile.tgdesc.all().delete()
                 profile.delete()
@@ -1928,7 +1931,12 @@ class ApiBotStat(APIView):
     """
     def get(self, request):
         data = {
-            'active': Profile.objects.filter(user__is_superuser=False, owner__isnull=True).count(),
+            'active': Profile.objects.filter(
+                user__is_superuser=False,
+                owner__isnull=True,
+                pending_tg_username__isnull=True,
+            ).count(),
+            'pending_tg_username': Profile.objects.filter(pending_tg_username__isnull=False).count(),
             'owned': Profile.objects.filter(owner__isnull=False).count(),
             'did_bot_start': Profile.objects.filter(did_bot_start=True, owner__isnull=True).count(),
             'with_geodata': Profile.objects.filter(latitude__isnull=False, owner__isnull=True).count(),

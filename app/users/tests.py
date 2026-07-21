@@ -8,15 +8,236 @@ from io import BytesIO
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from rest_framework.test import APIClient
+from rest_framework.authtoken.models import Token
 
-from contact.models import CurrentState, Key, KeyType
-from users.models import Profile, RentalEquipmentType, RentalOffer, RentalOfferMessage, \
+from contact.models import CurrentState, Journal, Key, KeyType, OperationType
+from users.models import Oauth, Profile, TelegramRelationRecheckNotice, RentalEquipmentType, RentalOffer, RentalOfferMessage, \
     RentalReservationEvent, RentalReservationIntent, RentalReservationPaymentProof, TgDesc, \
     VpnDonorPreference, VpnFeedbackTicket, VpnProfile, VpnRunwayLedgerEntry, \
     VpnServerRunway, VpnStatsSnapshot, VpnTrafficPeriod
 from users.views import ApiAuthTelegram
+
+
+@override_settings(TELEGRAM_BOT_TOKEN='123456:test-token')
+class TelegramPendingProfileTests(TestCase):
+
+    bot_token = '123456:test-token'
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def create_pending(self, username='pending_name'):
+        response = self.client.post('/api/profile', {
+            'tg_token': self.bot_token,
+            'pending_tg_username': username,
+        }, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        return response.data
+
+    @mock.patch('users.models.TelegramApiMixin.send_to_telegram', return_value=False)
+    def test_pending_profile_reuses_claims_and_resets_only_active_relations(self, _send):
+        pending_data = self.create_pending('Pending_Name')
+        repeated = self.create_pending('pending_name')
+        self.assertEqual(repeated['uuid'], pending_data['uuid'])
+        self.assertFalse(repeated['created'])
+
+        pending = Profile.objects.get(uuid=pending_data['uuid'])
+        self.assertIsNone(pending.owner_id)
+        self.assertFalse(pending.user.is_active)
+        self.assertFalse(Oauth.objects.filter(user=pending.user).exists())
+        self.assertFalse(Token.objects.filter(user=pending.user).exists())
+
+        source = User.objects.create_user(username='relation-source', first_name='Source')
+        source_profile = Profile.objects.create(user=source, r_sympa=pending.user)
+        Oauth.objects.create(provider='telegram', uid='9001', username='source_name', user=source)
+        CurrentState.objects.create(
+            user_from=source,
+            user_to=pending.user,
+            attitude=CurrentState.TRUST,
+            thanks_count=2,
+            is_father=True,
+            is_sympa=True,
+            is_sympa_confirmed=True,
+            is_invite_meet=True,
+            is_hide_meet=True,
+        )
+        CurrentState.objects.create(
+            user_from=pending.user,
+            user_to=source,
+            is_reverse=True,
+            attitude=CurrentState.TRUST,
+            thanks_count=2,
+        )
+        operation = OperationType.objects.create(pk=991, title='pending test')
+        journal = Journal.objects.create(user_from=source, user_to=pending.user, operationtype=operation)
+        key_type = KeyType.objects.create(title='pending sentinel')
+        key = Key.objects.create(owner=pending.user, type=key_type, value='sentinel')
+        owner = User.objects.create_user(username='owned-source-owner', first_name='Owner')
+        Profile.objects.create(user=owner)
+        owned = User.objects.create_user(username='owned-source', first_name='Owned')
+        Profile.objects.create(user=owned, owner=owner)
+        CurrentState.objects.create(user_from=owned, user_to=pending.user, attitude=CurrentState.ACQ)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            claimed = self.client.post('/api/profile', {
+                'tg_token': self.bot_token,
+                'tg_uid': '9002',
+                'username': 'PENDING_NAME',
+                'first_name': 'Claimed',
+                'did_bot_start': '1',
+            }, format='json')
+        self.assertEqual(claimed.status_code, 200, claimed.data)
+        self.assertEqual(claimed.data['uuid'], pending_data['uuid'])
+        self.assertTrue(claimed.data['created'])
+
+        pending.refresh_from_db()
+        source_profile.refresh_from_db()
+        self.assertIsNone(pending.pending_tg_username)
+        self.assertTrue(pending.user.is_active)
+        self.assertTrue(pending.did_bot_start)
+        self.assertIsNone(source_profile.r_sympa_id)
+        self.assertFalse(CurrentState.objects.filter(
+            user_from__in=(source, pending.user), user_to__in=(source, pending.user)
+        ).exists())
+        self.assertTrue(Journal.objects.filter(pk=journal.pk).exists())
+        self.assertTrue(Key.objects.filter(pk=key.pk).exists())
+        self.assertTrue(Token.objects.filter(user=pending.user).exists())
+        notice = TelegramRelationRecheckNotice.objects.get(user=source, profile=pending)
+        self.assertEqual(notice.attempts, 0)
+        self.assertEqual(notice.delivered_timestamp, 0)
+        self.assertTrue(TelegramRelationRecheckNotice.objects.filter(user=owner, profile=pending).exists())
+        self.assertFalse(TelegramRelationRecheckNotice.objects.filter(user=owned, profile=pending).exists())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            failed_retry = self.client.post('/api/profile', {
+                'tg_token': self.bot_token,
+                'tg_uid': '9001',
+                'username': 'source_name',
+                'first_name': 'Source',
+            }, format='json')
+        self.assertEqual(failed_retry.status_code, 200, failed_retry.data)
+        notice.refresh_from_db()
+        self.assertEqual(notice.attempts, 1)
+        self.assertEqual(notice.delivered_timestamp, 0)
+
+        _send.return_value = True
+        with self.captureOnCommitCallbacks(execute=True):
+            retried = self.client.post('/api/profile', {
+                'tg_token': self.bot_token,
+                'tg_uid': '9001',
+                'username': 'source_name',
+                'first_name': 'Source',
+            }, format='json')
+        self.assertEqual(retried.status_code, 200, retried.data)
+        notice.refresh_from_db()
+        self.assertGreater(notice.delivered_timestamp, 0)
+
+    @mock.patch('users.models.TelegramApiMixin.send_to_telegram', return_value=True)
+    def test_corrupted_pending_profile_is_never_reset(self, _send):
+        stable = User.objects.create_user(username='corrupt-stable', first_name='Stable')
+        stable_profile = Profile.objects.create(user=stable)
+        Oauth.objects.create(provider='telegram', uid='9050', username='stable_old', user=stable)
+        pending_data = self.create_pending('corrupt_name')
+        pending = Profile.objects.get(uuid=pending_data['uuid'])
+        source = User.objects.create_user(username='corrupt-source', first_name='Source')
+        Profile.objects.create(user=source)
+        relation = CurrentState.objects.create(user_from=source, user_to=pending.user, attitude=CurrentState.TRUST)
+        pending.user.is_active = True
+        pending.user.save(update_fields=('is_active',))
+
+        response = self.client.post('/api/profile', {
+            'tg_token': self.bot_token,
+            'tg_uid': '9050',
+            'username': 'corrupt_name',
+            'first_name': 'Stable',
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        pending.refresh_from_db()
+        self.assertEqual(pending.pending_tg_username, 'corrupt_name')
+        self.assertTrue(CurrentState.objects.filter(pk=relation.pk).exists())
+        self.assertTrue(Profile.objects.filter(pk=stable_profile.pk).exists())
+
+    @mock.patch('users.models.TelegramApiMixin.send_to_telegram', return_value=True)
+    def test_known_uid_wins_pending_collision_without_touching_identified_relations(self, _send):
+        stable = User.objects.create_user(username='stable-user', first_name='Stable')
+        stable_profile = Profile.objects.create(user=stable)
+        stable_oauth = Oauth.objects.create(
+            provider='telegram', uid='9100', username='old_name', user=stable,
+        )
+        source = User.objects.create_user(username='stable-source', first_name='Source')
+        Profile.objects.create(user=source)
+        relation = CurrentState.objects.create(
+            user_from=source, user_to=stable, attitude=CurrentState.TRUST,
+        )
+        pending_data = self.create_pending('new_name')
+        pending = Profile.objects.get(uuid=pending_data['uuid'])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post('/api/profile', {
+                'tg_token': self.bot_token,
+                'tg_uid': stable_oauth.uid,
+                'username': 'new_name',
+                'first_name': 'Stable',
+            }, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(str(response.data['uuid']), str(stable_profile.uuid))
+        stable_oauth.refresh_from_db()
+        pending.refresh_from_db()
+        self.assertEqual(stable_oauth.username, 'new_name')
+        self.assertIsNone(pending.pending_tg_username)
+        self.assertTrue(Profile.objects.filter(pk=pending.pk).exists())
+        self.assertTrue(CurrentState.objects.filter(pk=relation.pk).exists())
+
+    @mock.patch('users.models.TelegramApiMixin.send_to_telegram', return_value=True)
+    def test_reassigned_verified_alias_moves_without_relation_transfer(self, _send):
+        old = User.objects.create_user(username='old-user', first_name='Old')
+        old_profile = Profile.objects.create(user=old)
+        old_oauth = Oauth.objects.create(provider='telegram', uid='9200', username='shared_name', user=old)
+        new = User.objects.create_user(username='new-user', first_name='New')
+        new_profile = Profile.objects.create(user=new)
+        Oauth.objects.create(provider='telegram', uid='9201', username='other_name', user=new)
+        source = User.objects.create_user(username='alias-source', first_name='Source')
+        Profile.objects.create(user=source)
+        relation = CurrentState.objects.create(user_from=source, user_to=old, attitude=CurrentState.ACQ)
+
+        response = self.client.post('/api/profile', {
+            'tg_token': self.bot_token,
+            'tg_uid': '9201',
+            'username': 'SHARED_NAME',
+            'first_name': 'New',
+        }, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(str(response.data['uuid']), str(new_profile.uuid))
+        old_oauth.refresh_from_db()
+        self.assertEqual(old_oauth.username, '')
+        self.assertTrue(CurrentState.objects.filter(pk=relation.pk, user_to=old).exists())
+        self.assertTrue(Profile.objects.filter(pk=old_profile.pk).exists())
+
+    @mock.patch('users.models.TelegramApiMixin.send_to_telegram', return_value=True)
+    def test_web_auth_claims_same_pending_profile_and_pending_delete_is_rejected(self, _send):
+        pending_data = self.create_pending('web_claim')
+        pending = Profile.objects.get(uuid=pending_data['uuid'])
+        self.client.force_authenticate(user=pending.user)
+        rejected = self.client.delete('/api/profile', {'uuid': str(pending.uuid)}, format='json')
+        self.assertEqual(rejected.status_code, 400)
+        self.assertTrue(Profile.objects.filter(pk=pending.pk).exists())
+
+        auth = ApiAuthTelegram()
+        with transaction.atomic():
+            result = auth.process_input({
+                'id': '9300',
+                'username': 'WEB_CLAIM',
+                'first_name': 'Web',
+                'last_name': 'Claim',
+            })
+        pending.refresh_from_db()
+        self.assertEqual(result['user_uuid'], str(pending.uuid))
+        self.assertIsNone(pending.pending_tg_username)
+        self.assertTrue(pending.user.is_active)
+        self.assertTrue(Token.objects.filter(user=pending.user).exists())
 
 
 class MockUrlopenResponse:

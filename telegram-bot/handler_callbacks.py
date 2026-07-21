@@ -1636,6 +1636,9 @@ async def cbq_send_message(callback: CallbackQuery, state: FSMContext):
     if status_to != 200:
         await Misc.answer_callback_notice(callback)
         return
+    if profile_to.get('pending_tg_username'):
+        await Misc.answer_callback_notice(callback, 'Этому профилю пока нельзя написать')
+        return
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
     if status_from != 200:
         await Misc.answer_callback_notice(callback, Misc.MSG_CALLBACK_AUTH)

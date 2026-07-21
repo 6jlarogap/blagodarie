@@ -1,5 +1,6 @@
 import types
 import unittest
+from unittest import mock
 
 from bot_test_harness import (
     FakeCallback,
@@ -26,6 +27,46 @@ class CommonRuntimeDeeplinkTests(unittest.TestCase):
             self.common.Misc.get_deeplink({'username': 'woman'}),
             't.me/DoveraBot?start=woman',
         )
+
+
+class PendingProfileCardTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        install_dependency_stubs(stub_common=False)
+        self.common = import_fresh('common')
+
+    async def test_pending_card_is_labelled_and_has_no_message_actions(self):
+        sender = {
+            'user_id': 1, 'uuid': 'sender-uuid', 'did_meet': None,
+            'r_sympa_username': None,
+        }
+        pending = {
+            'user_id': 2, 'uuid': 'target-uuid', 'username': 'targetsid1',
+            'first_name': '@pending_name', 'comment': '', 'is_org': False,
+            'gender': None, 'trust_count': 0, 'sum_thanks_count': 0,
+            'acq_count': 0, 'mistrust_count': 0, 'invite_meet_count': 0,
+            'did_meet': None, 'owner': {}, 'tg_data': [], 'keys': [],
+            'pending_tg_username': 'pending_name', 'is_active': False,
+            'is_power': False, 'latitude': None, 'longitude': None,
+        }
+        tg_user = types.SimpleNamespace(id=1001)
+        self.common.bot_data.id = 9999
+
+        with mock.patch.object(
+            self.common.Misc,
+            'call_response_relations',
+            mock.AsyncMock(return_value=(200, {})),
+        ), mock.patch.object(
+            self.common.Misc,
+            'send_or_edit_card',
+            mock.AsyncMock(),
+        ) as send_card:
+            await self.common.Misc.show_card(pending, sender, tg_user)
+
+        reply, markup = send_card.await_args.args[:2]
+        labels = [button.text for row in markup.inline_keyboard for button in row]
+        self.assertIn('Неподтверждённое имя Telegram: @pending_name', reply)
+        self.assertNotIn('Написать', labels)
+        self.assertNotIn('Архив', labels)
 
 class CommonCallbackParserTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
