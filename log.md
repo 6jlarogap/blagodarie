@@ -1,5 +1,28 @@
 # Log
 
+## 2026-07-21
+
+- Implemented and deployed `doverabot-tg-profile-card-resolution` in commits
+  `900c89e` and `213dd5f`: exact standalone private `@username` messages now
+  get or create one ownerless pending profile and show its labelled card;
+  Telegram UID remains authoritative across bot and web-auth entry paths;
+  pending claims/tombstones clear provisional `CurrentState`/`r_sympa`, retain
+  `Journal` and non-relation data, recount neighbors, and queue bounded durable
+  recheck notices delivered on each source's next bot interaction. The first
+  `users.0064` migration attempt safely stopped on legacy case-insensitive
+  Telegram alias duplicates; the reviewed follow-up preserved those rows and
+  deferred only the OAuth alias constraint, while the global transactional
+  resolver prevents new races and clears stale aliases upon authoritative UID
+  observations. The adjusted migration applied successfully and deploy
+  restarted gunicorn/bot; nginx, web, bot, and rental STT are active. Checks:
+  users Django suite `33/33`, focused identity suite `5/5`, focused bot suite
+  `13/13`, compileall, Django check, migration dry-run, graphify update, staged
+  diff check, and independent DB/auth review with no blocker/high findings.
+  Existing Django `security.W002` remains. Full mocked bot discovery ran 127
+  tests but its unrelated extractor-adapter module lacked `aiohttp` in the
+  system Python; affected focused bot tests passed. Error-marker scans after
+  deploy were empty; no real Telegram messages or private data were used.
+
 ## 2026-06-25
 
 - Deployed and enabled `doverabot-rent-offer-llm-extractor-chain` live gate: installed the updated `blagodarie-admin` wrapper and `doverabot-rental-llm-extractor.service`, configured the extractor to call the local Hermes OpenAI-compatible API with a redacted runtime key and model `gpt-5.4-mini`, enabled bot runtime settings for `RENTAL_LLM_EXTRACTOR_URL`, contract, model, and timeout, then restarted only the extractor and Telegram bot. Checks passed: wrapper shell syntax, admin runtime wiring tests (`4 passed`), LLM adapter tests (`7 passed`), rental handler tests (`60 passed, 5 subtests`), bot compileall, `git diff --check`, Django deploy check (existing `security.W002` warning only), service active checks, `/healthz`, and two synthetic `/extract` smokes for `моноколесо` / `парадром Флай Чегем` and `крыло и подвеску`. Recent extractor and bot log error scans were empty; no private transcripts or provider secrets were printed.
