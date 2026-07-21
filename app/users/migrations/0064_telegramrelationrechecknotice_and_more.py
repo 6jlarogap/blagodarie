@@ -6,17 +6,6 @@ from django.conf import settings
 from django.db import migrations, models
 
 
-def require_unique_telegram_usernames(apps, schema_editor):
-    Oauth = apps.get_model('users', 'Oauth')
-    duplicates = Oauth.objects.filter(provider='telegram').exclude(username='').values(
-        normalized=django.db.models.functions.text.Lower('username'),
-    ).annotate(total=models.Count('id')).filter(total__gt=1)
-    if duplicates.exists():
-        raise RuntimeError(
-            'Case-insensitive duplicate Telegram usernames must be resolved before users.0064'
-        )
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -40,11 +29,6 @@ class Migration(migrations.Migration):
             model_name='profile',
             name='pending_tg_username',
             field=models.CharField(max_length=32, null=True, unique=True),
-        ),
-        migrations.RunPython(require_unique_telegram_usernames, migrations.RunPython.noop),
-        migrations.AddConstraint(
-            model_name='oauth',
-            constraint=models.UniqueConstraint(django.db.models.functions.text.Lower('username'), condition=models.Q(('provider', 'telegram'), models.Q(('username', ''), _negated=True)), name='users_oauth_unique_tg_username_ci'),
         ),
         migrations.AddConstraint(
             model_name='profile',

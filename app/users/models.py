@@ -215,13 +215,6 @@ class Oauth(BaseModelInsertUpdateTimestamp):
 
     class Meta:
         unique_together = ('provider', 'uid')
-        constraints = (
-            models.UniqueConstraint(
-                Lower('username'),
-                condition=Q(provider='telegram') & ~Q(username=''),
-                name='users_oauth_unique_tg_username_ci',
-            ),
-        )
 
     def get_display_name(self):
         return self.display_name or \
