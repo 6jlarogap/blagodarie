@@ -2,6 +2,25 @@
 
 ## 2026-07-22
 
+- Implemented and deployed `doverabot-telegram-link-input` in source commit
+  `8bb994d`: the existing private standalone-username card branch now accepts
+  exact `https://t.me/name` links with an optional trailing slash, normalizes
+  aliases to lowercase, and continues through the shared neutral pending
+  profile path. Its stdlib `urllib.parse` boundary rejects embedded/multiple
+  input, non-HTTPS or alternate hosts, userinfo/ports, non-printable/control
+  input, params/query/fragments, message and reserved paths, invite links,
+  visible forwards, and non-private chats. It does not infer entity kind from
+  names or change search/command/FSM behavior. Review fixed outer-whitespace
+  and Python URL-parser C0-normalization bypasses; final independent
+  correctness and high-risk/security/runtime rereads report zero findings.
+  Checks passed: focused private handler `9/9`, full bot `137/137`, users
+  `36/36`, focused identity `7/7`, migration drift, Django check, compileall,
+  Graphify update, and diff checks. Wrapper dry-run/deploy succeeded; all four
+  services are active; the deployed handler matches source; sanitized recent
+  web/bot error counts are zero. Existing Django `security.W002` remains. No
+  real Telegram message/private-data smoke was used. Next slug:
+  `doverabot-telegram-entity-visuals` (not started).
+
 - Implemented and deployed `doverabot-telegram-entity-foundation` in source
   commit `19f6f81`: `Profile` now derives one neutral `subject_kind`/`is_person`
   capability from nullable Telegram kind plus existing organization state;
