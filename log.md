@@ -1,5 +1,26 @@
 # Log
 
+## 2026-07-22
+
+- Implemented and deployed `doverabot-telegram-entity-foundation` in source
+  commit `19f6f81`: `Profile` now derives one neutral `subject_kind`/`is_person`
+  capability from nullable Telegram kind plus existing organization state;
+  authoritative human, bot, group, and channel observations share the stable
+  UID/alias resolver; unknown and confirmed non-person identities remain
+  inactive with no token or bot-start flag. Existing pending profiles were
+  reversibly classified by `users.0065`. Trust, mistrust, thanks, and cleanup
+  remain available while person-only relation, meet, message, notification,
+  and stale-callback paths fail closed. Visible bot/chat/channel forwards and
+  existing group update/member paths now classify without transferring
+  relations or erasing a known alias. Checks passed: users `36/36`, bot
+  `136/136`, focused callback/card/private paths `44/44`, migration dry-run,
+  Django check, compileall, Graphify update, diff checks, and two independent
+  final review gates with zero findings. Wrapper dry-run/sync/migrate/deploy
+  succeeded; `users.0065` applied; nginx/web/bot/rental STT are active;
+  sanitized recent web/bot error counts are zero. Existing Django
+  `security.W002` remains. No real Telegram message or private-data smoke was
+  used. Next slug: `doverabot-telegram-link-input` (not started).
+
 ## 2026-07-21
 
 - Implemented and deployed `doverabot-tg-profile-card-resolution` in commits
