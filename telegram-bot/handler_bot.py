@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 from aiogram import Router, F, html
 from aiogram.types import Message, CallbackQuery, ContentType,  \
-                            MessageOriginUser, MessageOriginHiddenUser, \
+                            MessageOriginUser, MessageOriginHiddenUser, MessageOriginChat, MessageOriginChannel, \
                             InlineKeyboardMarkup, InlineKeyboardButton, \
                             BufferedInputFile, LinkPreviewOptions
 from aiogram.enums import ChatType
@@ -851,6 +851,7 @@ async def message_to_bot(message: Message, state: FSMContext):
     tg_user_sender = message.from_user
     reply = ''
     is_forward = is_forward_from_other = found_username = False
+    tg_chat_forwarded = None
     if tg_user_sender.is_bot:
         reply = 'Сообщения от ботов пока не обрабатываются'
     elif message.content_type == ContentType.PINNED_MESSAGE:
@@ -858,20 +859,20 @@ async def message_to_bot(message: Message, state: FSMContext):
     if message.forward_origin:
         if type(message.forward_origin) == MessageOriginUser:
             tg_user_forwarded = message.forward_origin.sender_user
-            if tg_user_forwarded.is_bot:
-                reply = 'Сообщения, пересланные от ботов, пока не обрабатываются'
-            else:
-                is_forward = True
-                is_forward_from_other = tg_user_forwarded.id != tg_user_sender.id
+            is_forward = True
+            is_forward_from_other = tg_user_forwarded.id != tg_user_sender.id
         elif type(message.forward_origin) == MessageOriginHiddenUser:
             reply = (
                 'Автор исходного сообщения '
                 '<a href="https://telegram.org/blog/unsend-privacy-emoji#anonymous-forwarding">запретил</a> '
                 'идентифицировать себя в пересылаемых сообщениях'
             )
-        else:
-            # Возможны еще: MessageOriginChannel, MessageOriginChat как АВТОРЫ пересланных сообщений
-            reply = 'Пересланное сообщение, автор: группа или канал. Пока такие не обрабатываются'
+        elif type(message.forward_origin) == MessageOriginChat:
+            is_forward = is_forward_from_other = True
+            tg_chat_forwarded = message.forward_origin.sender_chat
+        elif type(message.forward_origin) == MessageOriginChannel:
+            is_forward = is_forward_from_other = True
+            tg_chat_forwarded = message.forward_origin.chat
     else:
         if message.content_type != ContentType.TEXT:
             reply = 'Сюда можно слать текст для поиска, включая @username, или пересылать сообщения любого типа'
@@ -887,8 +888,10 @@ async def message_to_bot(message: Message, state: FSMContext):
 
     message_text = getattr(message, 'text', '') and message.text.strip() or ''
     if is_forward_from_other:
-        logging.debug(f"Processing forwarded message - Forwarded from: {tg_user_forwarded.username} (ID: {tg_user_forwarded.id}), Forwarded by: {tg_user_sender.username} (ID: {tg_user_sender.id}), Message: {message_text}")
-        status_to, response_to = await Misc.post_tg_user(tg_user_forwarded, did_bot_start=False)
+        if tg_chat_forwarded:
+            status_to, response_to = await Misc.post_tg_chat(tg_chat_forwarded)
+        else:
+            status_to, response_to = await Misc.post_tg_user(tg_user_forwarded, did_bot_start=False)
         if status_to != 200:
             await message.reply(Misc.MSG_ERROR_API)
             return

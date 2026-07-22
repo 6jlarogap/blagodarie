@@ -97,6 +97,7 @@ async def process_group_message(message: Message, state: FSMContext):
                 chat_id=message.chat.id,
                 title=message.chat.title,
                 type_=message.chat.type,
+                username=getattr(message.chat, 'username', None) or '',
             )
             if status == 200:
                 logging.debug("TEST: migrate TgGroup.put {status}")                   
@@ -138,7 +139,8 @@ async def process_group_message(message: Message, state: FSMContext):
             group_chat_id=message.chat.id,
             group_title=message.chat.title,
             group_type=message.chat.type,
-            user_tg_uid=tg_user_sender.id
+            user_tg_uid=tg_user_sender.id,
+            group_username=getattr(message.chat, 'username', None) or '',
         )
         logging.debug("TEST: TgGroupMember.add")
     except Exception as e:
@@ -368,7 +370,8 @@ async def handle_bot_status_update(chat_member: ChatMemberUpdated):
                         group_chat_id=chat.id,
                         group_title=chat.title,
                         group_type=chat.type,
-                        user_tg_uid=chat_member.from_user.id
+                        user_tg_uid=chat_member.from_user.id,
+                        group_username=getattr(chat, 'username', None) or '',
                     )
                     logging.debug("TEST: AddBot TgGroupMember.add")
                     logging.info(f"Пользователь добавлен в группу: {chat.title} (ID: {chat.id}) (UID: {chat_member.from_user.id})")       
@@ -378,7 +381,9 @@ async def handle_bot_status_update(chat_member: ChatMemberUpdated):
         # Пробуем разные методы сохранения группы
         try:
             # Сначала пробуем создать/обновить через post (как в обработчике каналов)
-            status, response = await TgGroup.post(chat.id, chat.title, chat.type)
+            status, response = await TgGroup.post(
+                chat.id, chat.title, chat.type, getattr(chat, 'username', None) or '',
+            )
             logging.debug(f"TgGroup.post result: {status}")
         except Exception as e:
             logging.error(f"TgGroup.post failed: {str(e)}")
@@ -389,6 +394,7 @@ async def handle_bot_status_update(chat_member: ChatMemberUpdated):
                     chat_id=chat.id,
                     title=chat.title,
                     type_=chat.type,
+                    username=getattr(chat, 'username', None) or '',
                 )
                 logging.debug(f"TgGroup.put result: {status}")
             except Exception as e:
@@ -422,7 +428,10 @@ async def echo_my_chat_member_for_bot(chat_member: ChatMemberUpdated):
         status, user_from = await Misc.post_tg_user(tg_user_from, did_bot_start=False)
         if status == 200:
             try:
-                await TgGroupMember.add(chat_member.chat.id, chat_member.chat.title, chat_member.chat.type, tg_user_from.id)
+                await TgGroupMember.add(
+                    chat_member.chat.id, chat_member.chat.title, chat_member.chat.type,
+                    tg_user_from.id, getattr(chat_member.chat, 'username', None) or '',
+                )
                 logging.debug("TEST: Channel TgGroupMember.add")
             except Exception as e:
                 logging.error(f"Channel member add failed: {str(e)}")
@@ -430,7 +439,10 @@ async def echo_my_chat_member_for_bot(chat_member: ChatMemberUpdated):
             return
     else:
         try:
-            status, response = await TgGroup.post(chat_member.chat.id, chat_member.chat.title, chat_member.chat.type)
+            status, response = await TgGroup.post(
+                chat_member.chat.id, chat_member.chat.title, chat_member.chat.type,
+                getattr(chat_member.chat, 'username', None) or '',
+            )
             if status != 200:
                 return
         except Exception as e:
@@ -513,6 +525,7 @@ async def echo_join_chat_request(message: ChatJoinRequest):
         group_title=message.chat.title,
         group_type=message.chat.type,
         user_tg_uid=tg_subscriber.id,
+        group_username=getattr(message.chat, 'username', None) or '',
     )
     if status != 200:
         logging.debug(f'Failed to add subscriber to group, status: {status}')

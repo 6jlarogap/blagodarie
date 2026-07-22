@@ -37,6 +37,166 @@ class TelegramPendingProfileTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         return response.data
 
+    @mock.patch('users.models.TelegramApiMixin.send_to_telegram', return_value=True)
+    def test_subject_kinds_authoritative_claims_and_non_person_login_guarantees(self, _send):
+        manual = User.objects.create_user(username='manual-org', first_name='Manual')
+        manual_profile = Profile.objects.create(user=manual, is_org=True)
+        self.assertEqual(manual_profile.subject_kind, 'organization')
+        self.assertFalse(manual_profile.is_person)
+
+        pending_data = self.create_pending('kind_claim')
+        pending = Profile.objects.get(uuid=pending_data['uuid'])
+        self.assertEqual(pending.subject_kind, 'unknown')
+        self.assertFalse(pending.is_person)
+        self.assertTrue(pending.is_org)
+
+        claimed = self.client.post('/api/profile', {
+            'tg_token': self.bot_token,
+            'tg_uid': '9400',
+            'username': 'kind_claim',
+            'first_name': 'KindBot',
+            'telegram_kind': 'bot',
+            'activate': '1',
+            'did_bot_start': '1',
+        }, format='json')
+        self.assertEqual(claimed.status_code, 200, claimed.data)
+        self.assertEqual(claimed.data['subject_kind'], 'bot')
+        pending.refresh_from_db()
+        self.assertFalse(pending.user.is_active)
+        self.assertFalse(pending.did_bot_start)
+        self.assertFalse(Token.objects.filter(user=pending.user).exists())
+
+        auth = ApiAuthTelegram()
+        result = auth.process_input({
+            'id': '9400', 'username': 'kind_claim', 'first_name': 'Human Claim',
+        })
+        pending.refresh_from_db()
+        self.assertEqual(result['user_uuid'], str(pending.uuid))
+        self.assertEqual(pending.subject_kind, 'person')
+        self.assertTrue(pending.is_person)
+        self.assertFalse(pending.is_org)
+        self.assertTrue(pending.user.is_active)
+        self.assertTrue(Token.objects.filter(user=pending.user).exists())
+
+        for chat_id, chat_type, expected_kind in (
+            (-1009401, 'supergroup', 'group'), (-1009402, 'channel', 'channel'),
+        ):
+            response = self.client.post('/api/bot/group', {
+                'tg_token': self.bot_token,
+                'chat_id': chat_id,
+                'title': expected_kind.title(),
+                'type': chat_type,
+                'username': expected_kind + '_name',
+            }, format='json')
+            self.assertEqual(response.status_code, 200, response.data)
+            profile = Oauth.objects.get(provider='telegram', uid=str(chat_id)).user.profile
+            self.assertEqual(profile.subject_kind, expected_kind)
+            self.assertFalse(profile.user.is_active)
+            self.assertFalse(profile.did_bot_start)
+            self.assertFalse(Token.objects.filter(user=profile.user).exists())
+
+            member = self.client.post('/api/bot/groupmember', {
+                'tg_token': self.bot_token,
+                'group': {
+                    'chat_id': chat_id,
+                    'title': expected_kind.title(),
+                    'type': chat_type,
+                    'username': expected_kind + '_name',
+                },
+                'user': {'tg_uid': '9400'},
+            }, format='json')
+            self.assertEqual(member.status_code, 200, member.data)
+            pin = self.client.put('/api/bot/group', {
+                'tg_token': self.bot_token,
+                'old_chat_id': chat_id,
+                'chat_id': chat_id,
+                'title': expected_kind.title(),
+                'type': chat_type,
+                'username': expected_kind + '_name',
+                'pin_message_id': 42,
+            }, format='json')
+            self.assertEqual(pin.status_code, 200, pin.data)
+            self.assertEqual(
+                Oauth.objects.get(provider='telegram', uid=str(chat_id)).username,
+                expected_kind + '_name',
+            )
+
+    @mock.patch('users.models.TelegramApiMixin.send_to_telegram', return_value=True)
+    def test_non_person_alias_moves_without_relations_and_person_only_actions_are_rejected(self, _send):
+        sender = User.objects.create_user(username='kind-sender', first_name='Sender')
+        Profile.objects.create(user=sender)
+        old = User.objects.create_user(username='kind-old', first_name='Old')
+        old_profile = Profile.objects.create(user=old)
+        old_oauth = Oauth.objects.create(provider='telegram', uid='9500', username='moving_name', user=old)
+        relation = CurrentState.objects.create(user_from=sender, user_to=old, attitude=CurrentState.TRUST)
+
+        created = self.client.post('/api/profile', {
+            'tg_token': self.bot_token,
+            'tg_uid': '9501',
+            'username': 'moving_name',
+            'first_name': 'Moving Bot',
+            'telegram_kind': 'bot',
+        }, format='json')
+        self.assertEqual(created.status_code, 200, created.data)
+        target = Profile.objects.get(uuid=created.data['uuid'])
+        old_oauth.refresh_from_db()
+        self.assertEqual(old_oauth.username, '')
+        self.assertTrue(CurrentState.objects.filter(pk=relation.pk, user_to=old).exists())
+        self.assertTrue(Profile.objects.filter(pk=old_profile.pk).exists())
+
+        for operation_id in (OperationType.TRUST, OperationType.MISTRUST, OperationType.THANK):
+            OperationType.objects.get_or_create(pk=operation_id, defaults={'title': 'kind-%s' % operation_id})
+            response = self.client.post('/api/addoperation', {
+                'tg_token': self.bot_token,
+                'user_id_from': sender.pk,
+                'user_id_to': str(target.uuid),
+                'operation_type_id': operation_id,
+            }, format='json')
+            self.assertEqual(response.status_code, 200, response.data)
+
+        OperationType.objects.get_or_create(pk=OperationType.ACQ, defaults={'title': 'kind-acq'})
+        rejected = self.client.post('/api/addoperation', {
+            'tg_token': self.bot_token,
+            'user_id_from': sender.pk,
+            'user_id_to': str(target.uuid),
+            'operation_type_id': OperationType.ACQ,
+        }, format='json')
+        self.assertEqual(rejected.status_code, 400, rejected.data)
+
+        self.client.force_authenticate(user=sender)
+        with mock.patch('contact.views.TelegramApiMixin.send_to_telegram') as send:
+            trusted = self.client.post('/api/addoperation', {
+                'user_id_to': str(target.uuid),
+                'operation_type_id': OperationType.TRUST,
+            }, format='json')
+        self.assertEqual(trusted.status_code, 200, trusted.data)
+        send.assert_not_called()
+        self.client.force_authenticate(user=None)
+
+        message = self.client.post('/api/tg_message', {
+            'tg_token': self.bot_token,
+            'user_from_uuid': str(sender.profile.uuid),
+            'user_to_uuid': str(target.uuid),
+            'chat_id': sender.pk,
+            'message_id': 1,
+        }, format='json')
+        self.assertEqual(message.status_code, 400, message.data)
+
+        meet = self.client.post('/api/meet_id', {
+            'tg_token': self.bot_token,
+            'username': target.user.username,
+        }, format='json')
+        self.assertEqual(meet.status_code, 400, meet.data)
+
+        bot_start = self.client.put('/api/profile', {
+            'tg_token': self.bot_token,
+            'uuid': str(target.uuid),
+            'did_bot_start': True,
+        }, format='json')
+        self.assertEqual(bot_start.status_code, 400, bot_start.data)
+        target.refresh_from_db()
+        self.assertFalse(target.did_bot_start)
+
     @mock.patch('users.models.TelegramApiMixin.send_to_telegram', return_value=False)
     def test_pending_profile_reuses_claims_and_resets_only_active_relations(self, _send):
         pending_data = self.create_pending('Pending_Name')

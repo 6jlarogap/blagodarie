@@ -130,6 +130,42 @@ class PrivateEntryFeedbackTests(unittest.IsolatedAsyncioTestCase):
         show_card.assert_not_awaited()
         self.assertEqual([reply.text for reply in message.replies], [self.handler_bot.Misc.MSG_ERROR_API])
 
+    async def test_visible_bot_and_channel_forwards_use_authoritative_subject_paths(self):
+        sender = {'uuid': 'requester-uuid', 'first_name': 'Requester'}
+        targets = (
+            (self.handler_bot.MessageOriginUser, 'sender_user', mock.Mock(
+                id=2002, username='helper_bot', first_name='Helper', last_name='', is_bot=True,
+            ), 'post_tg_user'),
+            (self.handler_bot.MessageOriginChannel, 'chat', mock.Mock(
+                id=-1002003, username='news', title='News', type='channel',
+            ), 'post_tg_chat'),
+        )
+        for origin_type, attribute, forwarded, expected_method in targets:
+            message = FakeMessage(text='forwarded')
+            origin = origin_type()
+            setattr(origin, attribute, forwarded)
+            message.forward_origin = origin
+            target = {'uuid': 'target-uuid', 'first_name': 'Target'}
+            with mock.patch.object(
+                self.handler_bot.Misc, 'post_tg_user',
+                mock.AsyncMock(return_value=(200, sender)),
+            ) as post_user, mock.patch.object(
+                self.handler_bot.Misc, 'post_tg_chat',
+                mock.AsyncMock(return_value=(200, target)),
+            ) as post_chat, mock.patch.object(
+                self.handler_bot.Misc, 'show_card', mock.AsyncMock(),
+            ) as show_card:
+                if expected_method == 'post_tg_user':
+                    post_user.side_effect = [(200, sender), (200, target)]
+                await self.handler_bot.message_to_bot(message, FakeState())
+
+            if expected_method == 'post_tg_chat':
+                post_chat.assert_awaited_once_with(forwarded)
+            else:
+                self.assertEqual(post_user.await_count, 2)
+                self.assertEqual(post_user.await_args_list[1].kwargs, {'did_bot_start': False})
+            show_card.assert_awaited_once()
+
     async def test_agree_to_rules_auth_failure_shows_alert_and_keeps_state(self):
         callback = FakeCallback('70~agree')
         state = FakeState()

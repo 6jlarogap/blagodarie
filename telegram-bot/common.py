@@ -1015,6 +1015,7 @@ class Misc(object):
             last_name=tg_user_sender.last_name or '',
             first_name=tg_user_sender.first_name or '',
             username=tg_user_sender.username or '',
+            telegram_kind='bot' if getattr(tg_user_sender, 'is_bot', False) else 'person',
             activate='1' if activate else '',
             # Если пустой did_bot_start, то он не сбрасывается в профиле юзера
             did_bot_start='1' if did_bot_start else '',
@@ -1032,6 +1033,20 @@ class Misc(object):
             if status_photo == 200:
                 response_sender = response_photo
         return status_sender, response_sender
+
+    @classmethod
+    async def post_tg_chat(cls, chat):
+        return await cls.api_request(
+            path='/api/profile',
+            method='post',
+            data={
+                'tg_token': settings.TOKEN,
+                'tg_uid': chat.id,
+                'username': getattr(chat, 'username', None) or '',
+                'first_name': getattr(chat, 'title', None) or '',
+                'telegram_kind': 'channel' if chat.type == ChatType.CHANNEL else 'group',
+            },
+        )
 
     @classmethod
     async def get_or_create_tg_username(cls, username):
@@ -1266,6 +1281,7 @@ class Misc(object):
         is_own_account = user_from_id == profile['user_id']
         is_owned_account = profile.get('owner') and profile['owner']['user_id'] == user_from_id
         is_org = profile.get('is_org')
+        is_person = profile.get('is_person', not is_org)
         is_power = cls.is_power(profile=profile, sender=profile_sender)
 
         reply = cls.reply_user_card(profile_sender, profile, is_power)
@@ -1289,11 +1305,13 @@ class Misc(object):
             callback_data_template = OperationType.CALLBACK_DATA_TEMPLATE
             trust_buttons = []
 
-            dict_reply.update(operation=OperationType.ACQ)
-            inline_btn_acq = InlineKeyboardButton(
-                text='Знакомы',
-                callback_data=callback_data_template % dict_reply,
-            )
+            inline_btn_acq = None
+            if is_person:
+                dict_reply.update(operation=OperationType.ACQ)
+                inline_btn_acq = InlineKeyboardButton(
+                    text='Знакомы',
+                    callback_data=callback_data_template % dict_reply,
+                )
 
             dict_reply.update(operation=OperationType.TRUST)
             inline_btn_trust = InlineKeyboardButton(
@@ -1315,14 +1333,14 @@ class Misc(object):
             if response_relations:
                 attitude = response_relations['from_to']['attitude']
                 if attitude == None:
-                    trust_buttons = (inline_btn_acq, inline_btn_trust, inline_btn_mistrust, )
+                    trust_buttons = tuple(filter(None, (inline_btn_acq, inline_btn_trust, inline_btn_mistrust)))
                 elif attitude == Attitude.ACQ:
                     trust_buttons = (inline_btn_nullify_attitude, inline_btn_trust, inline_btn_mistrust, )
                 elif attitude == Attitude.TRUST:
                     trust_buttons = (inline_btn_acq, inline_btn_nullify_attitude, inline_btn_mistrust, )
                 elif attitude == Attitude.MISTRUST:
                     trust_buttons = (inline_btn_acq, inline_btn_trust, inline_btn_nullify_attitude, )
-                buttons.append(trust_buttons)
+                buttons.append(tuple(filter(None, trust_buttons)))
 
             dict_reply.update(operation=OperationType.THANK)
             inline_btn_thank = InlineKeyboardButton(
@@ -1339,7 +1357,7 @@ class Misc(object):
             ))
         login_url_buttons = [inline_btn_trusts, ]
 
-        if is_power and not is_org:
+        if is_power and is_person:
             inline_btn_genesis = InlineKeyboardButton(
                 text='Род',
                 login_url=cls.make_login_url(
@@ -1389,7 +1407,7 @@ class Misc(object):
                 if is_power:
                     edit_buttons_1 += [inline_btn_photo,]
 
-                if not is_org:
+                if is_person:
                     inline_btn_gender = InlineKeyboardButton(
                         text='Пол',
                         callback_data=callback_data_template % dict(
@@ -1455,7 +1473,7 @@ class Misc(object):
                         callback_data=callback_data_template % dict_change_owner,
                     )
                     edit_buttons_2.append(inline_btn_change_owner)
-                    if not profile['is_dead'] and not is_org:
+                    if not profile['is_dead'] and is_person:
                         dict_invite = dict(
                             keyboard_type=KeyboardType.INVITE,
                             uuid=profile['uuid'],
@@ -1469,7 +1487,7 @@ class Misc(object):
                 if edit_buttons_2:
                     buttons.append(edit_buttons_2)
 
-                if is_power and not is_org:
+                if is_power and is_person:
                     dict_papa_mama = dict(
                         keyboard_type=KeyboardType.FATHER,
                         uuid=profile['uuid'],
@@ -1524,7 +1542,7 @@ class Misc(object):
                     )
                     buttons.append([inline_btn_ability, inline_btn_wish,])
 
-        if not profile.get('pending_tg_username') and not is_own_account and \
+        if is_person and not is_own_account and \
            (not response_relations or response_relations['to_from']['attitude'] != Attitude.MISTRUST):
             dict_message = dict(
                 keyboard_type=KeyboardType.SEND_MESSAGE,
@@ -1989,6 +2007,7 @@ class Misc(object):
             await TgGroup.put(
                 old_chat_id=chat.id, chat_id=chat.id, title=chat.title, type_=chat.type,
                 pin_message_id=messsage_for_pin.message_id,
+                username=getattr(chat, 'username', None) or '',
             )
         return messsage_for_pin
 
@@ -2333,7 +2352,7 @@ class Misc(object):
             if profile_to.get('owner'):
                 if profile_to['owner']['uuid'] != profile_from['uuid']:
                     tg_user_to_notify_tg_data = profile_to['owner'].get('tg_data', [])
-            else:
+            elif profile_to.get('is_person', not profile_to.get('is_org')):
                 tg_user_to_notify_tg_data = profile_to.get('tg_data', [])
 
             if do_thank and journal_id and not bank_details:
@@ -2925,8 +2944,11 @@ class TgGroup(object):
         return status, response
 
     @classmethod
-    async def post(cls, chat_id, title, type_):
-        payload = {'tg_token': settings.TOKEN, 'chat_id': chat_id, 'title': title, 'type': type_,}
+    async def post(cls, chat_id, title, type_, username=''):
+        payload = {
+            'tg_token': settings.TOKEN, 'chat_id': chat_id, 'title': title,
+            'type': type_, 'username': username or '',
+        }
         logging.debug('post group id, payload: %s' % Misc.secret(payload))
         status, response = await Misc.api_request(
             path='/api/bot/group',
@@ -2938,11 +2960,11 @@ class TgGroup(object):
         return status, response
 
     @classmethod
-    async def put(cls, old_chat_id, chat_id, title, type_, pin_message_id=None):
+    async def put(cls, old_chat_id, chat_id, title, type_, pin_message_id=None, username=''):
         payload = {
             'tg_token': settings.TOKEN,
             'old_chat_id': old_chat_id,
-            'chat_id': chat_id, 'title': title, 'type': type_,
+            'chat_id': chat_id, 'title': title, 'type': type_, 'username': username or '',
             'pin_message_id' : pin_message_id,
         }
         logging.debug('modify group, payload: %s' % Misc.secret(payload))
@@ -2974,7 +2996,7 @@ class TgGroupMember(object):
     """
 
     @classmethod
-    def payload(cls, group_chat_id, group_title, group_type, user_tg_uid):
+    def payload(cls, group_chat_id, group_title, group_type, user_tg_uid, group_username=''):
         return {
             'tg_token': settings.TOKEN,
             'group': {
@@ -2983,6 +3005,7 @@ class TgGroupMember(object):
                 #
                 'title': group_title,
                 'type': group_type,
+                'username': group_username or '',
             },
             'user': {
                 'tg_uid': user_tg_uid,
@@ -2990,7 +3013,7 @@ class TgGroupMember(object):
         }
 
     @classmethod
-    async def add(cls, group_chat_id, group_title, group_type, user_tg_uid):
+    async def add(cls, group_chat_id, group_title, group_type, user_tg_uid, group_username=''):
 
         # для предотвращения повторного добавления одного и того же пользователя в ту же группу
         dedup_key = f"group_member_dedup:{group_chat_id}:{user_tg_uid}"
@@ -3008,7 +3031,7 @@ class TgGroupMember(object):
             finally:
                 r.close()
 
-        payload = cls.payload(group_chat_id, group_title, group_type, user_tg_uid)
+        payload = cls.payload(group_chat_id, group_title, group_type, user_tg_uid, group_username)
         logging.debug('post group member, payload: %s' % Misc.secret(payload))
         status, response = await Misc.api_request(
             path='/api/bot/groupmember',
@@ -3020,8 +3043,8 @@ class TgGroupMember(object):
         return status, response
 
     @classmethod
-    async def remove(cls, group_chat_id, group_title, group_type, user_tg_uid):
-        payload = cls.payload(group_chat_id, group_title, group_type, user_tg_uid)
+    async def remove(cls, group_chat_id, group_title, group_type, user_tg_uid, group_username=''):
+        payload = cls.payload(group_chat_id, group_title, group_type, user_tg_uid, group_username)
         logging.debug('delete group member, payload: %s' % Misc.secret(payload))
         status, response = await Misc.api_request(
             path='/api/bot/groupmember',

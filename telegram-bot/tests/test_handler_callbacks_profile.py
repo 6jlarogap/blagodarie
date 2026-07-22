@@ -556,6 +556,56 @@ class LegacyProfileEditStateFeedbackFinishTests(unittest.IsolatedAsyncioTestCase
         self.assertEqual(len(message.replies), 1)
         self.assertIn(self.common.Misc.MSG_ERROR_API.lower(), message.replies[0].text.lower())
 
+    async def test_send_message_rejects_non_person_stale_state_before_delivery(self):
+        message = FakeMessage(text='hello')
+        state = FakeState({
+            'uuid_pack': 'pack-uuid',
+            'profile_from': {'uuid': 'from-uuid', 'first_name': 'From'},
+            'profile_to': {
+                'uuid': 'to-uuid', 'username': 'helper_bot', 'first_name': 'Bot',
+                'owner': None, 'tg_data': [{'tg_uid': 3003}],
+                'is_org': True, 'is_person': False,
+            },
+        })
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc, 'api_request', mock.AsyncMock(),
+        ) as api_request, mock.patch.object(
+            self.handler_callbacks, 'bot', FakeBot(),
+        ) as bot:
+            await self.handler_callbacks.process_message_to_send(message, state)
+
+        api_request.assert_not_awaited()
+        self.assertFalse(bot.sent_messages)
+        self.assertTrue(state.cleared)
+        self.assertIn('нельзя написать', message.replies[0].text.lower())
+
+    async def test_send_message_api_rejection_aborts_delivery(self):
+        message = FakeMessage(text='hello')
+        state = FakeState({
+            'uuid_pack': 'pack-uuid',
+            'profile_from': {'uuid': 'from-uuid', 'first_name': 'From'},
+            'profile_to': {
+                'uuid': 'to-uuid', 'username': 'to-user', 'first_name': 'To',
+                'owner': None, 'tg_data': [{'tg_uid': 3003}],
+                'is_person': True,
+            },
+        })
+
+        with mock.patch.object(
+            self.handler_callbacks.Misc, 'redis_is_key_first_up', mock.Mock(return_value=True),
+        ), mock.patch.object(
+            self.handler_callbacks.Misc, 'api_request',
+            mock.AsyncMock(return_value=(400, {'message': 'rejected'})),
+        ), mock.patch.object(
+            self.handler_callbacks, 'bot', FakeBot(),
+        ) as bot:
+            await self.handler_callbacks.process_message_to_send(message, state)
+
+        self.assertFalse(bot.sent_messages)
+        self.assertTrue(state.cleared)
+        self.assertEqual(message.replies[0].text, 'rejected')
+
     async def test_user_desc_auth_failure_replies_and_skips_update(self):
         message = FakeMessage(text='description')
         state = FakeState({'uuid': 'person-uuid', 'uuid_pack': 'pack-uuid'})

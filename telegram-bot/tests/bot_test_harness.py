@@ -60,6 +60,7 @@ class ChatTypeStub:
     PRIVATE = 'private'
     GROUP = 'group'
     SUPERGROUP = 'supergroup'
+    CHANNEL = 'channel'
 
 
 class TelegramBadRequestStub(Exception):
@@ -224,6 +225,8 @@ def install_dependency_stubs(stub_common=True):
     types_mod.BufferedInputFile = lambda *args, **kwargs: (args, kwargs)
     types_mod.MessageOriginUser = type('MessageOriginUser', (), {})
     types_mod.MessageOriginHiddenUser = type('MessageOriginHiddenUser', (), {})
+    types_mod.MessageOriginChat = type('MessageOriginChat', (), {})
+    types_mod.MessageOriginChannel = type('MessageOriginChannel', (), {})
     types_mod.LinkPreviewOptions = lambda **kwargs: kwargs
     sys.modules['aiogram.types'] = types_mod
 

@@ -363,6 +363,17 @@ class Oauth(BaseModelInsertUpdateTimestamp):
 
 class Profile(PhotoModel, GeoPointAddressModel):
 
+    TELEGRAM_KIND_UNKNOWN = 'unknown'
+    TELEGRAM_KIND_BOT = 'bot'
+    TELEGRAM_KIND_GROUP = 'group'
+    TELEGRAM_KIND_CHANNEL = 'channel'
+    TELEGRAM_KIND_CHOICES = (
+        (TELEGRAM_KIND_UNKNOWN, _("Неизвестно")),
+        (TELEGRAM_KIND_BOT, _("Бот")),
+        (TELEGRAM_KIND_GROUP, _("Группа")),
+        (TELEGRAM_KIND_CHANNEL, _("Канал")),
+    )
+
     user = models.OneToOneField('auth.User', on_delete=models.CASCADE)
     uuid = models.UUIDField(default=uuid4, editable=False, db_index=True)
     middle_name = models.CharField(_("Отчество"), max_length=255, blank=True, default='')
@@ -375,6 +386,7 @@ class Profile(PhotoModel, GeoPointAddressModel):
     invite_meet_count = models.PositiveIntegerField(_("Число тех, кого он пригласил)"), default=0)
     did_bot_start = models.BooleanField(_("Стартовал телеграм бот"), default=False)
     pending_tg_username = models.CharField(max_length=32, null=True, unique=True)
+    telegram_kind = models.CharField(max_length=7, choices=TELEGRAM_KIND_CHOICES, null=True)
     is_org = models.BooleanField(_("Организация"), default=False)
     ability = models.ForeignKey('contact.Ability', verbose_name=_("Способность"), null=True, on_delete=models.SET_NULL)
     # Для родни:
@@ -407,6 +419,14 @@ class Profile(PhotoModel, GeoPointAddressModel):
 
     def __str__(self):
         return self.user.first_name or str(self.pk)
+
+    @property
+    def subject_kind(self):
+        return self.telegram_kind or ('organization' if self.is_org else 'person')
+
+    @property
+    def is_person(self):
+        return self.subject_kind == 'person'
 
     def data_dict(self, request=None, fmt='d3js', thumb={}, short=False):
         user = self.user
@@ -474,6 +494,8 @@ class Profile(PhotoModel, GeoPointAddressModel):
                 ability=self.ability and self.ability.text or None,
                 gender=self.gender,
                 is_org=self.is_org,
+                subject_kind=self.subject_kind,
+                is_person=self.is_person,
                 dob=self.dob and self.dob.str_safe() or None,
                 is_dead=self.is_dead or bool(self.dod),
                 dod=self.dod and self.dod.str_safe() or None,
@@ -856,7 +878,13 @@ class CreateUserMixin(object):
             affected.recount_invite_meet_count()
             affected.recount_trust_fame()
 
-    def reconcile_telegram_identity(self, *, uid, username='', last_name='', first_name='', photo=''):
+    @transaction.atomic
+    def reconcile_telegram_identity(
+        self, *, uid, username='', last_name='', first_name='', photo='', telegram_kind='person',
+    ):
+        if telegram_kind not in ('person', Profile.TELEGRAM_KIND_BOT,
+                                 Profile.TELEGRAM_KIND_GROUP, Profile.TELEGRAM_KIND_CHANNEL):
+            raise ServiceException('Неверный тип субъекта Telegram')
         uid = str(uid)
         username = self.normalize_tg_username(username)
         if connection.vendor == 'postgresql':
@@ -923,6 +951,26 @@ class CreateUserMixin(object):
         if changed:
             oauth.update_timestamp = int(time.time())
             oauth.save(update_fields=tuple(changed) + ('update_timestamp',))
+
+        stored_kind = None if telegram_kind == 'person' else telegram_kind
+        profile_changed = []
+        if profile.telegram_kind != stored_kind:
+            profile.telegram_kind = stored_kind
+            profile_changed.append('telegram_kind')
+        is_org = telegram_kind != 'person'
+        if profile.is_org != is_org:
+            profile.is_org = is_org
+            profile_changed.append('is_org')
+        if not profile.is_person and profile.did_bot_start:
+            profile.did_bot_start = False
+            profile_changed.append('did_bot_start')
+        if profile_changed:
+            profile.save(update_fields=profile_changed)
+        if not profile.is_person:
+            Token.objects.filter(user=user).delete()
+            if user.is_active:
+                user.is_active = False
+                user.save(update_fields=('is_active',))
 
         transaction.on_commit(lambda: self.deliver_relation_recheck_notices(user))
         return oauth, user, profile, identity_created

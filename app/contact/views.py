@@ -412,7 +412,7 @@ class ApiAddOperationView(ApiAddOperationMixin, TelegramApiMixin, UuidMixin, Fro
                 elif operationtype_id == OperationType.NULLIFY_ATTITUDE:
                     message_to = f'{dl_from_t} не знаком(а) с {dl_to_t}'
 
-                if message_to and profile_to.is_notified:
+                if message_to and profile_to.is_person and profile_to.is_notified:
                     self.send_to_telegram(message_to, user=user_to, options=options)
 
             KeyboardType = TelegramApiMixin.KeyboardType
@@ -4149,8 +4149,10 @@ class ApiTgMessage(UuidMixin, APIView):
                     raise ServiceException('Неверный токен телеграм бота')
             else:
                 raise NotAuthenticated
-            user_from, p = self.check_user_uuid(data.get('user_from_uuid'), comment='user_from_uuid: ')
-            user_to, p = self.check_user_uuid(data.get('user_to_uuid'), comment='user_to_uuid: ')
+            user_from, profile_from = self.check_user_uuid(data.get('user_from_uuid'), comment='user_from_uuid: ')
+            user_to, profile_to = self.check_user_uuid(data.get('user_to_uuid'), comment='user_to_uuid: ')
+            if not profile_from.is_person or not profile_to.is_person:
+                raise ServiceException('Сообщения доступны только для профилей людей')
             if data.get('user_to_delivered_uuid'):
                 user_to_delivered, p = self.check_user_uuid(data.get('user_to_delivered_uuid'), comment='user_to_delivered_uuid: ')
             else:
@@ -4489,4 +4491,3 @@ class ApiTgMessageList(UuidMixin, TelegramApiMixin, GenderMixin, APIView):
         return Response(data=data, status=status_code)
 
 api_tg_message_list = ApiTgMessageList.as_view()
-

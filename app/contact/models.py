@@ -515,6 +515,12 @@ class ApiAddOperationMixin(object):
         already_code = 'already'
         profile_from = user_from.profile
 
+        if (not profile_from.is_person or not profile_to.is_person) and operationtype_id not in (
+            OperationType.THANK, OperationType.MISTRUST, OperationType.TRUST,
+            OperationType.TRUST_OR_THANK, OperationType.NULLIFY_ATTITUDE,
+        ):
+            raise ServiceException('Действие доступно только для профилей людей')
+
         if operationtype_id == OperationType.THANK:
             currentstate, created_ = CurrentState.objects.select_for_update().get_or_create(
                 user_from=user_from,

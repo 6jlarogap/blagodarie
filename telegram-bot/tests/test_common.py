@@ -41,7 +41,8 @@ class PendingProfileCardTests(unittest.IsolatedAsyncioTestCase):
         }
         pending = {
             'user_id': 2, 'uuid': 'target-uuid', 'username': 'targetsid1',
-            'first_name': '@pending_name', 'comment': '', 'is_org': False,
+            'first_name': '@pending_name', 'comment': '', 'is_org': True,
+            'subject_kind': 'unknown', 'is_person': False,
             'gender': None, 'trust_count': 0, 'sum_thanks_count': 0,
             'acq_count': 0, 'mistrust_count': 0, 'invite_meet_count': 0,
             'did_meet': None, 'owner': {}, 'tg_data': [], 'keys': [],
@@ -54,7 +55,10 @@ class PendingProfileCardTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(
             self.common.Misc,
             'call_response_relations',
-            mock.AsyncMock(return_value=(200, {})),
+            mock.AsyncMock(return_value=(200, {
+                'from_to': {'attitude': self.common.Attitude.TRUST, 'is_sympa_confirmed': False},
+                'to_from': {'attitude': None, 'is_sympa_confirmed': False},
+            })),
         ), mock.patch.object(
             self.common.Misc,
             'send_or_edit_card',
@@ -67,6 +71,29 @@ class PendingProfileCardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Неподтверждённое имя Telegram: @pending_name', reply)
         self.assertNotIn('Написать', labels)
         self.assertNotIn('Архив', labels)
+        self.assertNotIn('Знакомы', labels)
+        self.assertTrue(all(button is not None for row in markup.inline_keyboard for button in row))
+
+        pending.update(
+            pending_tg_username=None,
+            subject_kind='bot',
+            is_person=False,
+            tg_data=[{'tg_uid': '2', 'tg_username': 'helper_bot'}],
+        )
+        with mock.patch.object(
+            self.common.Misc,
+            'call_response_relations',
+            mock.AsyncMock(return_value=(200, {
+                'from_to': {'attitude': None, 'is_sympa_confirmed': False},
+                'to_from': {'attitude': None, 'is_sympa_confirmed': False},
+            })),
+        ), mock.patch.object(self.common.Misc, 'send_or_edit_card', send_card):
+            await self.common.Misc.show_card(pending, sender, tg_user)
+        markup = send_card.await_args.args[1]
+        labels = [button.text for row in markup.inline_keyboard for button in row]
+        self.assertNotIn('Написать', labels)
+        self.assertNotIn('Архив', labels)
+        self.assertNotIn('Знакомы', labels)
 
 class CommonCallbackParserTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

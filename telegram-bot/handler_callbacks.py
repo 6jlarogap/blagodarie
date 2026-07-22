@@ -816,6 +816,7 @@ async def cbq_attitude(callback: CallbackQuery, state: FSMContext):
                     group_chat_id=message.chat.id,
                     group_title=message.chat.title,
                     group_type=message.chat.type,
+                    group_username=getattr(message.chat, 'username', None) or '',
             ) \
             or None
         tg_user_sender = callback.from_user
@@ -1636,7 +1637,7 @@ async def cbq_send_message(callback: CallbackQuery, state: FSMContext):
     if status_to != 200:
         await Misc.answer_callback_notice(callback)
         return
-    if profile_to.get('pending_tg_username'):
+    if not profile_to.get('is_person', not profile_to.get('is_org')):
         await Misc.answer_callback_notice(callback, 'Этому профилю пока нельзя написать')
         return
     status_from, profile_from = await Misc.post_tg_user(callback.from_user)
@@ -1672,13 +1673,16 @@ async def process_message_to_send(message: Message, state: FSMContext):
     if not (data.get('uuid_pack') and data.get('profile_to') and data.get('profile_from')):
         await reply_and_clear_state(message, state)
         return
+    profile_to = data['profile_to']; profile_from = data['profile_from']
+    if not profile_to.get('is_person', not profile_to.get('is_org')):
+        await reply_and_clear_state(message, state, 'Этому профилю нельзя написать')
+        return
     key = (
         f'{Rcache.SEND_MESSAGE_PREFIX}{Rcache.KEY_SEP}'
         f'{data["uuid_pack"]}'
     )
     if not await check_pack_state_or_reply(is_first := Misc.redis_is_key_first_up(key), message, state):
         return
-    profile_to = data['profile_to']; profile_from = data['profile_from']
 
     # Возможны варианты с получателем:
     #   - самому себе                               нет смысла отправлять
@@ -1727,6 +1731,11 @@ async def process_message_to_send(message: Message, state: FSMContext):
         )
     except Exception:
         await reply_and_clear_state(message, state, Misc.MSG_ERROR_API)
+        return
+    if status_log != 200:
+        await reply_and_clear_state(
+            message, state, (response_log or {}).get('message') or Misc.MSG_ERROR_API,
+        )
         return
 
     if not await check_pack_state_or_reply(Misc.redis_save_time(key), message, state):

@@ -570,6 +570,7 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
             last_name=rd.get('last_name', ''),
             first_name=rd.get('first_name', ''),
             photo=photo_url,
+            telegram_kind='person',
         )
         was_not_active = not user.is_active
         changed = False
@@ -1322,8 +1323,9 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
             username=request.data.get('username', ''),
             last_name=last_name,
             first_name=first_name,
+            telegram_kind=request.data.get('telegram_kind', 'person'),
         )
-        if identity_created:
+        if identity_created and profile.is_person:
             token, created_token = Token.objects.get_or_create(user=user)
             user.last_name = ''
             user.first_name = Profile.make_first_name(last_name, first_name)
@@ -1331,13 +1333,16 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
             user.save()
             self.save_photo(request, profile)
             data.update(created=True)
+        elif identity_created:
+            self.save_photo(request, profile)
+            data.update(created=True)
 
-        if request.data.get('did_bot_start') and not profile.did_bot_start:
+        if profile.is_person and request.data.get('did_bot_start') and not profile.did_bot_start:
             # Если пустой did_bot_start, то он не сбрасывается в профиле юзера
             profile.did_bot_start = True
             profile.save(update_fields=('did_bot_start',))
 
-        if not user.is_active and request.data.get('activate'):
+        if profile.is_person and not user.is_active and request.data.get('activate'):
             token, created_token = Token.objects.get_or_create(user=user)
             user.last_name = ''
             user.first_name = Profile.make_first_name(last_name, first_name)
@@ -1384,7 +1389,9 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
                         user = self.create_user(first_name='@' + username, is_active=False)
                         profile = user.profile
                         profile.pending_tg_username = username
-                        profile.save(update_fields=('pending_tg_username',))
+                        profile.telegram_kind = Profile.TELEGRAM_KIND_UNKNOWN
+                        profile.is_org = True
+                        profile.save(update_fields=('pending_tg_username', 'telegram_kind', 'is_org'))
                         created = True
                 except IntegrityError:
                     profile = Profile.objects.select_related('user').get(
@@ -1571,6 +1578,11 @@ class ApiProfile(CreateUserMixin, UuidMixin, GenderMixin, FrontendMixin, Telegra
                 raise NotAuthenticated
             else:
                 user, profile = self.check_user_or_owned_uuid(request, need_uuid=True)
+
+            if not profile.is_person and any(field in request.data for field in (
+                'gender', 'dob', 'is_dead', 'dod', 'did_bot_start', 'did_meet', 'username_inviter',
+            )):
+                raise ServiceException('Действие доступно только для профиля человека')
 
             bool_fields = ('did_bot_start',)
             for f in bool_fields:
@@ -1949,8 +1961,21 @@ class ApiBotStat(APIView):
 
 api_bot_stat = ApiBotStat.as_view()
 
-class ApiBotGroupMixin(APIView):
+class ApiBotGroupMixin(CreateUserMixin, TelegramApiMixin):
 
+    def reconcile_group(self, data):
+        type_ = data.get('type', '')
+        return self.reconcile_telegram_identity(
+            uid=data['chat_id'],
+            username=data.get('username', ''),
+            first_name=data.get('title', ''),
+            telegram_kind=(
+                Profile.TELEGRAM_KIND_CHANNEL
+                if type_ == 'channel' else Profile.TELEGRAM_KIND_GROUP
+            ),
+        )
+
+    @transaction.atomic
     def group_post(self, data):
         """
         Создать, если необходимо группу из ее данных, data
@@ -1973,6 +1998,7 @@ class ApiBotGroupMixin(APIView):
                 tg_group.type = type_
             if do_save:
                 tg_group.save()
+        self.reconcile_group(data)
         status_code = status.HTTP_200_OK
         return tg_group, created_
 
@@ -2017,6 +2043,7 @@ class ApiBotGroup(ApiBotGroupMixin, APIView):
             status_code = status.HTTP_400_BAD_REQUEST
         return Response(data=data, status=status_code)
 
+    @transaction.atomic
     def put(self, request):
         """
         Изменить группу канал
@@ -2056,6 +2083,9 @@ class ApiBotGroup(ApiBotGroupMixin, APIView):
                         setattr(tg_group, f, v)
                 if do_save:
                     tg_group.save()
+            observed = tg_group.data_dict()
+            observed['username'] = request.data.get('username', '')
+            self.reconcile_group(observed)
             data = tg_group.data_dict()
             status_code = status.HTTP_200_OK
         except ServiceException as excpt:
@@ -6241,6 +6271,8 @@ class ApiMeetId(APIView):
                         ).get(
                         user__username=request.data['username']
                     )
+                    if not profile.is_person:
+                        raise ServiceException('Действие доступно только для профиля человека')
                     done = False
                     if profile.meet_id:
                         done = True
@@ -6267,6 +6299,8 @@ class ApiMeetId(APIView):
             elif request.data.get('meet_id'):
                 try:
                     profile = Profile.objects.get(meet_id=request.data['meet_id'])
+                    if not profile.is_person:
+                        raise ServiceException('Действие доступно только для профиля человека')
                     data.update(profile=profile.data_dict(request))
                     data['profile'].update(tg_data=profile.tg_data())
                 except Profile.DoesNotExist:
