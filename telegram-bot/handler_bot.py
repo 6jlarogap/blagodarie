@@ -46,6 +46,33 @@ def _command_tail(text):
     return parts[1].strip() if len(parts) > 1 else ''
 
 
+def _telegram_username_input(text):
+    if not text or not text.isascii() or not text.isprintable():
+        return ''
+    if text.startswith('@'):
+        username = text[1:]
+    else:
+        if any(char in text for char in '?#;'):
+            return ''
+        try:
+            parsed = urlparse(text)
+        except ValueError:
+            return ''
+        if (
+            parsed.scheme.lower() != 'https'
+            or parsed.netloc.lower() != 't.me'
+            or parsed.params or parsed.query or parsed.fragment
+        ):
+            return ''
+        path = parsed.path[:-1] if parsed.path.endswith('/') else parsed.path
+        if not path.startswith('/') or '/' in path[1:]:
+            return ''
+        username = path[1:]
+        if username.lower() in ('c', 's', 'joinchat', 'share'):
+            return ''
+    return username.lower() if re.fullmatch(r'[A-Za-z0-9_]{5,32}', username) else ''
+
+
 def _vpn_profile_payload(profile, action='get', **kwargs):
     payload = dict(
         tg_token=settings.TOKEN,
@@ -886,7 +913,8 @@ async def message_to_bot(message: Message, state: FSMContext):
         await message.reply(Misc.MSG_ERROR_API)
         return
 
-    message_text = getattr(message, 'text', '') and message.text.strip() or ''
+    raw_message_text = getattr(message, 'text', '') or ''
+    message_text = raw_message_text.strip()
     if is_forward_from_other:
         if tg_chat_forwarded:
             status_to, response_to = await Misc.post_tg_chat(tg_chat_forwarded)
@@ -919,8 +947,9 @@ async def message_to_bot(message: Message, state: FSMContext):
     # not forwarded or forwarded from me
 
     a_found = []
-    if re.fullmatch(r'@[A-Za-z0-9_]{5,32}', message_text):
-        status, profile = await Misc.get_or_create_tg_username(message_text[1:])
+    username = _telegram_username_input(raw_message_text)
+    if message.chat.type == ChatType.PRIVATE and not is_forward and username:
+        status, profile = await Misc.get_or_create_tg_username(username)
         if status != 200:
             await message.reply(Misc.MSG_ERROR_API)
             return
