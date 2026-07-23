@@ -1,5 +1,24 @@
 # Log
 
+## 2026-07-23
+
+- Implemented and deployed `doverabot-telegram-entity-visuals` in source commit
+  `8d1b6c2`: profile, 3d-force-graph, and user-points payloads now expose the
+  shared subject kind, confirmation flag, and readable label across every
+  branch; Genesis and the maintained rental map render accessible person,
+  organization, bot, group, channel, and unknown shapes/badges while preserving
+  existing trust/rental colors and explicit-only geocoding. Unknown kinds are
+  allowlisted to the safe person fallback, graph nodes support Enter/Space, and
+  rental marker badges remain outside clipped shape frames. Checks passed:
+  users `39/39`, full mocked bot `137/137`, Node syntax and synthetic
+  mobile/desktop visual assertions, migration drift, compileall, Graphify
+  update, diff checks, and two independent final reviews with zero findings.
+  Wrapper dry-run/deploy/migration checks succeeded; no migrations were pending;
+  nginx, gunicorn, Telegram bot, and rental STT are active; all maintained
+  deployed runtime files match source; sanitized web/bot error counts are zero.
+  Existing Django `security.W002` remains. No real Telegram message or private
+  data smoke was used. Next slug: none.
+
 ## 2026-07-22
 
 - Implemented and deployed `doverabot-telegram-link-input` in source commit
