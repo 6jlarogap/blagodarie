@@ -2523,7 +2523,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
             method = method_template % (color, 3,)
         elif not color and not frame:
             method = 'crop'
-        return dict(
+        data = dict(
             user_id=profile.user.pk,
             full_name=profile.user.first_name,
             username=profile.user.username,
@@ -2558,6 +2558,8 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
             offer_reply_html='',
             link_on_map=link_on_map,
         )
+        data.update(profile.subject_data)
+        return data
 
     def rental_marker_icon(self):
         svg = (
@@ -2634,6 +2636,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                 availability=html.escape(availability.strip()),
             )
             points.append(dict(
+                **owner_profile.subject_data,
                 latitude=rental.latitude,
                 longitude=rental.longitude,
                 title=title,
@@ -2770,6 +2773,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                 offer_popup = popup % offerer
                 offer_popup = offer_popup[:-len('</table>')]
                 point = dict(
+                    **offer.owner.profile.subject_data,
                     latitude=offer.latitude,
                     longitude=offer.longitude,
                     title=offer.question,
@@ -2973,6 +2977,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                     hide_checked='checked' if dict_user['user_id'] in my_hidden else '',
                 )
                 points.append(dict(
+                    **p.subject_data,
                     latitude=p.latitude,
                     longitude=p.longitude,
                     title=title_template % dict_user,
@@ -3008,6 +3013,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                     thumb_size_icon=40
                 )
                 points.append(dict(
+                    **profile_auth.subject_data,
                     latitude=profile_auth.latitude,
                     longitude=profile_auth.longitude,
                     title=title_template % dict_auth,
@@ -3110,6 +3116,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                         offer_popup = popup % offerer
                         offer_popup = offer_popup[:-len('</table>')]
                         point = dict(
+                            **offer.owner.profile.subject_data,
                             latitude=offer.latitude,
                             longitude=offer.longitude,
                             title=f'Опрос/предложение: {offer.question}',
@@ -3196,6 +3203,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                         self.THUMB_SIZE_POPUP,
                     )
                     points.append(dict(
+                        **found_profile.subject_data,
                         latitude=found_profile.latitude,
                         longitude=found_profile.longitude,
                         title=title_template % dict_user,
@@ -3286,6 +3294,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                             self.THUMB_SIZE_POPUP,
                         )
                         points.append(dict(
+                            **cs.user_from.profile.subject_data,
                             latitude=cs.user_from.profile.latitude,
                             longitude=cs.user_from.profile.longitude,
                             title=title_template % dict_user,
@@ -3349,6 +3358,8 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                     'user__profile__photo',
                     'user__profile__gender',
                     'user__profile__uuid',
+                    'user__profile__telegram_kind',
+                    'user__profile__is_org',
                     'user__profile__trust_count',
                     'user__profile__acq_count',
                     'user__profile__latitude', 'user__profile__longitude',
@@ -3374,6 +3385,10 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                         uuid=rec['user__profile__uuid'],
                         latitude=rec['user__profile__latitude'],
                         longitude=rec['user__profile__longitude'],
+                        **Profile.subject_data_for(
+                            rec['user__profile__telegram_kind'],
+                            rec['user__profile__is_org'],
+                        ),
                         votes=[rec['button']]
                     ))
                     user_pks.append(rec['user__id'])
@@ -3438,6 +3453,13 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                         link_on_map=link_on_map,
                     )
                     points.append(dict(
+                        **{
+                            key: user_data[key] for key in (
+                                'subject_kind',
+                                'subject_kind_confirmed',
+                                'subject_kind_label',
+                            )
+                        },
                         latitude=user_data['latitude'],
                         longitude=user_data['longitude'],
                         title=title,
@@ -3664,6 +3686,7 @@ class ApiUserPoints(RentalVisibilityMixin, FromToCountMixin, FrontendMixin, Tele
                 )
                 if profile.latitude is not None and profile.longitude is not None:
                     point = dict(
+                        **profile.subject_data,
                         latitude=profile.latitude,
                         longitude=profile.longitude,
                         title=title_template % dict_user,

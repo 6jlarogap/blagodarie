@@ -17,6 +17,29 @@ const NODE_TYPES = Object.freeze({
 	//"PLUS": "plus"
 });
 
+// SUBJECT_VISUALS_START
+var SUBJECT_VISUALS = Object.freeze({
+    person: Object.freeze({ shape: 'circle', badge: '', label: 'Человек' }),
+    organization: Object.freeze({ shape: 'rounded-square', badge: '🏢', label: 'Организация' }),
+    bot: Object.freeze({ shape: 'square', badge: '⚙', label: 'Бот' }),
+    group: Object.freeze({ shape: 'hexagon', badge: '👥', label: 'Группа' }),
+    channel: Object.freeze({ shape: 'diamond', badge: '📣', label: 'Канал' }),
+    unknown: Object.freeze({ shape: 'circle', badge: '?', label: 'Неизвестно' })
+});
+
+function subjectVisualFor(subject) {
+    var rawKind = subject && subject.subject_kind;
+    var kind = Object.prototype.hasOwnProperty.call(SUBJECT_VISUALS, rawKind) ? rawKind : 'person';
+    if (!rawKind && subject && subject.is_org) kind = 'organization';
+    var visual = SUBJECT_VISUALS[kind];
+    return Object.assign({ kind: kind || 'person', confirmed: subject && subject.subject_kind_confirmed !== false }, visual);
+}
+
+if (typeof window !== 'undefined') {
+    window.DoverabotSubjectVisuals = { SUBJECT_VISUALS: SUBJECT_VISUALS, subjectVisualFor: subjectVisualFor };
+}
+// SUBJECT_VISUALS_END
+
 const WISHES_ROOT_ID = "WISHES_ROOT";
 const ABILITIES_ROOT_ID = "ABILITIES_ROOT";
 const SHARE_ID = "SHARE_ROOT";
@@ -340,7 +363,11 @@ d3.json(apiUrl, d3_json_params)
                 image: image(d),
                 base64Url: '',
                 text: `${d.first_name} `,
-                is_dead: d.is_dead
+                is_dead: d.is_dead,
+                subject_kind: d.subject_kind,
+                subject_kind_confirmed: d.subject_kind_confirmed,
+                subject_kind_label: d.subject_kind_label,
+                is_org: d.is_org
             };
 
             const base64UrlSetter = d.photo ? urlAsBase64 : noPhotoBase64Url;
@@ -1344,38 +1371,39 @@ function initializeDisplay() {
 		.selectAll('g')
 		.data(nodes)
 		.join('g')
-		.attr('onclick', d => `onNodeClick('${d.username}', '${d.nodeType}')`)
 	        .attr('class', 'svg_elem')
+	        .attr('role', d => isNodeClickable(d.nodeType) ? 'button' : 'img')
+	        .attr('tabindex', d => isNodeClickable(d.nodeType) ? 0 : null)
+	        .attr('aria-label', subjectAriaLabel)
 		.attr('style', 'cursor: pointer')
+		.on('click', (event, d) => activateNode(d))
+		.on('keydown', activateNodeFromKey)
         	.call(drag(simulation));
 
-	const defs = node.append('defs').attr('id', 'imgdefs');
+        node.append('title').text(subjectAriaLabel);
 
-        initDefClipPaths(defs, node);
+        node.append('path')
+            .attr('class', d => 'subject-outline subject-kind-' + subjectVisualFor(d).kind + (subjectVisualFor(d).confirmed ? '' : ' is-unconfirmed'))
+            .attr('d', d => subjectShapePath(subjectVisualFor(d).shape, subjectRadius(d) + 3));
 
 	node.append('image').attr('href', ({image}) => image)
 		.attr('class', ({nodeType}) => imageClass(nodeType))
 		.attr('style', 'z-index: 1; position: relative;')
-		.attr('clip-path', ({nodeType, is_dead}) => {
-                    let size = '';
+		.attr('clip-path', d => `url(#${subjectClipId(d)})`);
 
-                    (nodeType == NODE_TYPES.FILTERED) && (size = 'small');
-
-                    switch (nodeType) {
-                        case NODE_TYPES.FRIEND: {
-                            size = width < 900 ? 'small' : 'medium';
-                            break;
-                        }
-                        case NODE_TYPES.USER:
-                        case NODE_TYPES.PROFILE: {
-//                            size = width < 900 ? 'medium': 'large';
-                            size = 'medium';
-                            break;
-                        }
-                    }
-
-                    return is_dead ? '' : `url(#clip-circle-${size})`;
-        	});
+        node.filter(d => subjectVisualFor(d).badge)
+            .append('g')
+            .attr('class', d => 'subject-badge subject-kind-' + subjectVisualFor(d).kind)
+            .attr('transform', d => {
+                const r = subjectRadius(d);
+                return `translate(${r * 0.68}, ${-r * 0.68})`;
+            })
+            .call(selection => {
+                selection.append('circle').attr('r', d => subjectBadgeRadius(d));
+                selection.append('text')
+                    .attr('dy', '0.35em')
+                    .text(d => subjectVisualFor(d).badge);
+            });
 
     node.each(function(d) {
         // 1. Сплитим на «всё кроме последнего слова» и «последнее слово»
@@ -1722,22 +1750,56 @@ function initDefs() {
 		.attr("cy", "0")
 		.attr("r", "16")
 		.attr("fill", "#ff0000");
+
+    initSubjectClipPaths(defs);
 }
 
-function initDefClipPaths(defs, node) {
+function subjectSizeName({nodeType}) {
+    if (nodeType == NODE_TYPES.FILTERED) return 'small';
+    if (nodeType == NODE_TYPES.FRIEND) return width < 900 ? 'small' : 'medium';
+    if (nodeType == NODE_TYPES.USER || nodeType == NODE_TYPES.PROFILE) return 'medium';
+    return 'small';
+}
+
+function subjectRadius(d) {
+    return { small: 16, medium: 32, large: 64 }[subjectSizeName(d)] || 16;
+}
+
+function subjectBadgeRadius(d) {
+    return subjectRadius(d) < 20 ? 7 : 10;
+}
+
+function subjectClipId(d) {
+    return `clip-${subjectVisualFor(d).shape}-${subjectSizeName(d)}`;
+}
+
+function subjectAriaLabel(d) {
+    const visual = subjectVisualFor(d);
+    const label = d.subject_kind_label || visual.label;
+    const confirmed = visual.confirmed ? 'подтверждено' : 'не подтверждено';
+    return `${d.text || d.username || 'Профиль'}: ${label}, ${confirmed}`;
+}
+
+function subjectShapePath(shape, radius) {
+    const r = radius;
+    const c = Math.round(r * 0.28);
+    if (shape == 'square') return `M${-r},${-r}H${r}V${r}H${-r}Z`;
+    if (shape == 'rounded-square') return `M${-r + c},${-r}H${r - c}Q${r},${-r} ${r},${-r + c}V${r - c}Q${r},${r} ${r - c},${r}H${-r + c}Q${-r},${r} ${-r},${r - c}V${-r + c}Q${-r},${-r} ${-r + c},${-r}Z`;
+    if (shape == 'hexagon') return `M0,${-r}L${r * 0.87},${-r / 2}L${r * 0.87},${r / 2}L0,${r}L${-r * 0.87},${r / 2}L${-r * 0.87},${-r / 2}Z`;
+    if (shape == 'diamond') return `M0,${-r}L${r},0L0,${r}L${-r},0Z`;
+    return `M0,${-r}A${r},${r} 0 1 1 0,${r}A${r},${r} 0 1 1 0,${-r}Z`;
+}
+
+function initSubjectClipPaths(defs) {
     const sizes = ['small', 'medium', 'large'];
-    let radius = 16;
-    const idPattern = 'clip-circle-';
+    const radii = { small: 16, medium: 32, large: 64 };
+    const shapes = new Set(Object.values(SUBJECT_VISUALS).map(visual => visual.shape));
 
     for (const size of sizes) {
-        const id = `${idPattern}${size}`;
-
-        const clipPath = defs.append('clipPath').attr('id', id);
-        clipPath.append('circle').attr('r', radius);
-
-        node.append('use').attr('href', `#${id}`);
-
-        radius *= 2;
+        shapes.forEach(shape => {
+            const clipPath = defs.append('clipPath').attr('id', `clip-${shape}-${size}`);
+            clipPath.append('path').attr('d', subjectShapePath(shape, radii[size]));
+        });
     }
 }
 
@@ -1769,9 +1831,22 @@ function imageClass(nodeType) {
     return nodeClass;
 }
 
+function isNodeClickable(nodeType) {
+    return [NODE_TYPES.PROFILE, NODE_TYPES.FRIEND, NODE_TYPES.FILTERED].includes(nodeType);
+}
+
+function activateNode(d) {
+    onNodeClick(d.username, d.nodeType);
+}
+
+function activateNodeFromKey(event, d) {
+    if (event.key != 'Enter' && event.key != ' ') return;
+    event.preventDefault();
+    activateNode(d);
+}
+
 function onNodeClick(username, nodeType) {
-    const allowed = [NODE_TYPES.PROFILE, NODE_TYPES.FRIEND, NODE_TYPES.FILTERED];
-    if (!allowed.includes(nodeType)) return;
+    if (!isNodeClickable(nodeType)) return;
 
     const protocol = settings.url.protocol;
     const host = settings.url.host;

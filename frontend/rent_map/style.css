@@ -224,6 +224,9 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   text-align: left;
   background: var(--surface);
   cursor: pointer;
@@ -446,8 +449,14 @@ h2 {
 .rent-marker {
   width: 34px;
   height: 34px;
+  position: relative;
+  overflow: visible;
+}
+
+.rent-marker-frame {
+  width: 34px;
+  height: 34px;
   border: 3px solid #ffffff;
-  border-radius: 50%;
   display: grid;
   place-items: center;
   color: #ffffff;
@@ -456,8 +465,149 @@ h2 {
   font-weight: 900;
 }
 
-.rent-marker.is-selected {
+.rent-marker.is-selected .rent-marker-frame {
   background: var(--amber);
+}
+
+.subject-marker.is-unconfirmed .rent-marker-frame {
+  border-style: dashed;
+}
+
+.subject-shape-circle {
+  border-radius: 50%;
+}
+
+.subject-shape-rounded-square {
+  border-radius: 8px;
+}
+
+.subject-shape-square {
+  border-radius: 0;
+}
+
+.subject-shape-hexagon {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+
+.subject-shape-diamond {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.subject-marker-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--text);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.fallback-subject {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--text);
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.fallback-subject.is-unconfirmed {
+  border-style: dashed;
+}
+
+.subject-legend {
+  position: absolute;
+  top: 14px;
+  left: 56px;
+  z-index: 500;
+  max-width: min(520px, calc(100% - 70px));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .subject-legend {
+    top: 76px;
+    left: 14px;
+    max-width: calc(100% - 28px);
+  }
+}
+
+.subject-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.subject-swatch {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--text);
+  background: #ffffff;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  font-size: 9px;
+  line-height: 1;
+  font-style: normal;
+}
+
+.subject-person {
+  border-radius: 50%;
+}
+
+.subject-organization {
+  border-radius: 4px;
+}
+
+.subject-bot {
+  border-radius: 0;
+}
+
+.subject-group {
+  clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+
+.subject-channel {
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.subject-unknown {
+  border-radius: 50%;
+  border-style: dashed;
+  position: relative;
+}
+
+.subject-unknown::after {
+  content: "?";
+  position: absolute;
+  inset: -3px 0 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .leaflet-popup-content {

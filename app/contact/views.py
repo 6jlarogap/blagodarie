@@ -2467,7 +2467,9 @@ class ApiProfileGraph(UuidMixin, SQL_Mixin, ApiTgGroupConnectionsMixin, Telegram
                         users_profile.uuid,
                         users_profile.photo,
                         users_profile.gender,
-                        users_profile.is_dead
+                        users_profile.is_dead,
+                        users_profile.telegram_kind,
+                        users_profile.is_org
                     FROM
                         auth_user
                     %(outer_joins)s
@@ -2499,11 +2501,12 @@ class ApiProfileGraph(UuidMixin, SQL_Mixin, ApiTgGroupConnectionsMixin, Telegram
                         default_avatar_in_media=PhotoModel.get_gendered_default_avatar(user_q.profile.gender),
                         mark_dead=user_q.profile.is_dead,
                 ))
+                root_node.update(user_q.profile.subject_data)
                 nodes.append(root_node)
                 user_pks.append(user_q.pk)
                 for rec in recs:
                     if rec['id'] not in user_pks:
-                        nodes.append(dict(
+                        node = dict(
                             id=rec['id'],
                             uuid=rec['uuid'],
                             first_name=rec['first_name'],
@@ -2511,7 +2514,9 @@ class ApiProfileGraph(UuidMixin, SQL_Mixin, ApiTgGroupConnectionsMixin, Telegram
                             photo=Profile.image_thumb(request, rec['photo'], mark_dead=rec['is_dead']),
                             gender=rec['gender'],
                             is_dead=rec['is_dead'],
-                        ))
+                        )
+                        node.update(Profile.subject_data_for(rec['telegram_kind'], rec['is_org']))
+                        nodes.append(node)
                         user_pks.append(rec['id'])
                 links = []
 

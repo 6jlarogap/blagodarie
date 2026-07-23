@@ -424,6 +424,21 @@ class Profile(PhotoModel, GeoPointAddressModel):
     def subject_kind(self):
         return self.telegram_kind or ('organization' if self.is_org else 'person')
 
+    @classmethod
+    def subject_data_for(cls, telegram_kind=None, is_org=False):
+        kind = telegram_kind or ('organization' if is_org else 'person')
+        labels = dict(cls.TELEGRAM_KIND_CHOICES)
+        labels.update(person=_("Человек"), organization=_("Организация"))
+        return {
+            'subject_kind': kind,
+            'subject_kind_confirmed': kind != cls.TELEGRAM_KIND_UNKNOWN,
+            'subject_kind_label': str(labels[kind]),
+        }
+
+    @property
+    def subject_data(self):
+        return self.subject_data_for(self.telegram_kind, self.is_org)
+
     @property
     def is_person(self):
         return self.subject_kind == 'person'
@@ -506,6 +521,7 @@ class Profile(PhotoModel, GeoPointAddressModel):
                 has_bank=self.has_bank(),
                 r_sympa_username=self.r_sympa.username if self.r_sympa else None,
             )
+        result.update(self.subject_data)
         return result
 
     def has_bank(self):

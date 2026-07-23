@@ -14,6 +14,29 @@
   ];
   var BOUNDS_KEYS = ['lat_south', 'lat_north', 'lng_west', 'lng_east'];
 
+  // SUBJECT_VISUALS_START
+  var SUBJECT_VISUALS = Object.freeze({
+    person: Object.freeze({ shape: 'circle', badge: '', label: 'Человек' }),
+    organization: Object.freeze({ shape: 'rounded-square', badge: '🏢', label: 'Организация' }),
+    bot: Object.freeze({ shape: 'square', badge: '⚙', label: 'Бот' }),
+    group: Object.freeze({ shape: 'hexagon', badge: '👥', label: 'Группа' }),
+    channel: Object.freeze({ shape: 'diamond', badge: '📣', label: 'Канал' }),
+    unknown: Object.freeze({ shape: 'circle', badge: '?', label: 'Неизвестно' })
+  });
+
+  function subjectVisualFor(subject) {
+    var rawKind = subject && subject.subject_kind;
+    var kind = Object.prototype.hasOwnProperty.call(SUBJECT_VISUALS, rawKind) ? rawKind : 'person';
+    if (!rawKind && subject && subject.is_org) kind = 'organization';
+    var visual = SUBJECT_VISUALS[kind];
+    return Object.assign({ kind: kind || 'person', confirmed: subject && subject.subject_kind_confirmed !== false }, visual);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.DoverabotSubjectVisuals = { SUBJECT_VISUALS: SUBJECT_VISUALS, subjectVisualFor: subjectVisualFor };
+  }
+  // SUBJECT_VISUALS_END
+
   var el = {};
   var state = {
     auth: null,
@@ -204,6 +227,17 @@
     return 'https://t.me/' + encodeURIComponent(state.botUsername) + '?start=rent-' + encodeURIComponent(offer.uuid);
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
+    });
+  }
+
+  function subjectLabel(point) {
+    var visual = subjectVisualFor(point);
+    return point.subject_kind_label || visual.label;
+  }
+
   function mediaItems(offer) {
     return (offer.media || []).filter(function (item) {
       return item && (item.thumbnail_url || item.file_type);
@@ -244,11 +278,39 @@
     card.appendChild(strip);
   }
 
-  function makeMarkerIcon(selected) {
+  function markerHtml(point, selected) {
+    var visual = subjectVisualFor(point);
+    var classes = [
+      'rent-marker',
+      'subject-marker',
+      'subject-kind-' + visual.kind,
+      selected ? 'is-selected' : '',
+      visual.confirmed ? '' : 'is-unconfirmed'
+    ].filter(Boolean).join(' ');
+    var badge = visual.badge ? '<span class="subject-marker-badge">' + escapeHtml(visual.badge) + '</span>' : '';
+    var label = escapeHtml((point.title || 'Прокат') + ': ' + subjectLabel(point));
+    return (
+      '<div class="' + classes + '" role="img" aria-label="' + label + '" title="' + label + '">' +
+      '<span class="rent-marker-frame subject-shape-' + visual.shape + '"><span>R</span></span>' +
+      badge +
+      '</div>'
+    );
+  }
+
+  function appendFallbackSubject(button, point) {
+    var visual = subjectVisualFor(point);
+    var marker = document.createElement('span');
+    marker.className = 'fallback-subject subject-shape-' + visual.shape + (visual.confirmed ? '' : ' is-unconfirmed');
+    marker.textContent = visual.badge || '';
+    marker.setAttribute('aria-hidden', 'true');
+    button.appendChild(marker);
+  }
+
+  function makeMarkerIcon(point, selected) {
     if (!window.L) return null;
     return window.L.divIcon({
       className: '',
-      html: '<div class="rent-marker' + (selected ? ' is-selected' : '') + '">R</div>',
+      html: markerHtml(point, selected),
       iconSize: [34, 34],
       iconAnchor: [17, 17],
       popupAnchor: [0, -18]
@@ -300,7 +362,9 @@
         button.type = 'button';
         button.className = 'fallback-marker';
         button.dataset.uuid = point.rental_uuid;
-        button.textContent = point.title || 'Прокат';
+        button.setAttribute('aria-label', (point.title || 'Прокат') + ': ' + subjectLabel(point));
+        appendFallbackSubject(button, point);
+        button.appendChild(document.createTextNode(point.title || 'Прокат'));
         button.addEventListener('click', function () {
           selectOffer(point.rental_uuid, true);
         });
@@ -313,8 +377,8 @@
     rentalPoints.forEach(function (point) {
       var latLng = [Number(point.latitude), Number(point.longitude)];
       var marker = window.L.marker(latLng, {
-        title: point.title || 'Прокат',
-        icon: makeMarkerIcon(point.rental_uuid === state.selectedUuid)
+        title: (point.title || 'Прокат') + ': ' + subjectLabel(point),
+        icon: makeMarkerIcon(point, point.rental_uuid === state.selectedUuid)
       });
       marker.addTo(state.map);
       if (point.popup) marker.bindPopup(point.popup);
@@ -430,7 +494,10 @@
       marker.classList.toggle('is-selected', marker.dataset.uuid === state.selectedUuid);
     });
     Object.keys(state.markers).forEach(function (markerUuid) {
-      state.markers[markerUuid].setIcon(makeMarkerIcon(markerUuid === state.selectedUuid));
+      var point = state.points.find(function (item) {
+        return item.rental_uuid === markerUuid;
+      }) || {};
+      state.markers[markerUuid].setIcon(makeMarkerIcon(point, markerUuid === state.selectedUuid));
     });
     var marker = state.markers[state.selectedUuid];
     if (marker && fromUser) {

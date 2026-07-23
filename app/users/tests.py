@@ -7,18 +7,19 @@ from decimal import Decimal
 from io import BytesIO
 from unittest import mock
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.db import transaction
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from rest_framework.test import APIClient
 from rest_framework.authtoken.models import Token
 
 from contact.models import CurrentState, Journal, Key, KeyType, OperationType
-from users.models import Oauth, Profile, TelegramRelationRecheckNotice, RentalEquipmentType, RentalOffer, RentalOfferMessage, \
+from users.models import Oauth, Offer, Profile, TelegramRelationRecheckNotice, RentalEquipmentType, RentalOffer, RentalOfferMessage, \
     RentalReservationEvent, RentalReservationIntent, RentalReservationPaymentProof, TgDesc, \
     VpnDonorPreference, VpnFeedbackTicket, VpnProfile, VpnRunwayLedgerEntry, \
     VpnServerRunway, VpnStatsSnapshot, VpnTrafficPeriod
 from users.views import ApiAuthTelegram
+from wote.models import Video, Vote
 
 
 @override_settings(TELEGRAM_BOT_TOKEN='123456:test-token')
@@ -36,6 +37,87 @@ class TelegramPendingProfileTests(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         return response.data
+
+    def test_subject_metadata_covers_all_kinds_and_profile_formats(self):
+        expected = (
+            (None, False, 'person', True, 'Человек'),
+            (None, True, 'organization', True, 'Организация'),
+            ('unknown', True, 'unknown', False, 'Неизвестно'),
+            ('bot', True, 'bot', True, 'Бот'),
+            ('group', True, 'group', True, 'Группа'),
+            ('channel', True, 'channel', True, 'Канал'),
+        )
+        for index, (telegram_kind, is_org, kind, confirmed, label) in enumerate(expected):
+            user = User.objects.create_user(username=f'visual-{index}', first_name=label)
+            profile = Profile.objects.create(
+                user=user,
+                telegram_kind=telegram_kind,
+                is_org=is_org,
+                latitude=55.75 + index / 100,
+                longitude=37.61 + index / 100,
+            )
+            responses = (
+                self.client.get('/api/profile', {'uuid': str(profile.uuid)}),
+                self.client.get('/api/profile_graph', {
+                    'uuid': str(profile.uuid),
+                    'fmt': '3d-force-graph',
+                }),
+                self.client.get('/api/user/points', {'uuid': str(profile.uuid)}),
+            )
+            for response in responses:
+                self.assertEqual(response.status_code, 200, response.data)
+            payloads = (
+                responses[0].data,
+                responses[1].data['root_node'],
+                responses[2].data['points'][0],
+            )
+            for data in payloads:
+                self.assertEqual(data['subject_kind'], kind)
+                self.assertEqual(data['subject_kind_confirmed'], confirmed)
+                self.assertEqual(data['subject_kind_label'], label)
+
+    @override_settings(TELEGRAM_BOT_USERNAME='DoveraBot')
+    def test_user_points_meet_with_offers_adds_owner_subject_metadata(self):
+        admin = User.objects.create_user(username='meet-admin', first_name='Meet Admin')
+        Group.objects.create(pk=2, name='meetgame_admin').user_set.add(admin)
+        Profile.objects.create(user=admin)
+        owner = User.objects.create_user(username='meet-offer-owner', first_name='Offer Owner')
+        Profile.objects.create(
+            user=owner,
+            telegram_kind=Profile.TELEGRAM_KIND_CHANNEL,
+            latitude=55.75,
+            longitude=37.61,
+        )
+        Offer.objects.create(owner=owner, question='Channel offer', latitude=55.76, longitude=37.62)
+
+        self.client.force_authenticate(user=admin)
+        response = self.client.get('/api/user/points/', {'meet': '1', 'admin': '1', 'with_offers': '1'})
+        self.assertEqual(response.status_code, 200, response.data)
+        offer_point = next(point for point in response.data['points'] if point.get('is_offer'))
+        self.assertEqual(offer_point['subject_kind'], 'channel')
+        self.assertEqual(offer_point['subject_kind_label'], 'Канал')
+        self.client.force_authenticate(user=None)
+
+    def test_user_points_video_votes_add_subject_metadata(self):
+        owner = User.objects.create_user(username='video-owner', first_name='Video Owner')
+        Profile.objects.create(user=owner)
+        voter = User.objects.create_user(username='video-voter', first_name='Video Voter')
+        Profile.objects.create(
+            user=voter,
+            telegram_kind=Profile.TELEGRAM_KIND_BOT,
+            latitude=55.75,
+            longitude=37.61,
+        )
+        video = Video.objects.create(creator=owner, source=Video.SOURCE_YOUTUBE, videoid='subject-video')
+        Vote.objects.create(user=voter, video=video, time=1, button=Vote.VOTE_YES)
+
+        response = self.client.get('/api/user/points/', {
+            'source': Video.SOURCE_YOUTUBE,
+            'videoid': 'subject-video',
+        })
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['points'][0]['subject_kind'], 'bot')
+        self.assertEqual(response.data['points'][0]['subject_kind_label'], 'Бот')
 
     @mock.patch('users.models.TelegramApiMixin.send_to_telegram', return_value=True)
     def test_subject_kinds_authoritative_claims_and_non_person_login_guarantees(self, _send):
