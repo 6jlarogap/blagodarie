@@ -2,6 +2,18 @@
 
 ## 2026-07-30
 
+- Deployed `doverabot-revival-reliability-quick-wins` from source commits
+  `d36aff4` and `1eb0510`: retained serialized STT with explicit busy state,
+  shared bot API session reuse, request-failure logging, pending-update
+  preservation, and clean session shutdown; fully removed the proposed graph
+  depth/page caps so d2/d3 complete views and UUID Genesis up/down/depth keep
+  their existing semantics. Focused tests `5/5`, compileall, Django check,
+  Graphify update, and diff checks passed. Main deploy and the dedicated STT
+  install/restart succeeded; nginx, API, bot, and STT are active; STT health
+  reports `busy=false`; the public full graph remains 699 users/1,012
+  connections. Recent bot/STT logs show clean restarts. Existing Django
+  `security.W002` remains.
+
 - Source-implemented `doverabot-revival-capacity-quick-wins`: public graph
   traversal is capped at depth 10 and all-graph reads at 100 profiles; rental
   STT admits one transcription and returns 503 while busy without releasing
