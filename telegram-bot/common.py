@@ -756,25 +756,31 @@ class Misc(object):
             'json' или 'text'
         """
         status = response = None
-        async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
-            try:
-                async with session.request(
-                    method.upper(),
-                    "%s%s" % (settings.API_HOST, path,),
-                    data=data,
-                    json=json,
-                    params=params,
-                ) as resp:
-                    status = resp.status
-                    if status < 500:
-                        if response_type == 'json':
-                            response = await resp.json()
-                        elif response_type == 'text':
-                            response = await resp.text('UTF-8')
-                    else:
+        session = getattr(me, 'api_session', None)
+        close_session = session is None or session.closed
+        if close_session:
+            session = aiohttp.ClientSession(timeout=TIMEOUT)
+        try:
+            async with session.request(
+                method.upper(),
+                "%s%s" % (settings.API_HOST, path,),
+                data=data,
+                json=json,
+                params=params,
+            ) as resp:
+                status = resp.status
+                if status < 500:
+                    if response_type == 'json':
+                        response = await resp.json()
+                    elif response_type == 'text':
                         response = await resp.text('UTF-8')
-            except:
-                pass
+                else:
+                    response = await resp.text('UTF-8')
+        except Exception:
+            logging.exception('API request failed: %s %s', method.upper(), path)
+        finally:
+            if close_session:
+                await session.close()
         return status, response
 
     @classmethod

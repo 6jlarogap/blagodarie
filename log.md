@@ -2,6 +2,17 @@
 
 ## 2026-07-30
 
+- Source-implemented `doverabot-revival-capacity-quick-wins`: public graph
+  traversal is capped at depth 10 and all-graph reads at 100 profiles; rental
+  STT admits one transcription and returns 503 while busy without releasing
+  timed-out work early; the bot reuses one API session, logs failures, preserves
+  pending updates, and closes the session on shutdown. Focused graph `2/2`, bot
+  lifecycle/session `4/4`, and STT `1/1` tests, compileall, Django check,
+  Graphify update, and diff checks passed. Full bot discovery ran 136 tests but
+  retained the pre-existing host-interpreter `aiohttp` import failure in the
+  unrelated LLM extractor-adapter test. No deploy or live changes were made per
+  the revival safety rules.
+
 - Implemented and deployed `doverabot-update-profile` in source commit
   `d657be0`: `/update_profile` refreshes the Telegram name, username snapshot,
   and avatar, preserves the Doverabot photo when Telegram has none, reports API

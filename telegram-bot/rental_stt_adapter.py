@@ -57,10 +57,24 @@ class SttService:
     def __init__(self, model_name=MODEL_NAME):
         self.model_name = model_name
         self._model = None
+        self._busy = False
 
     @property
     def loaded(self):
         return self._model is not None
+
+    @property
+    def busy(self):
+        return self._busy
+
+    def try_reserve(self):
+        if self._busy:
+            return False
+        self._busy = True
+        return True
+
+    def release(self):
+        self._busy = False
 
     def _load_model(self):
         if self._model is not None:
@@ -191,6 +205,7 @@ async def healthz(request):
     service = request.app["stt_service"]
     return web.json_response({
         "ok": True,
+        "busy": service.busy,
         "contract": CONTRACT,
         "language": DEFAULT_LANGUAGE,
         "loaded": service.loaded,
@@ -201,14 +216,33 @@ async def healthz(request):
 
 async def transcribe(request):
     service = request.app["stt_service"]
+    if not service.try_reserve():
+        logger.warning("STT request rejected: transcription busy")
+        return json_error(503, "transcription busy")
+
     voice_path = None
+    worker = None
     try:
         voice_path, voice_size, language = await asyncio.wait_for(
             parse_transcribe_request(request),
             timeout=REQUEST_TIMEOUT,
         )
+        worker = asyncio.create_task(
+            asyncio.to_thread(service.transcribe, voice_path, language)
+        )
+
+        def finish(task):
+            try:
+                task.exception()
+            except asyncio.CancelledError:
+                pass
+            finally:
+                voice_path.unlink(missing_ok=True)
+                service.release()
+
+        worker.add_done_callback(finish)
         result = await asyncio.wait_for(
-            asyncio.to_thread(service.transcribe, voice_path, language),
+            asyncio.shield(worker),
             timeout=REQUEST_TIMEOUT,
         )
     except RequestError as exc:
@@ -220,8 +254,10 @@ async def transcribe(request):
         logger.exception("STT request failed")
         return json_error(500, "transcription failed")
     finally:
-        if voice_path is not None:
-            voice_path.unlink(missing_ok=True)
+        if worker is None:
+            service.release()
+            if voice_path is not None:
+                voice_path.unlink(missing_ok=True)
 
     logger.info(
         "Transcribed rental voice: bytes=%s language=%s chars=%s",

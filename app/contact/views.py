@@ -35,6 +35,8 @@ from users.models import CreateUserMixin, IncognitoUser, Profile, \
                          TempToken, Oauth, UuidMixin, TgGroup, TelegramApiMixin, TgDesc
 
 MSG_NO_PARM = 'Не задан или не верен какой-то из параметров в связке номер %s (начиная с 0)'
+PUBLIC_GRAPH_MAX_DEPTH = 10
+PUBLIC_GRAPH_MAX_PAGE_SIZE = 100
 
 
 class ApiAddOperationView(ApiAddOperationMixin, TelegramApiMixin, UuidMixin, FrontendMixin, APIView):
@@ -3132,7 +3134,8 @@ class GetTrustGenesisMixin(object):
             id_ = request.GET.get('id', '') or request.GET.get('uuid', '') or ''
             id_ = id_.strip(' ,')
             chat_id = is_request_genesis and request.GET.get('chat_id')
-            max_recursion_depth = settings.MAX_RECURSION_DEPTH_IN_GROUP if chat_id else settings.MAX_RECURSION_DEPTH
+            configured_depth = settings.MAX_RECURSION_DEPTH_IN_GROUP if chat_id else settings.MAX_RECURSION_DEPTH
+            max_recursion_depth = min(configured_depth, PUBLIC_GRAPH_MAX_DEPTH)
             if recursion_depth <= 0 or recursion_depth > max_recursion_depth:
                 recursion_depth = max_recursion_depth
             if id_:
@@ -3184,23 +3187,16 @@ class ApiProfileGenesisAll(TelegramApiMixin, APIView):
         withalone = request.GET.get('withalone')
         dover = request.GET.get('dover')
         rod = request.GET.get('rod')
-        from_ = number_ = None
         try:
-            from_ = int(request.GET.get('from'))
-            if from_ < 0:
-                from_ = 0
+            from_ = max(0, int(request.GET.get('from', 0)))
         except (ValueError, TypeError,):
-            pass
-        try:
-            number_ = int(request.GET.get('number'))
-        except (ValueError, TypeError,):
-            pass
-        if number_ and from_ is None:
             from_ = 0
-        if from_ is not None and not number_:
+        try:
+            number_ = int(request.GET.get('number', settings.PAGINATE_USERS_COUNT))
+        except (ValueError, TypeError,):
             number_ = settings.PAGINATE_USERS_COUNT
-        if number_ and from_ is not None:
-            withalone = 'on'
+        number_ = min(max(1, number_), PUBLIC_GRAPH_MAX_PAGE_SIZE)
+        withalone = 'on'
 
         connections = []
         user_pks = set()
