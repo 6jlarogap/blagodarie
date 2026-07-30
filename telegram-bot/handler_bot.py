@@ -209,6 +209,36 @@ async def cmd_ya(message: Message, state: FSMContext):
     F.text,
     F.chat.type.in_((ChatType.PRIVATE,)),
     StateFilter(None),
+    Command(re.compile('^update_profile$', flags=re.I)),
+)
+async def cmd_update_profile(message: Message, state: FSMContext):
+    status, profile = await Misc.post_tg_user(message.from_user)
+    if status != 200:
+        await message.reply(Misc.MSG_ERROR_API)
+        return
+    payload = dict(
+        uuid=profile['uuid'],
+        first_name=message.from_user.first_name or '',
+        last_name=message.from_user.last_name or '',
+    )
+    photo = await Misc.get_user_photo(message.from_user)
+    if photo:
+        payload['photo'] = photo
+    status, profile = await Misc.put_user_properties(**payload)
+    if status != 200:
+        await message.reply(Misc.MSG_ERROR_API)
+        return
+    await Misc.show_card(
+        profile=profile,
+        profile_sender=profile,
+        tg_user_sender=message.from_user,
+    )
+
+
+@router.message(
+    F.text,
+    F.chat.type.in_((ChatType.PRIVATE,)),
+    StateFilter(None),
     Command(re.compile('^help$', flags=re.I)),
 )
 async def cmd_help(message: Message, state: FSMContext):
@@ -1028,6 +1058,7 @@ async def message_to_bot(message: Message, state: FSMContext):
 commands_dict = {
     'graph': cmd_graph,
     'ya': cmd_ya,
+    'update_profile': cmd_update_profile,
     'help': cmd_help,
     'new': cmd_new_person,
     'new_person': cmd_new_person,

@@ -146,6 +146,78 @@ class PrivateEntryFeedbackTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([reply.text for reply in message.replies], [self.handler_bot.Misc.MSG_ERROR_API])
 
+    async def test_update_profile_updates_telegram_data_photo_and_shows_card(self):
+        message = FakeMessage(text='/update_profile')
+        message.from_user.first_name = 'New'
+        message.from_user.last_name = 'Name'
+        old_profile = {'uuid': 'user-uuid'}
+        updated_profile = {'uuid': 'user-uuid', 'first_name': 'Name New'}
+
+        with mock.patch.object(
+            self.handler_bot.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(200, old_profile)),
+        ) as post_tg_user, mock.patch.object(
+            self.handler_bot.Misc,
+            'get_user_photo',
+            mock.AsyncMock(return_value='base64-photo'),
+        ), mock.patch.object(
+            self.handler_bot.Misc,
+            'put_user_properties',
+            mock.AsyncMock(return_value=(200, updated_profile)),
+        ) as put_user_properties, mock.patch.object(
+            self.handler_bot.Misc,
+            'show_card',
+            mock.AsyncMock(),
+        ) as show_card:
+            await self.handler_bot.cmd_update_profile(message, FakeState())
+
+        post_tg_user.assert_awaited_once_with(message.from_user)
+        put_user_properties.assert_awaited_once_with(
+            uuid='user-uuid',
+            first_name='New',
+            last_name='Name',
+            photo='base64-photo',
+        )
+        show_card.assert_awaited_once_with(
+            profile=updated_profile,
+            profile_sender=updated_profile,
+            tg_user_sender=message.from_user,
+        )
+
+    async def test_update_profile_without_telegram_photo_preserves_existing_photo(self):
+        message = FakeMessage(text='/update_profile')
+
+        with mock.patch.object(
+            self.handler_bot.Misc,
+            'post_tg_user',
+            mock.AsyncMock(return_value=(200, {'uuid': 'user-uuid'})),
+        ), mock.patch.object(
+            self.handler_bot.Misc,
+            'get_user_photo',
+            mock.AsyncMock(return_value=None),
+        ), mock.patch.object(
+            self.handler_bot.Misc,
+            'put_user_properties',
+            mock.AsyncMock(return_value=(500, {})),
+        ) as put_user_properties, mock.patch.object(
+            self.handler_bot.Misc,
+            'show_card',
+            mock.AsyncMock(),
+        ) as show_card:
+            await self.handler_bot.cmd_update_profile(message, FakeState())
+
+        put_user_properties.assert_awaited_once_with(
+            uuid='user-uuid',
+            first_name='Requester',
+            last_name='',
+        )
+        show_card.assert_not_awaited()
+        self.assertEqual(
+            [reply.text for reply in message.replies],
+            [self.handler_bot.Misc.MSG_ERROR_API],
+        )
+
     async def test_forwarded_friend_target_auth_failure_replies_with_api_error(self):
         message = FakeMessage(text='forwarded hello')
         origin = self.handler_bot.MessageOriginUser()
