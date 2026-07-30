@@ -1,5 +1,18 @@
 # Log
 
+## 2026-07-30
+
+- Implemented and deployed `doverabot-update-profile` in source commit
+  `d657be0`: `/update_profile` refreshes the Telegram name, username snapshot,
+  and avatar, preserves the Doverabot photo when Telegram has none, reports API
+  failures, and shows the refreshed card. Focused bot tests `11/11`, compileall,
+  Graphify update, diff checks, and Django check passed. Wrapper deploy
+  succeeded; all four services are active; the deployed command is present and
+  recent bot/web logs show clean restarts. Existing Django `security.W002`
+  remains. Full bot discovery reached 133 tests but could not import the
+  unrelated extractor-adapter test because the host interpreter lacks
+  `aiohttp`.
+
 ## 2026-07-23
 
 - Implemented and deployed `doverabot-telegram-entity-visuals` in source commit
