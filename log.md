@@ -1,5 +1,25 @@
 # Log
 
+## 2026-08-01
+
+- Implemented and deployed `doverabot-full-graph-snapshot` in source commit
+  `b9c30bb`: the complete unpaginated d3 `rod+dover+withalone` response now
+  reuses one normalized 30-second Django/Redis data snapshot, while atomic
+  cache-lock admission permits one rebuild and bounds cold followers to a
+  10-second wait before a retryable 503. Existing per-URL caching remains for
+  sibling graph variants. Exact synthetic graph/map/tree contracts `4/4`, the
+  concurrent snapshot check `1/1`, adjacent graph/marker checks `2/2`, Django
+  check, migration drift, diff checks, and Graphify update passed; generated
+  Graphify output stayed clean. Migration reported nothing to apply; wrapper
+  sync/deploy and nginx syntax passed; all four services are active, deployed
+  files match source, and sanitized web/bot error-keyword counts are zero.
+  Public combined graph semantics stayed at 7,950 nodes/4,875 links and 533,997
+  compressed bytes. A cold sample was 6.004 s, normalized warm reuse 0.807 s,
+  and eight concurrent HTTP 200 samples completed in 10.479-11.438 s; the
+  synthetic eight-caller cold check measured 0.117 s with exactly one build.
+  Status is `awaiting_user_test`; next remains
+  `doverabot-d3-source-recovery` after G1, U1, G2, and G3 pass.
+
 ## 2026-07-30
 
 - Deployed `doverabot-revival-reliability-quick-wins` from source commits
