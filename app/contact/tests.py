@@ -1,10 +1,34 @@
+import time
+from concurrent.futures import ThreadPoolExecutor
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 
 from users.models import Profile
 
 from .models import CurrentState
+from .views import ApiProfileGenesisAll
+
+
+class FullGraphSnapshotTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+        self.request = RequestFactory().get('/api/profile_genesis/all/')
+
+    def test_concurrent_cold_requests_build_one_snapshot(self):
+        view = ApiProfileGenesisAll()
+        build = mock.Mock(side_effect=lambda: (time.sleep(.1), {'nodes': [], 'links': []})[1])
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(
+                lambda _: view.get_complete_snapshot(self.request, build),
+                range(8),
+            ))
+
+        self.assertEqual(build.call_count, 1)
+        self.assertEqual(results, [{'nodes': [], 'links': []}] * 8)
 
 
 class GraphContractBaselineTests(TestCase):
@@ -68,6 +92,33 @@ class GraphContractBaselineTests(TestCase):
         } <= node.keys() for node in d3.data['nodes']))
         self.assertTrue(all({'source', 'target', 'is_child', 'thanks_count', 'attitude'} <= link.keys()
                             for link in d3.data['links']))
+
+    @mock.patch.object(ApiProfileGenesisAll, 'SNAPSHOT_SECONDS', .05)
+    def test_complete_graph_snapshot_refreshes_after_short_ttl(self):
+        params = {
+            'rod': 'on', 'dover': 'on', 'withalone': 'on', 'fmt': '3d-force-graph',
+        }
+        root = self.profiles['root'].user
+        owned = self.profiles['owned'].user
+        view = ApiProfileGenesisAll.as_view()
+        request = lambda: RequestFactory().get('/api/profile_genesis/all/', params)
+
+        initial = view(request())
+        relation = CurrentState.objects.get(user_from=root, user_to=owned)
+        relation.attitude = CurrentState.MISTRUST
+        relation.save(update_fields=('attitude',))
+
+        cached = view(request())
+        time.sleep(.08)
+        refreshed = view(request())
+
+        edge = lambda response: next(
+            link for link in response.data['links']
+            if link['source'] == root.pk and link['target'] == owned.pk
+        )
+        self.assertEqual(edge(initial)['attitude'], CurrentState.TRUST)
+        self.assertEqual(edge(cached)['attitude'], CurrentState.TRUST)
+        self.assertEqual(edge(refreshed)['attitude'], CurrentState.MISTRUST)
 
     def test_full_map_marker_contract_is_uncapped_and_interactive(self):
         response = self.client.get('/api/user/points/', {'participants': 'on', 'owned': 'on'})

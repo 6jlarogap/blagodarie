@@ -10,6 +10,7 @@ from django.views.generic.base import View
 from django.views.decorators.cache import cache_page
 from django.http import Http404
 from django.core.exceptions import ValidationError
+from django.core.cache import cache
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -3179,6 +3180,34 @@ class ApiProfileGenesisAll(TelegramApiMixin, APIView):
     """
     # permission_classes = (IsAuthenticated,)
 
+    SNAPSHOT_SECONDS = 30
+    SNAPSHOT_LOCK_SECONDS = 30
+    SNAPSHOT_WAIT_SECONDS = 10
+    SNAPSHOT_POLL_SECONDS = .05
+
+    def get_complete_snapshot(self, request, build):
+        key = 'profile-genesis-all:3d:complete:v1:%s:%s' % (
+            request.scheme, request.get_host(),
+        )
+        lock_key = key + ':lock'
+        deadline = time.monotonic() + self.SNAPSHOT_WAIT_SECONDS
+        while True:
+            data = cache.get(key)
+            if data is not None:
+                return data
+            if cache.add(lock_key, True, self.SNAPSHOT_LOCK_SECONDS):
+                try:
+                    data = build()
+                    cache.set(key, data, self.SNAPSHOT_SECONDS)
+                    return data
+                finally:
+                    cache.delete(lock_key)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            # ponytail: portable cache polling; use a backend lock if refreshes exceed 10s.
+            time.sleep(min(self.SNAPSHOT_POLL_SECONDS, remaining))
+
     def get(self, request):
         fmt = request.GET.get('fmt', 'd3js')
         withalone = request.GET.get('withalone')
@@ -3201,6 +3230,21 @@ class ApiProfileGenesisAll(TelegramApiMixin, APIView):
             number_ = settings.PAGINATE_USERS_COUNT
         if number_ and from_ is not None:
             withalone = 'on'
+
+        build = lambda: self.get_data(request, fmt, withalone, dover, rod, from_, number_)
+        if fmt == '3d-force-graph' and withalone and dover and rod and from_ is None:
+            data = self.get_complete_snapshot(request, build)
+            if data is None:
+                return Response(
+                    data=dict(message='Graph snapshot is refreshing; retry shortly.'),
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    headers={'Retry-After': '2'},
+                )
+        else:
+            data = build()
+        return Response(data=data, status=status.HTTP_200_OK)
+
+    def get_data(self, request, fmt, withalone, dover, rod, from_, number_):
 
         connections = []
         user_pks = set()
@@ -3277,7 +3321,7 @@ class ApiProfileGenesisAll(TelegramApiMixin, APIView):
             data = dict(bot_username=bot_username, nodes=users, links=connections)
         else:
             data = dict(users=users, connections=connections, trust_connections=[])
-        return Response(data=data, status=status.HTTP_200_OK)
+        return data
 
 api_profile_genesis_all = cache_page(30)(ApiProfileGenesisAll.as_view())
 
