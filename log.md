@@ -2,6 +2,17 @@
 
 ## 2026-08-01
 
+- Recovered reproducible d3 source in `b75aa0e` for
+  `doverabot-d3-source-recovery`: upstream source provenance is pinned at
+  `6jlarogap/blagodarie-site@2848bbd`, the exact npm lock is restored, and
+  Node 24.16.0/npm 12.0.1 are pinned. The clean upstream build reproduced the
+  initial mirrored JS byte-for-byte; the local source retains only the three
+  later live fixes (local images, no startup popup, larger focal node). An
+  isolated build passed, produced deterministic SHA-256 `17fce4b1...`, and its
+  HTML matched deployed HTML after normalizing only Vite's generated asset URL.
+  Node syntax, Graphify update, and diff checks passed. No tracked `dist/`,
+  runtime, migration, or delivery file changed, so nothing was deployed.
+
 - Implemented and deployed `doverabot-full-graph-snapshot` in source commit
   `b9c30bb`: the complete unpaginated d3 `rod+dover+withalone` response now
   reuses one normalized 30-second Django/Redis data snapshot, while atomic
