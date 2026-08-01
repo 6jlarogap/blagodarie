@@ -75,6 +75,7 @@
 import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import ForceGraph3D from '3d-force-graph';
+import { bindRenderLifecycle } from './render-lifecycle.js';
 
 (async function() {
 // ----------
@@ -422,33 +423,13 @@ import ForceGraph3D from '3d-force-graph';
         window.location.assign(url_path() + '?f=0&q=' + paginate_users_count);
         return;
     }
-    const api_images = 'images';
-    const photoTextureMale = new THREE.TextureLoader().load(`${api_images}/no-photo-gender-male.jpg`);
-    const photoTextureFemale = new THREE.TextureLoader().load(`${api_images}/no-photo-gender-female.jpg`);
-    const photoTextureNone = new THREE.TextureLoader().load(`${api_images}/no-photo-gender-none.jpg`);
-    const photoTextureMaleDead = new THREE.TextureLoader().load(`${api_images}/no-photo-gender-male-dead.jpg`);
-    const photoTextureFemaleDead = new THREE.TextureLoader().load(`${api_images}/no-photo-gender-female-dead.jpg`);
-    const photoTextureNoneDead = new THREE.TextureLoader().load(`${api_images}/no-photo-gender-none-dead.jpg`);
-
     function node_draw(node) {
-        let photoTexture;
-        if (node.photo) {
-            photoTexture = new THREE.TextureLoader().load(node.photo);
-        } else if (node.gender == 'm' && !node.is_dead) {
-            photoTexture = photoTextureMale;
-        } else if (node.gender == 'm' && node.is_dead) {
-            photoTexture = photoTextureMaleDead;
-        } else if (node.gender == 'f' && !node.is_dead) {
-            photoTexture = photoTextureFemale;
-        } else if (node.gender == 'f' && node.is_dead) {
-            photoTexture = photoTextureFemaleDead;
-        } else if (node.is_dead) {
-            photoTexture = photoTextureNoneDead;
-        } else {
-            photoTexture = photoTextureNone;
-        }
-        const material = new THREE.SpriteMaterial({ map: photoTexture });
+        let fallback = `no-photo-gender-${node.gender == 'm' || node.gender == 'f' ? node.gender : 'none'}`;
+        if (node.is_dead) fallback += '-dead';
+        const photoTexture = new THREE.TextureLoader().load(node.photo || `images/${fallback}.jpg`);
+        const material = new THREE.SpriteMaterial({ map: photoTexture, depthTest: false });
         const sprite = new THREE.Sprite(material);
+        sprite.renderOrder = 11;
         const size = data && data.root_node && node.id == data.root_node.id ? 50 : 25;
         sprite.scale.set(size, size);
 
@@ -457,6 +438,8 @@ import ForceGraph3D from '3d-force-graph';
         label.text = node.first_name;
         label.textHeight = 0.2;
         label.color = node_text_color(node, 'rgba');
+        label.material.depthTest = false;
+        label.renderOrder = 12;
         sprite.add(label)
         sprite.center.set(0.5, -0.1);
 
@@ -465,9 +448,29 @@ import ForceGraph3D from '3d-force-graph';
 
     let data = null;
     let node_current = {};
+    let hovered_node = null;
     let last_click_node_time = 0;
     const menu__title_span = document.querySelector(".menu__title-span");
     const menu_wrapper = document.querySelector(".menu-wrapper");
+
+    function show_node_detail(node, visible) {
+        if (!node || !node.__threeObj) return;
+        if (!node.__detailObj || node.__detailObj.parent !== node.__threeObj) {
+            if (!visible) return;
+            node.__detailObj = node_draw(node);
+            node.__threeObj.add(node.__detailObj);
+        }
+        const label = node.__detailObj.children[0];
+        label.text = node.first_name;
+        label.color = node_text_color(node, 'rgba');
+        node.__detailObj.visible = visible;
+    }
+
+    function select_node(node) {
+        if (node_current !== node && node_current !== hovered_node) show_node_detail(node_current, false);
+        node_current = node;
+        show_node_detail(node, true);
+    }
 
     function is_double_clicked() {
         /*
@@ -483,7 +486,7 @@ import ForceGraph3D from '3d-force-graph';
     async function show_popup(node) {
         const menu__btns = document.querySelector(".menu__btns");
         menu__btns.classList.remove('text-align--center');
-        node_current = node;
+        select_node(node);
         if (node.uuid) {
             menu__title_span.textContent =
                 ('first_name_orig' in node) ? node.first_name_orig : node.first_name;
@@ -592,9 +595,12 @@ import ForceGraph3D from '3d-force-graph';
     }
 
     const graph_container = $('#3d-graph')[0];
+    let render_lifecycle = null;
+    const set_graph_data = graphData => {
+        if (render_lifecycle) render_lifecycle.resume();
+        Graph.graphData(graphData);
+    };
     let Graph = ForceGraph3D()
-        .nodeThreeObject(node => node_draw(node))
-
         // Если не дерево родства: если есть и родственная связь, и доверие, и если задано
         // искать родственные связи, то показываем стрелку цвета родственной связи.
         // В дереве родства своя цветовая гамма для оконченых узлов
@@ -603,8 +609,13 @@ import ForceGraph3D from '3d-force-graph';
         .linkOpacity(0.8)
         .linkCurvature(0.25)
         .backgroundColor("#FFFFFF")
+        .nodeRelSize(12.5)
+        .nodeVal(node => data && data.root_node && node.id == data.root_node.id ? 8 : 1)
         .nodeLabel('first_name')
         .onNodeHover(node => {
+            if (hovered_node && hovered_node !== node_current) show_node_detail(hovered_node, false);
+            hovered_node = node;
+            show_node_detail(node, true);
             let cursor = null;
             if (parm_user_genesis_tree) {
                 if (node) {
@@ -617,7 +628,6 @@ import ForceGraph3D from '3d-force-graph';
         })
         .onNodeClick(async function(node) {
             last_click_node_time = new Date().getTime();
-            node_current = node;
             // if (parm_user_genesis_tree) {
             //     if (node.is_my) {
             //         await show_popup(node);
@@ -629,7 +639,6 @@ import ForceGraph3D from '3d-force-graph';
             // }
         })
         .onNodeRightClick(async function(node) {
-            node_current = node;
             await show_popup(node);
         })
         .linkDirectionalArrowLength(10)
@@ -744,8 +753,8 @@ import ForceGraph3D from '3d-force-graph';
                 //      особенно при сворачивании узла!
                 //  https://github.com/vasturiano/3d-force-graph/issues/61#issuecomment-901611382
                 //
-                Graph.nodeThreeObject(node => node_draw(node));
-                Graph.graphData(get_pruned_tree());
+                show_node_detail(node, node === node_current || node === hovered_node);
+                set_graph_data(get_pruned_tree());
             }
         }
     }
@@ -806,7 +815,7 @@ import ForceGraph3D from '3d-force-graph';
                         data.links[i_found].attitude = attitudes.trust;
                     }
                 }
-                Graph.graphData(data);
+                set_graph_data(data);
                 graph_container.style.cursor = null;
             } else {
                 graph_container.style.cursor = null;
@@ -1061,8 +1070,8 @@ import ForceGraph3D from '3d-force-graph';
             if (node.collapsed) {
                 await collapse_expand(node);
             } else {
-                Graph.nodeThreeObject(node => node_draw(node));
-                Graph.graphData(get_pruned_tree());
+                show_node_detail(node, node === node_current || node === hovered_node);
+                set_graph_data(get_pruned_tree());
             }
         }
 
@@ -1089,7 +1098,7 @@ import ForceGraph3D from '3d-force-graph';
                 if (node_link.collapsed) {
                     await collapse_expand(node_link, false);
                 } else {
-                    Graph.nodeThreeObject(node_link => node_draw(node_link));
+                    show_node_detail(node_link, node_link === node_current || node_link === hovered_node);
                 }
             }
 
@@ -1131,11 +1140,11 @@ import ForceGraph3D from '3d-force-graph';
                     if (node_link.collapsed) {
                         await collapse_expand(node_link, false);
                     } else {
-                        Graph.nodeThreeObject(node_link => node_draw(node_link));
+                        show_node_detail(node_link, node_link === node_current || node_link === hovered_node);
                     }
                 }
             }
-            Graph.graphData(get_pruned_tree());
+            set_graph_data(get_pruned_tree());
         }
         graph_container.style.cursor = null;
         $('#id_form_parent_wrap').css("display", "none");
@@ -1170,6 +1179,8 @@ import ForceGraph3D from '3d-force-graph';
             document.title = 'Голоса по видео: ' + data.title + ', благо Рода';
         }
         Graph = Graph(graph_container);
+        render_lifecycle = bindRenderLifecycle(Graph, document);
+        Graph.onEngineTick(render_lifecycle.keepAlive).onEngineStop(render_lifecycle.idle);
         if (parm_user_genesis_tree) {
             // if (!parm_up && !parm_down) {
                 // nodes_by_id[root_node.id].collapsed = true;
@@ -1180,8 +1191,8 @@ import ForceGraph3D from '3d-force-graph';
             for (const [id, node] of Object.entries(nodes_by_id)) {
                 node.first_name_orig = node.first_name;
             }
-            Graph.graphData(get_pruned_tree());
-        } else Graph.graphData(data);
+            set_graph_data(get_pruned_tree());
+        } else set_graph_data(data);
     }
 // ----------
 })();
