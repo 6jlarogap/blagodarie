@@ -1,3 +1,7 @@
+gzip_vary on;
+gzip_proxied any;
+gzip_types application/json application/javascript text/css;
+
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
@@ -12,6 +16,11 @@ server {
 
     root /srv/blagodarie/frontend/map_npm/dist;
     index index.html;
+
+    location /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
 
     location /common/ {
         alias /srv/blagodarie/frontend/common/;
@@ -99,6 +108,11 @@ server {
     root /srv/blagodarie/frontend/graph_npm/dist;
     index index.html;
 
+    location /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }
@@ -118,6 +132,11 @@ server {
 
     root /srv/blagodarie/frontend/mgraph/dist;
     index index.html;
+
+    location /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
 
     location / {
         try_files $uri $uri/ /index.html;
