@@ -76,6 +76,7 @@ import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import ForceGraph3D from '3d-force-graph';
 import { bindRenderLifecycle } from './render-lifecycle.js';
+import { nodePhotoUrl } from './node-visual.js';
 
 (async function() {
 // ----------
@@ -424,25 +425,13 @@ import { bindRenderLifecycle } from './render-lifecycle.js';
         return;
     }
     function node_draw(node) {
-        let fallback = `no-photo-gender-${node.gender == 'm' || node.gender == 'f' ? node.gender : 'none'}`;
-        if (node.is_dead) fallback += '-dead';
-        const photoTexture = new THREE.TextureLoader().load(node.photo || `images/${fallback}.jpg`);
+        const photoTexture = new THREE.TextureLoader().load(nodePhotoUrl(node));
         const material = new THREE.SpriteMaterial({ map: photoTexture, depthTest: false });
         const sprite = new THREE.Sprite(material);
         sprite.renderOrder = 11;
         const size = data && data.root_node && node.id == data.root_node.id ? 50 : 25;
         sprite.scale.set(size, size);
-
-        const label = new SpriteText();
-        // label.material.depthWrite = false; // make sprite background transparent
-        label.text = node.first_name;
-        label.textHeight = 0.2;
-        label.color = node_text_color(node, 'rgba');
-        label.material.depthTest = false;
-        label.renderOrder = 12;
-        sprite.add(label)
         sprite.center.set(0.5, -0.1);
-
         return sprite;
     }
 
@@ -455,15 +444,17 @@ import { bindRenderLifecycle } from './render-lifecycle.js';
 
     function show_node_detail(node, visible) {
         if (!node || !node.__threeObj) return;
-        if (!node.__detailObj || node.__detailObj.parent !== node.__threeObj) {
+        if (!node.__labelObj || node.__labelObj.parent !== node.__threeObj) {
             if (!visible) return;
-            node.__detailObj = node_draw(node);
-            node.__threeObj.add(node.__detailObj);
+            node.__labelObj = new SpriteText();
+            node.__labelObj.textHeight = 0.2;
+            node.__labelObj.material.depthTest = false;
+            node.__labelObj.renderOrder = 12;
+            node.__threeObj.add(node.__labelObj);
         }
-        const label = node.__detailObj.children[0];
-        label.text = node.first_name;
-        label.color = node_text_color(node, 'rgba');
-        node.__detailObj.visible = visible;
+        node.__labelObj.text = node.first_name;
+        node.__labelObj.color = node_text_color(node, 'rgba');
+        node.__labelObj.visible = visible;
     }
 
     function select_node(node) {
@@ -601,6 +592,7 @@ import { bindRenderLifecycle } from './render-lifecycle.js';
         Graph.graphData(graphData);
     };
     let Graph = ForceGraph3D()
+        .nodeThreeObject(node => node_draw(node))
         // Если не дерево родства: если есть и родственная связь, и доверие, и если задано
         // искать родственные связи, то показываем стрелку цвета родственной связи.
         // В дереве родства своя цветовая гамма для оконченых узлов
@@ -609,8 +601,6 @@ import { bindRenderLifecycle } from './render-lifecycle.js';
         .linkOpacity(0.8)
         .linkCurvature(0.25)
         .backgroundColor("#FFFFFF")
-        .nodeRelSize(12.5)
-        .nodeVal(node => data && data.root_node && node.id == data.root_node.id ? 8 : 1)
         .nodeLabel('first_name')
         .onNodeHover(node => {
             if (hovered_node && hovered_node !== node_current) show_node_detail(hovered_node, false);

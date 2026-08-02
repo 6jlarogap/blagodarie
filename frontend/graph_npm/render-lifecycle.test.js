@@ -1,7 +1,21 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { nodePhotoUrl } from './node-visual.js';
 import { bindRenderLifecycle } from './render-lifecycle.js';
+
+test('shared graph renderer always creates visible photo nodes', async () => {
+    const thumbnail = 'https://api.example/thumbnail/128x128.jpg';
+    assert.equal(nodePhotoUrl({ photo: thumbnail }), thumbnail);
+    assert.equal(
+        nodePhotoUrl({ photo: '', gender: 'f', is_dead: true }),
+        'images/no-photo-gender-f-dead.jpg',
+    );
+
+    const source = await readFile(new URL('./main.js', import.meta.url), 'utf8');
+    assert.match(source, /ForceGraph3D\(\)[\s\S]*?\.nodeThreeObject\(node => node_draw\(node\)\)/);
+});
 
 test('rendering pauses when idle or hidden and resumes on interaction', async () => {
     const target = new EventTarget();
