@@ -350,6 +350,20 @@ function cacheBase64Url(afunc) {
 
 const noPhotoBase64Url = cacheBase64Url(urlAsBase64);
 
+function buildLinks(connections) {
+    const key = ({source, target}) => `${source}\0${target}`;
+    const trustByDirection = new Map(connections
+        .filter(({is_trust}) => is_trust != null)
+        .map(connection => [key(connection), connection.is_trust]));
+
+    return connections.map(({source, target}) => ({
+        source,
+        target,
+        is_trust: true,
+        reverse_is_trust: trustByDirection.get(key({source: target, target: source})) ?? true
+    }));
+}
+
 d3.json(apiUrl, d3_json_params)
     .then(async data => {
 	//добавить пользователей в вершины
@@ -399,23 +413,7 @@ d3.json(apiUrl, d3_json_params)
             }
 	}
 
-	data.connections.forEach(d => {
-            d.is_trust = true;
-            let reverse_is_trust = d.is_trust;
-
-            data.connections.forEach(dd => {
-                if (d.source == dd.target && d.target == dd.source && dd.is_trust != null){
-                    reverse_is_trust = dd.is_trust;
-                }
-            });
-
-            links.push({
-                source: d.source,
-                target: d.target,
-                is_trust: d.is_trust,
-                reverse_is_trust: reverse_is_trust
-            });
-	});
+	links.push(...buildLinks(data.connections));
 
 	//зафиксировать вершины пользователя, желаний и ключей
 
@@ -502,14 +500,9 @@ d3.json(apiUrl, d3_json_params)
     simulation.force("collide", d3.forceCollide().radius(200));//.strength(1).radius(300))//.iterations(1))
     simulation.force('x', d3.forceX(width / 2).strength(0.006));
     simulation.force('y', d3.forceY(height / 2).strength(0.012));
-//    simulation.alpha(1).alphaTarget(1).alphaMin(0.001).alphaDecay(.001).velocityDecay(0.01).restart();
-    simulation.alpha(1).alphaTarget(1).alphaMin(0.001).alphaDecay(0.01).velocityDecay(0.01).restart();
-
 	initializeDisplay();
 	initializeSimulation();
 });
-
-var layoutWorker = new Worker('staticlayout.worker.js');
 
 const css = (el, styles) => Object.assign(el.style, styles);
 
@@ -557,33 +550,12 @@ function* loadingScreen(caption) {
 
 const loading = loadingScreen('Загрузка');
 
-function simStarted() {
-    loading.next();
-    simulation.nodes(nodes);
-    simulation.on('tick', ticked);
-    simulation.alpha(1).velocityDecay(0.05).restart();
-}
-
-const simEnded = ({ nTicks }) => setTimeout(() => loading.next(), nTicks * 10);
-
-const MESSAGE_HANDLES = Object.freeze({
-    'start': simStarted,
-    'end': simEnded
-});
-
-function simTickCount(simulation) {
-    const alphaMinLog = Math.log(simulation.alphaMin());
-    const alphaDecayLog = Math.log(1 - simulation.alphaDecay());
-
-    return Math.ceil(alphaMinLog / alphaDecayLog);
-};
-
 function initializeSimulation() {
-  layoutWorker.postMessage({
-    nTicks: simTickCount(simulation)
-  });
-
-  layoutWorker.onmessage = ({ data }) => (MESSAGE_HANDLES[data.type] || (() => {}))(data);
+    loading.next();
+    simulation.nodes(nodes)
+        .on('tick', ticked)
+        .on('end', () => loading.next())
+        .alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(0.01).velocityDecay(0.05).restart();
 }
 
 const ZOOM_MIN = 0.01;
@@ -1079,10 +1051,9 @@ function exporting(to) {
 
 const export2svg = () => exporting(EXPORT_FORMATS.SVG);
 const stopsim = () => {simulation.stop()};
-// unlim const startsim1 = () => {simulation.alpha(1).alphaTarget(1).alphaMin(0.001).alphaDecay(.001).velocityDecay(0.01).restart()};
 // slow decay const startsim1 = () => {simulation.alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(.001).velocityDecay(0.01).restart()};
 // fast decay const startsim5 = () => {simulation.alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(.061).velocityDecay(0.01).restart()};
-const startsim = () => {simulation.alpha(1).alphaTarget(1).alphaMin(0.001).alphaDecay(.001).velocityDecay(0.01).restart()};
+const startsim = () => {simulation.alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(.001).velocityDecay(0.01).restart()};
 const slowsim = () => {simulation.alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(.001).velocityDecay(0.05).restart()};
 const alf1 = () => {simulation.alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(.001).velocityDecay(0.5).restart()};
 const alf2 = () => {simulation.alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(.001).velocityDecay(0.7).restart()};

@@ -168,6 +168,18 @@ assert.match(maliciousMarker, /subject-kind-person/);
 assert.doesNotMatch(maliciousMarker, /onclick|alert\(1\)|subject-kind-x/);
 
 const genesisSource = source('frontend/genesis/code.js');
+const d2 = run(functionSource(genesisSource, 'buildLinks'), { Map });
+assert.deepEqual(d2.buildLinks([
+  { source: 'a', target: 'b', is_trust: false },
+  { source: 'b', target: 'a', is_trust: true },
+  { source: 'b', target: 'c', is_trust: null },
+]), [
+  { source: 'a', target: 'b', is_trust: true, reverse_is_trust: true },
+  { source: 'b', target: 'a', is_trust: true, reverse_is_trust: false },
+  { source: 'b', target: 'c', is_trust: true, reverse_is_trust: true },
+]);
+assert.doesNotMatch(genesisSource, /new Worker|alphaTarget\(1\)/);
+assert.match(genesisSource, /\.on\('end', \(\) => loading\.next\(\)\)/);
 assert.doesNotMatch(genesisSource, /\.attr\('onclick'/);
 assert.match(genesisSource, /\.attr\('role', d => isNodeClickable\(d\.nodeType\) \? 'button' : 'img'\)/);
 assert.match(genesisSource, /\.attr\('tabindex', d => isNodeClickable\(d\.nodeType\) \? 0 : null\)/);
