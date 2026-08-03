@@ -1356,7 +1356,7 @@ function initializeDisplay() {
 		.on('keydown', activateNodeFromKey)
         	.call(drag(simulation));
 
-        node.append('title').text(subjectAriaLabel);
+        node.append('title').text(d => d.text || d.username || 'Профиль');
 
         node.append('path')
             .attr('class', d => 'subject-outline subject-kind-' + subjectVisualFor(d).kind + (subjectVisualFor(d).confirmed ? '' : ' is-unconfirmed'))

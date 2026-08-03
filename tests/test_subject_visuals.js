@@ -234,6 +234,9 @@ assert.deepEqual(firstTick.calls[3], ['tick']);
 assert.doesNotMatch(genesisSource, /\.attr\('onclick'/);
 assert.match(genesisSource, /\.attr\('role', d => isNodeClickable\(d\.nodeType\) \? 'button' : 'img'\)/);
 assert.match(genesisSource, /\.attr\('tabindex', d => isNodeClickable\(d\.nodeType\) \? 0 : null\)/);
+assert.match(genesisSource, /\.attr\('aria-label', subjectAriaLabel\)/);
+assert.match(genesisSource, /node\.append\('title'\)\.text\(d => d\.text \|\| d\.username \|\| 'Профиль'\)/);
+assert.doesNotMatch(genesisSource, /node\.append\('title'\)\.text\(subjectAriaLabel\)/);
 const keyboard = loadGenesisKeyboard();
 assert.equal(keyboard.isNodeClickable('friend'), true);
 assert.equal(keyboard.isNodeClickable('home'), false);
@@ -264,12 +267,13 @@ const mobileLegendTopMatch = rentStyle.match(/@media \(max-width: 520px\) \{[\s\
 assert.ok(mobileLegendTopMatch);
 assert.ok(Number(mobileLegendTopMatch[1]) > 66, `mobile legend top must clear the 66px Leaflet control bottom, got ${mobileLegendTopMatch[1]}px`);
 
-for (const htmlPath of ['frontend/genesis/index.html', 'frontend/rent_map/index.html']) {
-  const html = source(htmlPath);
-  assert.match(html, /class="subject-legend"/);
-  assert.match(html, /aria-label="[^"]+"/);
-  assert.match(html, /🏢/);
-  assert.match(html, /⚙/);
-  assert.match(html, /👥/);
-  assert.match(html, /📣/);
-}
+assert.doesNotMatch(source('frontend/genesis/index.html'), /class="subject-legend"/);
+assert.doesNotMatch(genesisStyle, /\.subject-legend|\.subject-swatch/);
+
+const rentHtml = source('frontend/rent_map/index.html');
+assert.match(rentHtml, /class="subject-legend"/);
+assert.match(rentHtml, /aria-label="[^"]+"/);
+assert.match(rentHtml, /🏢/);
+assert.match(rentHtml, /⚙/);
+assert.match(rentHtml, /👥/);
+assert.match(rentHtml, /📣/);
