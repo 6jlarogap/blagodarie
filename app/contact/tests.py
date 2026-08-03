@@ -66,9 +66,10 @@ class GraphContractBaselineTests(TestCase):
         expected_ids = {profile.user_id for profile in self.profiles.values()}
         expected_uuids = {str(profile.uuid) for profile in self.profiles.values()}
 
-        d2 = self.client.get('/api/profile_genesis/all/', {
-            'rod': 'on', 'dover': 'on', 'withalone': 'on',
-        })
+        with self.assertNumQueries(5):
+            d2 = self.client.get('/api/profile_genesis/all/', {
+                'rod': 'on', 'dover': 'on', 'withalone': 'on',
+            })
         self.assertEqual(d2.status_code, 200, d2.data)
         self.assertEqual({str(node['uuid']) for node in d2.data['users']}, expected_uuids)
         self.assertEqual(len(d2.data['connections']), 5)

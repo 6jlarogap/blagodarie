@@ -210,6 +210,10 @@ text{
 
 		.userName, .friendName {
 			text-anchor: middle;
+			fill: #16221d;
+			paint-order: stroke;
+			stroke: #ffffff;
+			stroke-width: 3px;
 		}
  
 		.close_auth_icon{

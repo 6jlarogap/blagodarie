@@ -198,6 +198,8 @@ assert.equal(escape.prevented, undefined);
 assert.deepEqual(keyboard.clicks, [['alice', 'friend'], ['bob', 'filtered']]);
 
 const rentStyle = source('frontend/rent_map/style.css');
+const genesisStyle = source('frontend/genesis/style.css');
+assert.match(genesisStyle, /\.userName, \.friendName \{[\s\S]*fill: #16221d;[\s\S]*paint-order: stroke;[\s\S]*stroke: #ffffff;/);
 assert.match(rentStyle, /\.subject-legend \{[\s\S]*left: 56px;/);
 const mobileLegendTopMatch = rentStyle.match(/@media \(max-width: 520px\) \{[\s\S]*\.subject-legend \{[\s\S]*top: (\d+)px;/);
 assert.ok(mobileLegendTopMatch);

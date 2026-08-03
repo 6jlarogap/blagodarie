@@ -528,15 +528,23 @@ class Profile(PhotoModel, GeoPointAddressModel):
         """
         Имеет ли Реквизиты платежей
         """
+        if hasattr(self.user, '_bank_keys'):
+            return bool(self.user._bank_keys)
         Key = get_model('contact', 'Key')
         KeyType = get_model('contact', 'KeyType')
         return Key.objects.filter(owner=self.user, type__pk=KeyType.BANKING_DETAILS_ID).exists()
 
+    def is_in_group(self, group_id):
+        groups = getattr(self.user, '_prefetched_objects_cache', {}).get('groups')
+        if groups is not None:
+            return any(group.pk == group_id for group in groups)
+        return self.user.groups.filter(pk=group_id).exists()
+
     def is_power(self):
-        return self.user.groups.filter(pk=settings.GROUP_IDS['power_telegram']).exists()
+        return self.is_in_group(settings.GROUP_IDS['power_telegram'])
 
     def is_meetgame_admin(self):
-        return self.user.groups.filter(pk=settings.GROUP_IDS['meetgame_admin']).exists()
+        return self.is_in_group(settings.GROUP_IDS['meetgame_admin'])
 
     def owner_dict(self, request=None):
         owner = {}

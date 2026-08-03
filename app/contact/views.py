@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from django.shortcuts import redirect
 from django.db import transaction, IntegrityError, connection
-from django.db.models import F, Sum, Max, Min
+from django.db.models import F, Sum, Max, Min, Prefetch
 from django.db.models.query_utils import Q
 from django.views.generic.base import View
 from django.views.decorators.cache import cache_page
@@ -3248,6 +3248,17 @@ class ApiProfileGenesisAll(TelegramApiMixin, APIView):
 
         connections = []
         user_pks = set()
+        profiles = Profile.objects.select_related('user').filter(user__is_superuser=False)
+        if fmt != '3d-force-graph':
+            profiles = profiles.select_related('ability', 'r_sympa').prefetch_related(
+                'tgdesc',
+                'user__groups',
+                Prefetch(
+                    'user__key_set',
+                    queryset=Key.objects.filter(type__pk=KeyType.BANKING_DETAILS_ID).only('owner_id', 'type_id'),
+                    to_attr='_bank_keys',
+                ),
+            )
         q_connections = Q(pk=0)
         if rod:
             q_connections = Q(is_child=True)
@@ -3257,7 +3268,7 @@ class ApiProfileGenesisAll(TelegramApiMixin, APIView):
             if from_ is None:
                 users = [
                     profile.data_dict(request=request, fmt=fmt) \
-                    for profile in Profile.objects.select_related('user').filter(user__is_superuser=False).distinct()
+                    for profile in profiles.distinct()
                 ]
                 if rod or dover:
                     connections = [
@@ -3274,9 +3285,7 @@ class ApiProfileGenesisAll(TelegramApiMixin, APIView):
                 users = []
                 connections = []
                 if rod or dover:
-                    for profile in Profile.objects.select_related('user').filter(
-                            user__is_superuser=False,
-                        ).order_by(
+                    for profile in profiles.order_by(
                             '-user__date_joined'
                         ).distinct()[from_: from_ + number_]:
                         users.append(profile.data_dict(request=request, fmt=fmt))
