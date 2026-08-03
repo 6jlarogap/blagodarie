@@ -486,11 +486,12 @@ d3.json(apiUrl, d3_json_params)
 	});
 
     simulation = d3.forceSimulation(nodes);
+    const isolated = links.length === 0;
     simulation.force('link', d3.forceLink(links).id(({id}) => id).strength(0.1)); // .distance()
-    simulation.force('charge', d3.forceManyBody().strength(-7000));
-    simulation.force("collide", d3.forceCollide().radius(200));//.strength(1).radius(300))//.iterations(1))
-    simulation.force('x', d3.forceX(width / 2).strength(0.006));
-    simulation.force('y', d3.forceY(height / 2).strength(0.012));
+    simulation.force('charge', d3.forceManyBody().strength(isolated ? -300 : -7000));
+    simulation.force("collide", d3.forceCollide().radius(isolated ? 60 : 200));//.strength(1).radius(300))//.iterations(1))
+    simulation.force('x', d3.forceX(width / 2).strength(isolated ? 0.08 : 0.006));
+    simulation.force('y', d3.forceY(height / 2).strength(isolated ? 0.08 : 0.012));
 	initializeDisplay();
 	initializeSimulation();
 });

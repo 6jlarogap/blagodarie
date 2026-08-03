@@ -219,6 +219,10 @@ assert.deepEqual(d2.buildLinks([
   { source: 'b', target: 'c', is_trust: true, reverse_is_trust: true },
 ]);
 assert.doesNotMatch(genesisSource, /new Worker|alphaTarget\(1\)/);
+assert.match(genesisSource, /const isolated = links\.length === 0;/);
+assert.match(genesisSource, /strength\(isolated \? -300 : -7000\)/);
+assert.match(genesisSource, /radius\(isolated \? 60 : 200\)/);
+assert.equal((genesisSource.match(/strength\(isolated \? 0\.08 : 0\.0(?:06|12)\)/g) || []).length, 2);
 assert.doesNotMatch(genesisSource, /\.on\('end', \(\) => loading\.next\(\)\)/);
 assert.match(genesisSource, /\.on\('tick', firstSimulationTick\)/);
 assert.match(genesisSource, /\.alphaDecay\(0\.1\)/);
