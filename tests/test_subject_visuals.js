@@ -187,6 +187,27 @@ assert.doesNotMatch(maliciousMarker, /onclick|alert\(1\)|subject-kind-x/);
 
 const genesisSource = source('frontend/genesis/code.js');
 assert.match(genesisSource, /\.attr\("fill", "#16221d"\)[\s\S]*\.attr\("class", \[NODE_TYPES\.USER, NODE_TYPES\.PROFILE\]/);
+const graphLoad = genesisSource.slice(genesisSource.indexOf('d3.json(apiUrl'), genesisSource.indexOf('links.push('));
+assert.doesNotMatch(graphLoad, /urlAsBase64|base64Url|fetch\(/);
+assert.match(functionSource(genesisSource, 'prepareSvg'), /await Promise\.all\(nodes\.map\([\s\S]*imageBase64Url\(node\.image\)/);
+assert.match(functionSource(genesisSource, 'makeSvgBlob'), /const prepared = await prepareSvg\('main'\)/);
+const urlAsBase64Source = 'async ' + functionSource(genesisSource, 'urlAsBase64');
+const imageConversion = run(urlAsBase64Source, {
+  fetch: async () => { throw new Error('network'); },
+  blobAsBase64: async () => 'data:image/jpeg;base64,eA==',
+  console: { warn() {} },
+});
+imageConversion.urlAsBase64('https://example.invalid/photo.jpg').then(result => {
+  assert.equal(result, 'https://example.invalid/photo.jpg');
+});
+const successfulImageConversion = run(urlAsBase64Source, {
+  fetch: async () => ({ ok: true, blob: async () => ({}) }),
+  blobAsBase64: async () => 'data:image/jpeg;base64,eA==',
+  console: { warn() {} },
+});
+successfulImageConversion.urlAsBase64('https://example.test/photo.jpg').then(result => {
+  assert.equal(result, 'data:image/jpeg;base64,eA==');
+});
 const d2 = run(functionSource(genesisSource, 'buildLinks'), { Map });
 assert.deepEqual(d2.buildLinks([
   { source: 'a', target: 'b', is_trust: false },

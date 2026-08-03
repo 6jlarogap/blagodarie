@@ -57,7 +57,6 @@ const PROFILE = {
 	id: '',
 	nodeType: NODE_TYPES.PROFILE,
 	image: '',
-        base64Url: '',
 	text: '',
 	tabil: ' ',
 	count: ''
@@ -331,14 +330,12 @@ const image = d => d.photo || no_photo(d);
 function cacheBase64Url(afunc) {
     const cache = new Map();
 
-    async function awrapper(url, callback) {
+    async function awrapper(url) {
         if (cache.has(url)) {
-            const cached = cache.get(url);
-
-            return callback ? callback(cached) : cached;
+            return cache.get(url);
         }
 
-        const base64Url = await afunc(url, callback);
+        const base64Url = await afunc(url);
 
         cache.set(url, base64Url);
 
@@ -348,7 +345,7 @@ function cacheBase64Url(afunc) {
     return awrapper;
 }
 
-const noPhotoBase64Url = cacheBase64Url(urlAsBase64);
+const imageBase64Url = cacheBase64Url(urlAsBase64);
 
 function buildLinks(connections) {
     const key = ({source, target}) => `${source}\0${target}`;
@@ -365,17 +362,15 @@ function buildLinks(connections) {
 }
 
 d3.json(apiUrl, d3_json_params)
-    .then(async data => {
+    .then(data => {
 	//добавить пользователей в вершины
         const filterUser = ({uuid}) => !nodes.some(({id}) => id === uuid);
-        const updateUrl = node => dataUrl => (node.base64Url = dataUrl);
 	data.users.filter(filterUser).forEach(d => {
             const node = {
                 id: d.uuid,
                 username: d.username,
                 nodeType: nodeType(d),
                 image: image(d),
-                base64Url: '',
                 text: `${d.first_name} `,
                 is_dead: d.is_dead,
                 subject_kind: d.subject_kind,
@@ -383,10 +378,6 @@ d3.json(apiUrl, d3_json_params)
                 subject_kind_label: d.subject_kind_label,
                 is_org: d.is_org
             };
-
-            const base64UrlSetter = d.photo ? urlAsBase64 : noPhotoBase64Url;
-
-            base64UrlSetter(node.image, updateUrl(node));
 
             nodes.push(node);
 	});
@@ -616,21 +607,27 @@ const fromBase64 = (base64, {escape=true}={}) => {
     return decodeURIComponent(string);
 };
 
-async function blobAsBase64(blob, callback) {
+async function blobAsBase64(blob) {
     const arrayBuffer = await blob.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
     const base64 = btoa(String.fromCharCode(...uint8Array));
     const base64DataUrl = `data:${blob.type};base64,${base64}`;
 
-    return callback ? callback(base64DataUrl) : base64DataUrl;
+    return base64DataUrl;
 }
 
-async function urlAsBase64(url, callback) {
-    const response = await fetch(url);
-    const blob = await response.blob();
+async function urlAsBase64(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error();
+        const blob = await response.blob();
 
-    return await blobAsBase64(blob, callback);
+        return await blobAsBase64(blob);
+    } catch {
+        console.warn('Image could not be embedded in SVG export');
+        return url;
+    }
 }
 
 function encodeSvg(svgXML, toHex) {
@@ -710,7 +707,7 @@ SVGRect.prototype.toString = function() {
     return `${this.x} ${this.y} ${this.width} ${this.height}`;
 };
 
-function prepareSvg(id) {
+async function prepareSvg(id) {
     // hide context menu
     d3.select('body').node().click();
 
@@ -728,6 +725,9 @@ function prepareSvg(id) {
 
     const svg_elem = prepared.selectAll('.svg_elem').data(nodes);
 
+    await Promise.all(nodes.map(async node => {
+        node.base64Url = await imageBase64Url(node.image);
+    }));
     svg_elem.select('image').attr('href', ({base64Url}) => base64Url);
 
 /*    const userXY = width < 900 ? '-32px' : '-64px';
@@ -936,7 +936,7 @@ const success = (text, id='export-success') => message(text, {id: id, cssClass: 
 const warning = (text, id='export-empty') => message(text, {id: id, cssClass: 'alert alert-warning mt-5'});
 const error = (text, id='export-invalid') => message(text, {id: id, cssClass: 'alert alert-danger mt-5'});
 
-function makeSvgBlob(callback, options={}) {
+async function makeSvgBlob(callback, options={}) {
     const XMLHEADER = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>';
 
     const {
@@ -944,7 +944,7 @@ function makeSvgBlob(callback, options={}) {
         monitor
     } = options;
 
-    const prepared = prepareSvg('main');
+    const prepared = await prepareSvg('main');
     const serialized = serializeSvg(prepared, { encode: false });
     const content = `${XMLHEADER}${serialized}`;
 
@@ -1051,7 +1051,7 @@ function exporting(to) {
 
     exportStarted();
 
-    return makeBlob(to, callDownload);
+    return makeBlob(to, callDownload).catch(() => error('Ошибка загрузки'));
 }
 
 const export2svg = () => exporting(EXPORT_FORMATS.SVG);
