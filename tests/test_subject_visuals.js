@@ -186,6 +186,7 @@ assert.match(maliciousMarker, /subject-kind-person/);
 assert.doesNotMatch(maliciousMarker, /onclick|alert\(1\)|subject-kind-x/);
 
 const genesisSource = source('frontend/genesis/code.js');
+assert.match(genesisSource, /\.attr\("fill", "#16221d"\)[\s\S]*\.attr\("class", \[NODE_TYPES\.USER, NODE_TYPES\.PROFILE\]/);
 const d2 = run(functionSource(genesisSource, 'buildLinks'), { Map });
 assert.deepEqual(d2.buildLinks([
   { source: 'a', target: 'b', is_trust: false },
@@ -232,6 +233,11 @@ const genesisNameStyle = genesisStyle.match(/\.userName, \.friendName \{([^}]+)\
 assert.match(genesisNameStyle, /fill: #16221d;/);
 assert.doesNotMatch(genesisNameStyle, /paint-order|stroke/);
 assert.match(genesisStyle, /#main \{[\s\S]*background-color: #ffffff;/);
+const mediaNginx = source('deploy/nginx/sites-available/api.doverabot.ru');
+assert.match(mediaNginx, /"https:\/\/doverabot\.ru" \$http_origin;/);
+assert.ok(mediaNginx.includes('~^https://(?:d2|d3|map|mgraph)\\.doverabot\\.ru$ $http_origin;'));
+assert.match(mediaNginx, /location \/media\/ \{[\s\S]*add_header Access-Control-Allow-Origin \$doverabot_media_origin always;[\s\S]*add_header Vary Origin always;/);
+assert.doesNotMatch(mediaNginx, /Access-Control-Allow-Credentials|Access-Control-Allow-Origin\s+["']?\*/);
 assert.match(rentStyle, /\.subject-legend \{[\s\S]*left: 56px;/);
 const mobileLegendTopMatch = rentStyle.match(/@media \(max-width: 520px\) \{[\s\S]*\.subject-legend \{[\s\S]*top: (\d+)px;/);
 assert.ok(mobileLegendTopMatch);

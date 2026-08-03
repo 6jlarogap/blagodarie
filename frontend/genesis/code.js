@@ -1393,6 +1393,7 @@ function initializeDisplay() {
             .attr("y", 50)
             .attr("font-size", 35)
             .attr("font-weight", 400) // bold
+            .attr("fill", "#16221d")
             .attr("class", [NODE_TYPES.USER, NODE_TYPES.PROFILE].includes(d.nodeType)
                 ? "userName"
                 : "friendName"

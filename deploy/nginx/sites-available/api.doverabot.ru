@@ -1,3 +1,9 @@
+map $http_origin $doverabot_media_origin {
+    default "";
+    "https://doverabot.ru" $http_origin;
+    ~^https://(?:d2|d3|map|mgraph)\.doverabot\.ru$ $http_origin;
+}
+
 server {
     server_name api.doverabot.ru;
 
@@ -9,6 +15,8 @@ server {
 
     location /media/ {
         alias /srv/blagodarie/app/media/;
+        add_header Access-Control-Allow-Origin $doverabot_media_origin always;
+        add_header Vary Origin always;
     }
 
     location /robots.txt {
