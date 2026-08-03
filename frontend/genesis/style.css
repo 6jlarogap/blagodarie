@@ -211,9 +211,6 @@ text{
 		.userName, .friendName {
 			text-anchor: middle;
 			fill: #16221d;
-			paint-order: stroke;
-			stroke: #ffffff;
-			stroke-width: 3px;
 		}
  
 		.close_auth_icon{
@@ -534,6 +531,10 @@ text{
 			height: 100%;
 			margin: 0;
 			padding: 0;
+			background-color: #ffffff;
+		}
+
+		#main {
 			background-color: #ffffff;
 		}
 #shareDialog{

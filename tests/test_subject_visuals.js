@@ -58,6 +58,24 @@ function loadGenesisKeyboard() {
   ].join('\n'));
 }
 
+function loadGenesisSimulationTick() {
+  const src = source('frontend/genesis/code.js');
+  const calls = [];
+  const simulation = {
+    on(event, callback) {
+      calls.push(['on', event, callback]);
+      this.callback = callback;
+    },
+  };
+  const sandbox = {
+    calls,
+    simulation,
+    ticked() { calls.push(['tick']); },
+    loading: { next() { calls.push(['loading']); } },
+  };
+  return run(functionSource(src, 'firstSimulationTick'), sandbox);
+}
+
 function fakeNode(tag) {
   return {
     tag,
@@ -179,7 +197,18 @@ assert.deepEqual(d2.buildLinks([
   { source: 'b', target: 'c', is_trust: true, reverse_is_trust: true },
 ]);
 assert.doesNotMatch(genesisSource, /new Worker|alphaTarget\(1\)/);
-assert.match(genesisSource, /\.on\('end', \(\) => loading\.next\(\)\)/);
+assert.doesNotMatch(genesisSource, /\.on\('end', \(\) => loading\.next\(\)\)/);
+assert.match(genesisSource, /\.on\('tick', firstSimulationTick\)/);
+assert.match(genesisSource, /\.alphaDecay\(0\.1\)/);
+const firstTick = loadGenesisSimulationTick();
+firstTick.firstSimulationTick();
+assert.deepEqual(firstTick.calls.slice(0, 3).map(call => call.slice(0, 2)), [
+  ['tick'],
+  ['loading'],
+  ['on', 'tick'],
+]);
+firstTick.simulation.callback();
+assert.deepEqual(firstTick.calls[3], ['tick']);
 assert.doesNotMatch(genesisSource, /\.attr\('onclick'/);
 assert.match(genesisSource, /\.attr\('role', d => isNodeClickable\(d\.nodeType\) \? 'button' : 'img'\)/);
 assert.match(genesisSource, /\.attr\('tabindex', d => isNodeClickable\(d\.nodeType\) \? 0 : null\)/);
@@ -199,7 +228,10 @@ assert.deepEqual(keyboard.clicks, [['alice', 'friend'], ['bob', 'filtered']]);
 
 const rentStyle = source('frontend/rent_map/style.css');
 const genesisStyle = source('frontend/genesis/style.css');
-assert.match(genesisStyle, /\.userName, \.friendName \{[\s\S]*fill: #16221d;[\s\S]*paint-order: stroke;[\s\S]*stroke: #ffffff;/);
+const genesisNameStyle = genesisStyle.match(/\.userName, \.friendName \{([^}]+)\}/)[1];
+assert.match(genesisNameStyle, /fill: #16221d;/);
+assert.doesNotMatch(genesisNameStyle, /paint-order|stroke/);
+assert.match(genesisStyle, /#main \{[\s\S]*background-color: #ffffff;/);
 assert.match(rentStyle, /\.subject-legend \{[\s\S]*left: 56px;/);
 const mobileLegendTopMatch = rentStyle.match(/@media \(max-width: 520px\) \{[\s\S]*\.subject-legend \{[\s\S]*top: (\d+)px;/);
 assert.ok(mobileLegendTopMatch);

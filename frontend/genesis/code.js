@@ -550,12 +550,17 @@ function* loadingScreen(caption) {
 
 const loading = loadingScreen('Загрузка');
 
+function firstSimulationTick() {
+    ticked();
+    loading.next();
+    simulation.on('tick', ticked);
+}
+
 function initializeSimulation() {
     loading.next();
     simulation.nodes(nodes)
-        .on('tick', ticked)
-        .on('end', () => loading.next())
-        .alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(0.01).velocityDecay(0.05).restart();
+        .on('tick', firstSimulationTick)
+        .alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(0.1).velocityDecay(0.05).restart();
 }
 
 const ZOOM_MIN = 0.01;
