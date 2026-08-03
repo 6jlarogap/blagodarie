@@ -221,7 +221,7 @@ assert.deepEqual(d2.buildLinks([
 assert.doesNotMatch(genesisSource, /new Worker|alphaTarget\(1\)/);
 assert.doesNotMatch(genesisSource, /\.on\('end', \(\) => loading\.next\(\)\)/);
 assert.match(genesisSource, /\.on\('tick', firstSimulationTick\)/);
-assert.match(genesisSource, /\.alphaDecay\(0\.1\)/);
+assert.match(genesisSource, /\.alphaDecay\(0\.01\)/);
 const firstTick = loadGenesisSimulationTick();
 firstTick.firstSimulationTick();
 assert.deepEqual(firstTick.calls.slice(0, 3).map(call => call.slice(0, 2)), [

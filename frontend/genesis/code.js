@@ -551,7 +551,7 @@ function initializeSimulation() {
     loading.next();
     simulation.nodes(nodes)
         .on('tick', firstSimulationTick)
-        .alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(0.1).velocityDecay(0.05).restart();
+        .alpha(1).alphaTarget(0).alphaMin(0.001).alphaDecay(0.01).velocityDecay(0.05).restart();
 }
 
 const ZOOM_MIN = 0.01;
