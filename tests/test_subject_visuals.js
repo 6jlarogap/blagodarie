@@ -11,7 +11,7 @@ function block(src) {
 }
 
 function functionSource(src, name) {
-  const start = src.indexOf(`function ${name}`);
+  const start = src.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, name);
   const bodyStart = src.indexOf('{', src.indexOf(')', start));
   let depth = 0;
@@ -74,6 +74,36 @@ function loadGenesisSimulationTick() {
     loading: { next() { calls.push(['loading']); } },
   };
   return run(functionSource(src, 'firstSimulationTick'), sandbox);
+}
+
+function loadGenesisDrag() {
+  const src = source('frontend/genesis/code.js');
+  const handlers = {};
+  const d3 = {
+    drag() {
+      return {
+        on(event, handler) {
+          handlers[event] = handler;
+          return this;
+        },
+      };
+    },
+  };
+  const simulation = {
+    targets: [],
+    restarts: 0,
+    alphaTarget(value) {
+      this.targets.push(value);
+      return this;
+    },
+    restart() {
+      this.restarts += 1;
+      return this;
+    },
+  };
+  const sandbox = run(functionSource(src, 'drag'), { d3 });
+  sandbox.drag(simulation);
+  return { handlers, simulation };
 }
 
 function fakeNode(tag) {
@@ -208,16 +238,51 @@ const successfulImageConversion = run(urlAsBase64Source, {
 successfulImageConversion.urlAsBase64('https://example.test/photo.jpg').then(result => {
   assert.equal(result, 'data:image/jpeg;base64,eA==');
 });
-const d2 = run(functionSource(genesisSource, 'buildLinks'), { Map });
-assert.deepEqual(d2.buildLinks([
-  { source: 'a', target: 'b', is_trust: false },
-  { source: 'b', target: 'a', is_trust: true },
-  { source: 'b', target: 'c', is_trust: null },
+const relationFunctions = run([
+  functionSource(genesisSource, 'relationKind'),
+  functionSource(genesisSource, 'relationColorValue'),
+  functionSource(genesisSource, 'relationColor'),
+  functionSource(genesisSource, 'relationMarker'),
+  functionSource(genesisSource, 'buildLinks'),
+].join('\n'), { Map });
+assert.deepEqual(relationFunctions.buildLinks([
+  { source: 'a', target: 'b', attitude: 'mt', is_child: false },
+  { source: 'b', target: 'a', attitude: 't', is_child: false },
+  { source: 'b', target: 'c', attitude: null, is_child: true },
+  { source: 'c', target: 'd', attitude: 't', is_child: true },
+  { source: 'd', target: 'e', attitude: 'a', is_child: false },
+  { source: 'e', target: 'f', is_trust: false },
 ]), [
-  { source: 'a', target: 'b', is_trust: true, reverse_is_trust: true },
-  { source: 'b', target: 'a', is_trust: true, reverse_is_trust: false },
-  { source: 'b', target: 'c', is_trust: true, reverse_is_trust: true },
+  { source: 'a', target: 'b', attitude: 'mt', is_child: false, relation_kind: 'mistrust', reverse_relation_kind: 'trust', relation_gradient_id: 'relation-gradient-0' },
+  { source: 'b', target: 'a', attitude: 't', is_child: false, relation_kind: 'trust', reverse_relation_kind: 'mistrust', relation_gradient_id: 'relation-gradient-1' },
+  { source: 'b', target: 'c', attitude: null, is_child: true, relation_kind: 'family', reverse_relation_kind: 'family', relation_gradient_id: 'relation-gradient-2' },
+  { source: 'c', target: 'd', attitude: 't', is_child: true, relation_kind: 'family-trust', reverse_relation_kind: 'family-trust', relation_gradient_id: 'relation-gradient-3' },
+  { source: 'd', target: 'e', attitude: 'a', is_child: false, relation_kind: 'acquaintance', reverse_relation_kind: 'acquaintance', relation_gradient_id: 'relation-gradient-4' },
+  { source: 'e', target: 'f', is_trust: false, relation_kind: 'mistrust', reverse_relation_kind: 'mistrust', relation_gradient_id: 'relation-gradient-5' },
 ]);
+const relationColors = ['family', 'trust', 'mistrust', 'acquaintance']
+  .map(relationFunctions.relationColorValue);
+assert.equal(new Set(relationColors).size, relationColors.length);
+assert.equal(relationFunctions.relationColor({
+  relation_kind: 'trust',
+  reverse_relation_kind: 'mistrust',
+  relation_gradient_id: 'mixed',
+}), 'url(#mixed)');
+assert.equal(relationFunctions.relationMarker({ relation_kind: 'family' }), 'url(#arrow-gen)');
+assert.equal(relationFunctions.relationMarker({ relation_kind: 'mistrust' }), 'url(#arrow-mistrust)');
+assert.match(functionSource(genesisSource, 'initializeDisplay'), /\.attr\("vector-effect", "non-scaling-stroke"\)/);
+
+const dragRuntime = loadGenesisDrag();
+const draggedNode = { x: 10, y: 20 };
+dragRuntime.handlers.start({ active: 0 }, draggedNode);
+assert.deepEqual(dragRuntime.simulation.targets, [0.01]);
+assert.equal(dragRuntime.simulation.restarts, 1);
+assert.deepEqual([draggedNode.fx, draggedNode.fy], [10, 20]);
+dragRuntime.handlers.drag({ x: 30, y: 40 }, draggedNode);
+assert.deepEqual([draggedNode.fx, draggedNode.fy], [30, 40]);
+dragRuntime.handlers.end({ active: 0 }, draggedNode);
+assert.deepEqual(dragRuntime.simulation.targets, [0.01, 0]);
+assert.deepEqual([draggedNode.fx, draggedNode.fy], [null, null]);
 assert.doesNotMatch(genesisSource, /new Worker|alphaTarget\(1\)/);
 assert.doesNotMatch(genesisSource, /\.on\('end', \(\) => loading\.next\(\)\)/);
 assert.match(genesisSource, /\.on\('tick', firstSimulationTick\)/);

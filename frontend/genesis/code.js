@@ -347,18 +347,62 @@ function cacheBase64Url(afunc) {
 
 const imageBase64Url = cacheBase64Url(urlAsBase64);
 
+function relationKind({is_child, attitude, is_trust}) {
+    let attitudeKind = '';
+    if (attitude === 'mt' || is_trust === false) attitudeKind = 'mistrust';
+    else if (attitude === 'a') attitudeKind = 'acquaintance';
+    else if (attitude === 't' || is_trust === true) attitudeKind = 'trust';
+
+    if (is_child && attitudeKind) return `family-${attitudeKind}`;
+    if (is_child) return 'family';
+    return attitudeKind || 'other';
+}
+
+function relationColorValue(relationKind) {
+    switch (relationKind) {
+    case 'family': return '#3548db';
+    case 'trust': return '#1c8401';
+    case 'mistrust': return '#ff0000';
+    case 'acquaintance': return '#8a6d1d';
+    case 'family-trust': return '#6f42c1';
+    case 'family-mistrust': return '#c2185b';
+    case 'family-acquaintance': return '#00796b';
+    default: return '#345334';
+    }
+}
+
+function relationColor({relation_kind, reverse_relation_kind, relation_gradient_id}) {
+    return relation_kind === reverse_relation_kind
+        ? relationColorValue(relation_kind)
+        : `url(#${relation_gradient_id})`;
+}
+
+function relationMarker({relation_kind}) {
+    if (relation_kind === 'family') return 'url(#arrow-gen)';
+    if (relation_kind === 'mistrust' || relation_kind === 'family-mistrust') return 'url(#arrow-mistrust)';
+    if (relation_kind === 'trust' || relation_kind === 'family-trust') return 'url(#arrow-trust)';
+    return 'url(#arrow-to-other)';
+}
+
 function buildLinks(connections) {
     const key = ({source, target}) => `${source}\0${target}`;
-    const trustByDirection = new Map(connections
-        .filter(({is_trust}) => is_trust != null)
-        .map(connection => [key(connection), connection.is_trust]));
+    const kindByDirection = new Map(connections.map(connection => [
+        key(connection),
+        relationKind(connection)
+    ]));
 
-    return connections.map(({source, target}) => ({
-        source,
-        target,
-        is_trust: true,
-        reverse_is_trust: trustByDirection.get(key({source: target, target: source})) ?? true
-    }));
+    return connections.map((connection, index) => {
+        const relation_kind = relationKind(connection);
+        return {
+            ...connection,
+            relation_kind,
+            reverse_relation_kind: kindByDirection.get(key({
+                source: connection.target,
+                target: connection.source
+            })) || relation_kind,
+            relation_gradient_id: `relation-gradient-${index}`
+        };
+    });
 }
 
 d3.json(apiUrl, d3_json_params)
@@ -561,26 +605,24 @@ var zoom = d3.zoom().scaleExtent([ZOOM_MIN, ZOOM_MAX]);
 zoom.on('zoom', ({transform: {x, y, k}}) => svg.attr('transform', `translate(${x}, ${y}) scale(${k})`));
 
 function drag(simulation) {
-	function dragstarted(e, d) {
-//		!e.active && simulation.alphaTarget(0.01).velocityDecay(0.01).restart();
-	}
-	
-	const dragged = ({x, y}, d) => { d.fx = x; d.fy = y; };
-	
-	const dragended = (e, d) => { 
-//		if (!e.active) simulation.stop();
-//		d.fx = e.x;
-//		d.fy = e.y;		
-		d.fx = null;
-		d.fy = null;		
-	};
+    function dragstarted(event, node) {
+        if (!event.active) simulation.alphaTarget(0.01).restart();
+        node.fx = node.x;
+        node.fy = node.y;
+    }
 
-	let behavior = d3.drag();
-	behavior.on('start', dragstarted);
-	behavior.on('drag', dragged);
-	behavior.on('end', dragended);
+    const dragged = ({x, y}, node) => { node.fx = x; node.fy = y; };
 
-	return behavior;
+    function dragended(event, node) {
+        if (!event.active) simulation.alphaTarget(0);
+        node.fx = null;
+        node.fy = null;
+    }
+
+    return d3.drag()
+        .on('start', dragstarted)
+        .on('drag', dragged)
+        .on('end', dragended);
 }
 
 const EXPORT_ID = 'export';
@@ -1282,24 +1324,23 @@ function initializeDisplay() {
 		.attr("x2", calcX2)
 		.attr("y2", calcY2);
 
-	link.append("svg:defs")
+	link.filter(d => d.relation_kind !== d.reverse_relation_kind)
+		.append("svg:defs")
 		.append("linearGradient")
-		.attr('id', d => `grad_from_${d.source.id}_to_${d.target.id}`)
+		.attr("id", d => d.relation_gradient_id)
 		.attr("gradientUnits", "userSpaceOnUse")
-		.attr("stroke-width", "5px")
 		.attr("x1", calcX1)
 		.attr("y1", calcY1)
 		.attr("x2", calcX2)
 		.attr("y2", calcY2)
 		.selectAll("stop")
-		.data(d => [[1, d.reverse_is_trust], [2, d.is_trust]])
+		.data(d => [
+                    ["0%", relationColorValue(d.reverse_relation_kind)],
+                    ["100%", relationColorValue(d.relation_kind)]
+                ])
 		.join("stop")
-		.attr('offset', d => d[0] == 1 ? '0%' : '100%')
-		.attr('style', d => {
-                    const color = d[1] || d[3] ? 'green' : 'red';
-
-                    return `stop-color: ${color}; stop-opacity: 1`;
-		});
+		.attr("offset", ([offset]) => offset)
+		.attr("stop-color", ([, color]) => color);
 
 	link.append("svg:line")
 		.attr("class", "link")
@@ -1308,40 +1349,9 @@ function initializeDisplay() {
 		.attr("x2", calcX2)
 		.attr("y2", calcY2)
 		.attr("stroke-width", "1.5px")
-		.attr("stroke", d => {
-			if (d.target.nodeType == NODE_TYPES.USER || d.target.nodeType == NODE_TYPES.FRIEND || d.target.nodeType == NODE_TYPES.PROFILE || d.source.nodeType == NODE_TYPES.TRUST || d.source.nodeType == NODE_TYPES.MISTRUST || d.target.nodeType == NODE_TYPES.FILTERED){
-				if (d.is_trust == d.reverse_is_trust || d.source.nodeType == NODE_TYPES.TRUST || d.source.nodeType == NODE_TYPES.MISTRUST){
-					if(d.is_trust || d.source.nodeType == NODE_TYPES.TRUST){
-						if(!window.location.href.includes('gen')){
-						return "#1c8401";
-						}else{
-							return "#3548db";
-						}
-					} else{
-						return "#ff0000";
-					}
-				} else {
-					return `url(#grad_from_${d.source.id}_to_${d.target.id})`;
-				}
-			} else {
-				return "#345334";
-			}
-		})
-		.attr("marker-end", d => {
-			if (d.target.nodeType == NODE_TYPES.USER || d.target.nodeType == NODE_TYPES.FRIEND || d.target.nodeType == NODE_TYPES.PROFILE || d.source.nodeType == NODE_TYPES.PROFILE || d.source.nodeType == NODE_TYPES.TRUST || d.source.nodeType == NODE_TYPES.MISTRUST || d.target.nodeType == NODE_TYPES.FILTERED){
-				if (d.is_trust || d.source.nodeType == NODE_TYPES.TRUST){
-					if(!window.location.href.includes('gen')){
-					return "url(#arrow-trust)";
-					}else{
-						return "url(#arrow-gen)";
-					}
-				} else{
-					return "url(#arrow-mistrust)";
-				}
-			} else {
-				return "url(#arrow-to-other)";
-			}
-		});
+                .attr("vector-effect", "non-scaling-stroke")
+		.attr("stroke", relationColor)
+		.attr("marker-end", relationMarker);
 
 	node = svg.append('g')
 		.selectAll('g')
@@ -1502,7 +1512,7 @@ function fullTransform() {
   g.attr('x2', x2);
   g.attr('y2', y2);
 
-  let linearGradient = link.selectAll('linearGradient');
+  const linearGradient = link.selectAll('linearGradient');
   linearGradient.attr('x1', x1);
   linearGradient.attr('y1', y1);
   linearGradient.attr('x2', x2);
@@ -1542,7 +1552,7 @@ function boundedTransform() {
   g.attr('x2', calcX2);
   g.attr('y2', calcY2);
 
-  let linearGradient = link.selectAll('linearGradient');
+  const linearGradient = link.selectAll('linearGradient');
   linearGradient.attr('x1', calcX1);
   linearGradient.attr('y1', calcY1);
   linearGradient.attr('x2', calcX2);
