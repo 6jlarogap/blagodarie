@@ -431,6 +431,15 @@ import { nodePhotoUrl } from './node-visual.js';
         sprite.renderOrder = 11;
         const size = data && data.root_node && node.id == data.root_node.id ? 50 : 25;
         sprite.scale.set(size, size);
+
+        const label = new SpriteText();
+        label.text = node.first_name;
+        label.textHeight = 0.2;
+        label.color = node_text_color(node, 'rgba');
+        label.material.depthTest = false;
+        label.renderOrder = 12;
+        sprite.add(label);
+        node.__labelObj = label;
         sprite.center.set(0.5, -0.1);
         return sprite;
     }
@@ -442,19 +451,11 @@ import { nodePhotoUrl } from './node-visual.js';
     const menu__title_span = document.querySelector(".menu__title-span");
     const menu_wrapper = document.querySelector(".menu-wrapper");
 
-    function show_node_detail(node, visible) {
-        if (!node || !node.__threeObj) return;
-        if (!node.__labelObj || node.__labelObj.parent !== node.__threeObj) {
-            if (!visible) return;
-            node.__labelObj = new SpriteText();
-            node.__labelObj.textHeight = 0.2;
-            node.__labelObj.material.depthTest = false;
-            node.__labelObj.renderOrder = 12;
-            node.__threeObj.add(node.__labelObj);
-        }
+    function show_node_detail(node) {
+        if (!node || !node.__threeObj || !node.__labelObj || node.__labelObj.parent !== node.__threeObj) return;
         node.__labelObj.text = node.first_name;
         node.__labelObj.color = node_text_color(node, 'rgba');
-        node.__labelObj.visible = visible;
+        node.__labelObj.visible = true;
     }
 
     function select_node(node) {

@@ -15,6 +15,10 @@ test('shared graph renderer always creates visible photo nodes', async () => {
 
     const source = await readFile(new URL('./main.js', import.meta.url), 'utf8');
     assert.match(source, /ForceGraph3D\(\)[\s\S]*?\.nodeThreeObject\(node => node_draw\(node\)\)/);
+    assert.match(source, /sprite\.add\(label\);\s*node\.__labelObj = label;/);
+    const showNodeDetail = source.match(/function show_node_detail[\s\S]*?\n    }/)[0];
+    assert.doesNotMatch(showNodeDetail, /new SpriteText/);
+    assert.match(showNodeDetail, /node\.__labelObj\.visible = true/);
 });
 
 test('rendering pauses when idle or hidden and resumes on interaction', async () => {
