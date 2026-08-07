@@ -3,7 +3,7 @@
 # Константы, функции и т.п., применяемые в handler_*/py
 
 import base64, re, datetime, time, copy, redis
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 from uuid import UUID
 import qrcode
 from PIL import Image
@@ -1017,6 +1017,30 @@ class Misc(object):
         return redirect_path + separator + 'mini_app=1'
 
     @classmethod
+    def make_main_mini_app_url(cls, mode, **params):
+        """Build a whitelisted Main Mini App startapp link.
+
+        The payload is intentionally compact because it is supplied by Telegram
+        to the configured Main Mini App rather than being a redirect URL.
+        """
+        payload_prefix = {'map': 'm', 'graph': 'g'}.get(mode)
+        if payload_prefix is None or set(params) != {'chat_id'}:
+            return None
+        chat_id = str(params['chat_id'])
+        if not re.fullmatch(r'-?\d{1,20}', chat_id):
+            return None
+        payload = quote('%s_%s' % (payload_prefix, chat_id), safe='')
+        return 'https://t.me/%s?startapp=%s' % (bot_data.username, payload)
+
+    @classmethod
+    def make_group_launch_button(cls, text, mode, chat_id, redirect_path):
+        """Use Main Mini App routing, retaining login_url as a safe fallback."""
+        url = cls.make_main_mini_app_url(mode, chat_id=chat_id)
+        if url:
+            return InlineKeyboardButton(text=text, url=url)
+        return cls.make_launch_button(text, redirect_path)
+
+    @classmethod
     def make_launch_button(cls, text, redirect_path, use_mini_app=False, **kwargs):
         button_data = dict(text=text)
         if use_mini_app:
@@ -1973,24 +1997,24 @@ class Misc(object):
             text = text.replace('$CHAT_LINK', chat_link)
         else:
             text = '@' + bot_data.username
-        inline_btn_map = InlineKeyboardButton(
+        inline_btn_map = cls.make_group_launch_button(
             text='Карта',
-            login_url=cls.make_login_url(
-                redirect_path='%(map_host)s/?chat_id=%(chat_id)s' % dict(
-                    map_host=settings.MAP_HOST,
-                    chat_id=chat.id,
-                ),
-                keep_user_data='on',
-            ))
-        inline_btn_trusts = InlineKeyboardButton(
+            mode='map',
+            chat_id=chat.id,
+            redirect_path='%(map_host)s/?chat_id=%(chat_id)s' % dict(
+                map_host=settings.MAP_HOST,
+                chat_id=chat.id,
+            ),
+        )
+        inline_btn_trusts = cls.make_group_launch_button(
             text='Схема',
-            login_url=cls.make_login_url(
-                redirect_path='%(graph_host)s/?tgr=%(chat_id)s' % dict(
-                    graph_host=settings.GRAPH_HOST,
-                    chat_id=chat.id,
-                ),
-                keep_user_data='on',
-            ))
+            mode='graph',
+            chat_id=chat.id,
+            redirect_path='%(graph_host)s/?tgr=%(chat_id)s' % dict(
+                graph_host=settings.GRAPH_HOST,
+                chat_id=chat.id,
+            ),
+        )
         reply_markup = InlineKeyboardMarkup(inline_keyboard=[[inline_btn_map, inline_btn_trusts]])
         return text, reply_markup
 

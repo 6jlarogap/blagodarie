@@ -1,3 +1,4 @@
+import asyncio
 import types
 import unittest
 from unittest import mock
@@ -44,6 +45,28 @@ class CommonRuntimeDeeplinkTests(unittest.TestCase):
         )
         self.assertNotIn('web_app', fallback.kwargs)
         self.assertIn('login_url', fallback.kwargs)
+
+    def test_main_mini_app_group_routes_are_whitelisted_and_compact(self):
+        self.assertEqual(
+            self.common.Misc.make_main_mini_app_url('map', chat_id=-100123),
+            'https://t.me/DoveraBot?startapp=m_-100123',
+        )
+        self.assertEqual(
+            self.common.Misc.make_main_mini_app_url('graph', chat_id=-100123),
+            'https://t.me/DoveraBot?startapp=g_-100123',
+        )
+        self.assertIsNone(self.common.Misc.make_main_mini_app_url('redirect', chat_id=-100123))
+        self.assertIsNone(self.common.Misc.make_main_mini_app_url('map', chat_id='https://evil.example'))
+        self.assertIsNone(self.common.Misc.make_main_mini_app_url('map', chat_id=-100123, redirect='x'))
+
+    def test_group_pin_buttons_use_main_mini_app_and_keep_fallback(self):
+        chat = types.SimpleNamespace(id=-100123, title='Тест', username='test_group')
+        with mock.patch.object(self.common.Misc, 'chat_pin_message_text', mock.AsyncMock(return_value='pin')):
+            text, markup = asyncio.run(self.common.Misc.make_pin_group_message(chat))
+        self.assertEqual(text, 'pin')
+        buttons = markup.inline_keyboard[0]
+        self.assertEqual(buttons[0].url, 'https://t.me/DoveraBot?startapp=m_-100123')
+        self.assertEqual(buttons[1].url, 'https://t.me/DoveraBot?startapp=g_-100123')
 
 
 class PendingProfileCardTests(unittest.IsolatedAsyncioTestCase):

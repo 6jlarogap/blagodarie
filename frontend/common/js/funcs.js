@@ -70,7 +70,10 @@
 
   var telegram_web_app_promise = null;
   function telegram_web_app() {
-    if (new URLSearchParams(window.location.search).get('mini_app') !== '1') {
+    var params = new URLSearchParams(window.location.search);
+    var is_mini_app = params.get('mini_app') === '1';
+    var has_start_param = params.has('tgWebAppStartParam') || params.has('startapp');
+    if (!is_mini_app && !has_start_param && !(window.Telegram && window.Telegram.WebApp)) {
       return Promise.resolve(null);
     }
     if (window.Telegram && window.Telegram.WebApp) {
@@ -87,9 +90,27 @@
     return telegram_web_app_promise;
   }
 
+  function route_main_mini_app_start_param(webApp) {
+    var params = new URLSearchParams(window.location.search);
+    var startParam = params.get('tgWebAppStartParam') || params.get('startapp') || '';
+    if (!startParam && webApp && webApp.initDataUnsafe) {
+      startParam = webApp.initDataUnsafe.start_param || '';
+    }
+    var match = /^([mg])_(-?\d{1,20})$/.exec(startParam);
+    if (!match) return false;
+    var target = match[1] === 'm'
+      ? new URL('https://map.doverabot.ru/')
+      : new URL('https://d3.doverabot.ru/');
+    target.searchParams.set(match[1] === 'm' ? 'chat_id' : 'tgr', match[2]);
+    target.searchParams.set('mini_app', '1');
+    window.location.replace(target.toString());
+    return true;
+  }
+
   async function authenticate_telegram_web_app() {
     var webApp = await telegram_web_app();
     if (!webApp) return null;
+    if (route_main_mini_app_start_param(webApp)) return null;
     if (webApp.ready) webApp.ready();
     if (webApp.expand) webApp.expand();
     if (webApp.disableVerticalSwipes) webApp.disableVerticalSwipes();
