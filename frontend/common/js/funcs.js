@@ -68,6 +68,51 @@
     return get_auth_cookie_raw();
   }
 
+  var telegram_web_app_promise = null;
+  function telegram_web_app() {
+    if (new URLSearchParams(window.location.search).get('mini_app') !== '1') {
+      return Promise.resolve(null);
+    }
+    if (window.Telegram && window.Telegram.WebApp) {
+      return Promise.resolve(window.Telegram.WebApp);
+    }
+    if (telegram_web_app_promise) return telegram_web_app_promise;
+    telegram_web_app_promise = new Promise(function (resolve) {
+      var script = document.createElement('script');
+      script.src = 'https://telegram.org/js/telegram-web-app.js';
+      script.onload = function () { resolve(window.Telegram && window.Telegram.WebApp); };
+      script.onerror = function () { resolve(null); };
+      document.head.appendChild(script);
+    });
+    return telegram_web_app_promise;
+  }
+
+  async function authenticate_telegram_web_app() {
+    var webApp = await telegram_web_app();
+    if (!webApp) return null;
+    if (webApp.ready) webApp.ready();
+    if (webApp.expand) webApp.expand();
+    if (webApp.disableVerticalSwipes) webApp.disableVerticalSwipes();
+    if (!webApp.initData) return null;
+    try {
+      var response = await fetch(new URL('/api/auth/telegram/', window.get_api_url()).toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: new URLSearchParams({ init_data: webApp.initData }),
+        credentials: 'omit'
+      });
+      if (!response.ok) return null;
+      var data = await response.json();
+      if (!data || typeof data !== 'object' || Array.isArray(data) || !data.auth_token) return null;
+      store_auth_data(data);
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  var telegram_web_app_auth_promise = authenticate_telegram_web_app();
+
   function remove_authdata_token_from_url() {
     if (!window.history || !window.history.replaceState) return;
     var url = new URL(window.location.href);
@@ -108,6 +153,10 @@
   window.check_auth = async function check_auth(required) {
     var redeemedAuthData = await window.redeem_authdata_token();
     if (redeemedAuthData) return redeemedAuthData;
+
+    var miniAppAuthData = await telegram_web_app_auth_promise;
+    if (miniAppAuthData) return miniAppAuthData;
+    if (new URLSearchParams(window.location.search).get('mini_app') === '1') return null;
 
     var raw = get_stored_auth_raw();
     if (!raw) {

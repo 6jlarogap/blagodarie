@@ -435,6 +435,8 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
             Некоторое исключение для фото: если фото не было задано в Profile, оно таки заносится.
     """
 
+    parser_classes = (FormParser, JSONParser)
+
     TELEGRAM_AUTH_FIELDS = (
         'id',
         'first_name',
@@ -476,6 +478,49 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
             rd.setlist(key, [value])
         else:
             rd[key] = value
+
+    def check_web_app_input(self, raw_init_data):
+        if not isinstance(raw_init_data, str) or not raw_init_data:
+            raise ServiceException('Неверный запрос')
+        pairs = urllib.parse.parse_qsl(raw_init_data, keep_blank_values=True)
+        if len(pairs) != len(dict(pairs)):
+            raise ServiceException('Неверный запрос')
+        values = dict(pairs)
+        received_hash = values.pop('hash', '')
+        if not received_hash or not values.get('auth_date') or not values.get('user'):
+            raise ServiceException('Неверный запрос')
+        if not settings.TELEGRAM_BOT_TOKEN:
+            raise ServiceException('В системе не определен TELEGRAM_BOT_TOKEN')
+
+        data_check_string = '\n'.join(
+            '%s=%s' % item for item in sorted(values.items())
+        )
+        secret_key = hmac.new(
+            b'WebAppData', settings.TELEGRAM_BOT_TOKEN.encode(), hashlib.sha256,
+        ).digest()
+        calculated_hash = hmac.new(
+            secret_key, data_check_string.encode(), hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(calculated_hash, received_hash):
+            raise ServiceException('Неверный запрос, данные не прошли проверку на hash')
+
+        try:
+            auth_date = int(values['auth_date'])
+            telegram_user = json.loads(values['user'])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            raise ServiceException('Неверный запрос')
+        if not isinstance(telegram_user, dict) or not telegram_user.get('id'):
+            raise ServiceException('Неверный запрос')
+        if int(time.time()) - auth_date > settings.TELEGRAM_AUTH_DATA_OUTDATED:
+            raise ServiceException('Неверный запрос, данные авторизации устарели')
+        result = {
+            key: telegram_user[key]
+            for key in self.TELEGRAM_AUTH_FIELDS
+            if key in telegram_user and telegram_user[key] is not None
+        }
+        result['id'] = str(telegram_user['id'])
+        result['auth_date'] = str(auth_date)
+        return result
 
     def pop_request_key(self, rd, key):
         try:
@@ -520,6 +565,9 @@ class ApiAuthTelegram(CreateUserMixin, TelegramApiMixin, FrontendMixin, ApiToken
 
     def check_input(self, request):
         rd = self.copy_request_data(request)
+        raw_init_data = rd.get('init_data')
+        if raw_init_data:
+            return self.check_web_app_input(raw_init_data)
         self.restore_redirect_path_query(rd)
         msg_invalid_request = 'Неверный запрос'
         try:

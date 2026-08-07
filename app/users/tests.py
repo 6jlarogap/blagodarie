@@ -3,6 +3,7 @@ import hmac
 import datetime
 import json
 import time
+import urllib.parse
 from decimal import Decimal
 from io import BytesIO
 from unittest import mock
@@ -10,7 +11,7 @@ from unittest import mock
 from django.contrib.auth.models import Group, User
 from django.db import transaction
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework.authtoken.models import Token
 
 from contact.models import CurrentState, Journal, Key, KeyType, OperationType
@@ -20,6 +21,62 @@ from users.models import Oauth, Offer, Profile, TelegramRelationRecheckNotice, R
     VpnServerRunway, VpnStatsSnapshot, VpnTrafficPeriod
 from users.views import ApiAuthTelegram
 from wote.models import Video, Vote
+
+
+@override_settings(TELEGRAM_BOT_TOKEN='123456:test-token')
+class TelegramMiniAppInitDataTests(SimpleTestCase):
+
+    bot_token = '123456:test-token'
+
+    def make_init_data(self, auth_date=None):
+        values = {
+            'auth_date': str(int(time.time()) if auth_date is None else auth_date),
+            'query_id': 'AAH-test-query',
+            'user': json.dumps({
+                'id': 12345,
+                'first_name': 'Mini & Co',
+                'username': 'mini_user',
+            }, separators=(',', ':')),
+        }
+        data_check_string = '\n'.join('%s=%s' % item for item in sorted(values.items()))
+        secret_key = hmac.new(b'WebAppData', self.bot_token.encode(), hashlib.sha256).digest()
+        values['hash'] = hmac.new(
+            secret_key, data_check_string.encode(), hashlib.sha256,
+        ).hexdigest()
+        return urllib.parse.urlencode(values)
+
+    def test_valid_init_data_is_verified_and_normalized_for_existing_auth_flow(self):
+        result = ApiAuthTelegram().check_web_app_input(self.make_init_data())
+        self.assertEqual(result['id'], '12345')
+        self.assertEqual(result['username'], 'mini_user')
+        self.assertEqual(result['first_name'], 'Mini & Co')
+        self.assertIn('auth_date', result)
+
+    def test_init_data_form_post_reuses_existing_auth_endpoint(self):
+        view = ApiAuthTelegram()
+        request = view.initialize_request(APIRequestFactory().post(
+            '/api/auth/telegram/',
+            data=urllib.parse.urlencode({'init_data': self.make_init_data()}),
+            content_type='application/x-www-form-urlencoded',
+        ))
+        result = view.check_input(request)
+        self.assertEqual(result['id'], '12345')
+
+    def test_bad_hash_is_rejected(self):
+        raw = self.make_init_data().replace('hash=', 'hash=bad', 1)
+        with self.assertRaisesMessage(Exception, 'данные не прошли проверку на hash'):
+            ApiAuthTelegram().check_web_app_input(raw)
+
+    def test_stale_init_data_is_rejected(self):
+        stale = int(time.time()) - 3601
+        with self.settings(TELEGRAM_AUTH_DATA_OUTDATED=3600):
+            with self.assertRaisesMessage(Exception, 'данные авторизации устарели'):
+                ApiAuthTelegram().check_web_app_input(self.make_init_data(stale))
+
+    @override_settings(TELEGRAM_BOT_TOKEN='')
+    def test_empty_bot_token_is_rejected(self):
+        with self.assertRaisesMessage(Exception, 'TELEGRAM_BOT_TOKEN'):
+            ApiAuthTelegram().check_web_app_input(self.make_init_data())
 
 
 @override_settings(TELEGRAM_BOT_TOKEN='123456:test-token')

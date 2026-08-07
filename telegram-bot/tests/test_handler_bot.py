@@ -36,6 +36,17 @@ class PrivateEntryFeedbackTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([reply.text for reply in message.replies], [self.handler_bot.Misc.MSG_ERROR_API])
 
+    async def test_private_graph_and_map_commands_use_mini_app_buttons(self):
+        graph_message = FakeMessage(text='/graph')
+        await self.handler_bot.cmd_graph(graph_message, FakeState())
+        graph_buttons = graph_message.replies[0].reply_markup.inline_keyboard
+        self.assertTrue(all('web_app' in row[0].kwargs for row in graph_buttons))
+
+        map_message = FakeMessage(text='/map')
+        await self.handler_bot.cmd_map(map_message, FakeState())
+        map_button = map_message.replies[0].reply_markup.inline_keyboard[0][0]
+        self.assertIn('web_app', map_button.kwargs)
+
     def test_telegram_username_input_accepts_only_exact_public_profiles(self):
         allowed = {
             '@Pending_Name': 'pending_name',
@@ -183,6 +194,7 @@ class PrivateEntryFeedbackTests(unittest.IsolatedAsyncioTestCase):
             profile=updated_profile,
             profile_sender=updated_profile,
             tg_user_sender=message.from_user,
+            use_mini_app=True,
         )
 
     async def test_update_profile_without_telegram_photo_preserves_existing_photo(self):
@@ -326,6 +338,7 @@ class PrivateEntryFeedbackTests(unittest.IsolatedAsyncioTestCase):
             profile=profile,
             profile_sender=profile,
             tg_user_sender=callback.from_user,
+            use_mini_app=True,
         )
         self.assertTrue(state.cleared)
         self.assertTrue(callback.answered)

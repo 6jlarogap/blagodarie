@@ -167,18 +167,18 @@ def _vpn_dashboard_text(response):
 )
 async def cmd_graph(message: Message, state: FSMContext):
     logging.debug(f"Executing cmd_graph command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
-    inline_btn_all_users = InlineKeyboardButton(
+    inline_btn_all_users = Misc.make_launch_button(
         text='Отношения участников',
-        login_url=Misc.make_login_url(
-            redirect_path=settings.GRAPH_HOST + '/?rod=on&dover=on&withalone=on',
-            keep_user_data='on'
-    ))
-    inline_btn_recent = InlineKeyboardButton(
+        redirect_path=settings.GRAPH_HOST + '/?rod=on&dover=on&withalone=on',
+        use_mini_app=True,
+        keep_user_data='on',
+    )
+    inline_btn_recent = Misc.make_launch_button(
         text='Недавно добавленные',
-        login_url=Misc.make_login_url(
-            redirect_path=settings.GRAPH_HOST + '/?f=0&q=50',
-            keep_user_data='on'
-    ))
+        redirect_path=settings.GRAPH_HOST + '/?f=0&q=50',
+        use_mini_app=True,
+        keep_user_data='on',
+    )
     await message.reply(
         text='Выберите тип графика',
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[inline_btn_all_users],[inline_btn_recent]])
@@ -202,6 +202,7 @@ async def cmd_ya(message: Message, state: FSMContext):
         profile=response_sender,
         profile_sender=response_sender,
         tg_user_sender=message.from_user,
+        use_mini_app=True,
     )
 
 
@@ -232,6 +233,7 @@ async def cmd_update_profile(message: Message, state: FSMContext):
         profile=profile,
         profile_sender=profile,
         tg_user_sender=message.from_user,
+        use_mini_app=True,
     )
 
 
@@ -402,9 +404,16 @@ async def cmd_stat(message: Message, state: FSMContext):
 )
 async def cmd_map(message: Message, state: FSMContext):
     logging.debug(f"Executing cmd_map command - User: {message.from_user.username} (ID: {message.from_user.id}), Message: {message.text}")
-    await bot.send_message(
-        message.from_user.id,
-        text=Misc.get_html_a(href=settings.MAP_HOST, text='Карта участников'),
+    await message.reply(
+        text='Карта участников',
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            Misc.make_launch_button(
+                text='Открыть карту',
+                redirect_path=settings.MAP_HOST,
+                use_mini_app=True,
+                keep_user_data='on',
+            ),
+        ]]),
     )
 
 
@@ -671,6 +680,7 @@ async def cmd_start(message: Message, state: FSMContext):
                 profile=profile_to,
                 profile_sender=response_sender,
                 tg_user_sender=message.from_user,
+                use_mini_app=True,
             )
         else:
             await message.reply('Пользователь не найден')
@@ -682,6 +692,7 @@ async def cmd_start(message: Message, state: FSMContext):
                 profile=profile_to,
                 profile_sender=response_sender,
                 tg_user_sender=message.from_user,
+                use_mini_app=True,
             )
         else:
             await message.reply('Пользователь не найден')
@@ -958,6 +969,7 @@ async def message_to_bot(message: Message, state: FSMContext):
             profile_sender=response_from,
             tg_user_sender=tg_user_sender,
             message_to_forward_id = message.message_id,
+            use_mini_app=True,
         )
         usernames, text_stripped = Misc.get_text_usernames(message_text)
         if usernames:
@@ -987,6 +999,7 @@ async def message_to_bot(message: Message, state: FSMContext):
             profile=profile,
             profile_sender=response_from,
             tg_user_sender=tg_user_sender,
+            use_mini_app=True,
         )
         return
     if message_text.startswith('/'):
@@ -1212,6 +1225,7 @@ async def put_location(message, state, show_card=False):
                         profile=response,
                         profile_sender=response_sender,
                         tg_user_sender=tg_user_sender,
+                        use_mini_app=True,
                     )
                     await message.reply('Координаты записаны', reply_markup=reply_markup)
             else:
@@ -1320,6 +1334,7 @@ async def process_new_org_ask(message: Message, state: FSMContext):
                 profile=response,
                 profile_sender=response_sender,
                 tg_user_sender=message.from_user,
+        use_mini_app=True,
             )
     await state.clear()
 
@@ -1373,6 +1388,7 @@ async def cbq_agree_to_rules(callback: CallbackQuery, state: FSMContext):
         profile=response_sender,
         profile_sender=response_sender,
         tg_user_sender=callback.from_user,
+        use_mini_app=True,
     )
     await state.clear()
     await callback.answer()

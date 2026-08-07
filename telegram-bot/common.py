@@ -14,6 +14,7 @@ import asyncio
 from aiogram import types, html
 from aiogram.types.login_url import LoginUrl
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
+from aiogram.types.web_app_info import WebAppInfo
 from aiogram.types.input_media_photo import InputMediaPhoto
 from aiogram.enums import ChatType
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramNetworkError
@@ -1011,6 +1012,20 @@ class Misc(object):
         )
 
     @classmethod
+    def make_mini_app_url(cls, redirect_path):
+        separator = '&' if '?' in redirect_path else '?'
+        return redirect_path + separator + 'mini_app=1'
+
+    @classmethod
+    def make_launch_button(cls, text, redirect_path, use_mini_app=False, **kwargs):
+        button_data = dict(text=text)
+        if use_mini_app:
+            button_data['web_app'] = WebAppInfo(url=cls.make_mini_app_url(redirect_path))
+        else:
+            button_data['login_url'] = cls.make_login_url(redirect_path, **kwargs)
+        return InlineKeyboardButton(**button_data)
+
+    @classmethod
     async def post_tg_user(cls, tg_user_sender, activate=False, did_bot_start=True):
         """
         Получить данные и/или сформировать пользователя
@@ -1277,6 +1292,7 @@ class Misc(object):
         # Сообщение с карточкой, которое надо подправить, а не слать новую карточку
         #
         card_message=None,
+        use_mini_app=False,
     ):
         """
         Показать карточку пользователя
@@ -1355,36 +1371,36 @@ class Misc(object):
             )
             buttons.append([inline_btn_thank])
 
-        inline_btn_trusts = InlineKeyboardButton(
+        inline_btn_trusts = cls.make_launch_button(
             text='Схема доверия',
-            login_url=cls.make_login_url(
-                redirect_path=f'{settings.GRAPH_HOST}/?user_trusts={profile["username"]}',
-                keep_user_data='on',
-            ))
+            redirect_path=f'{settings.GRAPH_HOST}/?user_trusts={profile["username"]}',
+            use_mini_app=use_mini_app,
+            keep_user_data='on',
+        )
         login_url_buttons = [inline_btn_trusts, ]
 
         if is_power and is_person:
-            inline_btn_genesis = InlineKeyboardButton(
+            inline_btn_genesis = cls.make_launch_button(
                 text='Род',
-                login_url=cls.make_login_url(
-                    redirect_path=(
-                            f'{settings.GRAPH_HOST}/?user_genesis_tree={profile["username"]}'
-                            f'&up=on&down=on&depth=2'
-                    ),
-                    keep_user_data='on',
-            ))
+                redirect_path=(
+                        f'{settings.GRAPH_HOST}/?user_genesis_tree={profile["username"]}'
+                        f'&up=on&down=on&depth=2'
+                ),
+                use_mini_app=use_mini_app,
+                keep_user_data='on',
+            )
             login_url_buttons.append(inline_btn_genesis)
 
         if profile.get('latitude') is not None and profile.get('longitude') is not None:
-            inline_btn_map = InlineKeyboardButton(
+            inline_btn_map = cls.make_launch_button(
                 text='Карта',
-                login_url=cls.make_login_url(
-                    redirect_path='%(map_host)s/?uuid_trustees=%(user_uuid)s' % dict(
-                        map_host=settings.MAP_HOST,
-                        user_uuid=profile['uuid'],
-                    ),
+                redirect_path='%(map_host)s/?uuid_trustees=%(user_uuid)s' % dict(
+                    map_host=settings.MAP_HOST,
+                    user_uuid=profile['uuid'],
+                ),
+                use_mini_app=use_mini_app,
                 keep_user_data='on',
-            ))
+            )
             login_url_buttons.append(inline_btn_map)
         buttons.append(login_url_buttons)
 

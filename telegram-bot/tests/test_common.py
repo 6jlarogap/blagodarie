@@ -28,6 +28,23 @@ class CommonRuntimeDeeplinkTests(unittest.TestCase):
             't.me/DoveraBot?start=woman',
         )
 
+    def test_private_mini_app_launcher_and_login_url_fallback_are_explicit(self):
+        mini = self.common.Misc.make_launch_button(
+            'Схема', 'https://graph.example/?user_trusts=alice', use_mini_app=True,
+            keep_user_data='on',
+        )
+        self.assertNotIn('login_url', mini.kwargs)
+        self.assertEqual(
+            mini.kwargs['web_app']['url'],
+            'https://graph.example/?user_trusts=alice&mini_app=1',
+        )
+        fallback = self.common.Misc.make_launch_button(
+            'Схема', 'https://graph.example/?user_trusts=alice', use_mini_app=False,
+            keep_user_data='on',
+        )
+        self.assertNotIn('web_app', fallback.kwargs)
+        self.assertIn('login_url', fallback.kwargs)
+
 
 class PendingProfileCardTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

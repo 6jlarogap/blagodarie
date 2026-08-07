@@ -234,6 +234,10 @@ def install_dependency_stubs(stub_common=True):
     types_login_url.LoginUrl = lambda **kwargs: kwargs
     sys.modules['aiogram.types.login_url'] = types_login_url
 
+    types_web_app_info = types.ModuleType('aiogram.types.web_app_info')
+    types_web_app_info.WebAppInfo = lambda **kwargs: kwargs
+    sys.modules['aiogram.types.web_app_info'] = types_web_app_info
+
     types_input_media_photo = types.ModuleType('aiogram.types.input_media_photo')
     types_input_media_photo.InputMediaPhoto = lambda **kwargs: kwargs
     sys.modules['aiogram.types.input_media_photo'] = types_input_media_photo
