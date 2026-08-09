@@ -77,6 +77,7 @@ import SpriteText from 'three-spritetext';
 import ForceGraph3D from '3d-force-graph';
 import { bindRenderLifecycle } from './render-lifecycle.js';
 import { nodePhotoUrl } from './node-visual.js';
+import { anchorOwnNode, canShowOwnProfileAnchor, findOwnNode, nodeSize } from './own-profile-anchor.js';
 
 (async function() {
 // ----------
@@ -429,7 +430,7 @@ import { nodePhotoUrl } from './node-visual.js';
         const material = new THREE.SpriteMaterial({ map: photoTexture, depthTest: false });
         const sprite = new THREE.Sprite(material);
         sprite.renderOrder = 11;
-        const size = data && data.root_node && node.id == data.root_node.id ? 50 : 25;
+        const size = nodeSize(node, data && data.root_node);
         sprite.scale.set(size, size);
 
         const label = new SpriteText();
@@ -448,8 +449,19 @@ import { nodePhotoUrl } from './node-visual.js';
     let node_current = {};
     let hovered_node = null;
     let last_click_node_time = 0;
+    let own_profile_node = null;
     const menu__title_span = document.querySelector(".menu__title-span");
     const menu_wrapper = document.querySelector(".menu-wrapper");
+    const own_profile_anchor_button = document.querySelector('#anchor-own-profile-button');
+
+    function update_own_profile_anchor_visibility() {
+        own_profile_node = canShowOwnProfileAnchor(
+            Boolean(parm_user_trusts),
+            auth_data,
+            data && data.nodes,
+        ) ? findOwnNode(data.nodes, auth_data) : null;
+        own_profile_anchor_button.hidden = !own_profile_node;
+    }
 
     function show_node_detail(node) {
         if (!node || !node.__threeObj || !node.__labelObj || node.__labelObj.parent !== node.__threeObj) return;
@@ -1174,6 +1186,12 @@ import { nodePhotoUrl } from './node-visual.js';
         render_lifecycle = bindRenderLifecycle(Graph, document);
         Graph.onEngineTick(render_lifecycle.keepAlive).onEngineStop(render_lifecycle.idle);
         document.querySelector('#reset-view-button').addEventListener('click', () => Graph.zoomToFit(750, 40));
+        own_profile_anchor_button.addEventListener('click', () => {
+            anchorOwnNode(Graph, own_profile_node, {
+                width: window.innerWidth,
+                height: window.innerHeight,
+            });
+        });
         if (parm_user_genesis_tree) {
             // if (!parm_up && !parm_down) {
                 // nodes_by_id[root_node.id].collapsed = true;
@@ -1186,6 +1204,7 @@ import { nodePhotoUrl } from './node-visual.js';
             }
             set_graph_data(get_pruned_tree());
         } else set_graph_data(data);
+        update_own_profile_anchor_visibility();
     }
 // ----------
 })();
