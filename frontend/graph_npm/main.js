@@ -636,7 +636,8 @@ import { nodePhotoUrl } from './node-visual.js';
         .linkDirectionalArrowRelPos(1)
         .linkDirectionalArrowColor(link => link_color(link, 'rgba'))
     ;
-    if (!parm_user_genesis_tree) Graph.d3Force('link').distance(195);
+    const ROD_LINK_DISTANCE = 195;
+    Graph.d3Force('link').distance(parm_user_genesis_tree ? ROD_LINK_DISTANCE : 195);
 
     async function collapse_expand(node, refresh=true) {
         if (!node) return;

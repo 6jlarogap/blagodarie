@@ -29,6 +29,14 @@ test('Schema renderer exposes a mobile reset-view control', async () => {
     assert.match(source, /querySelector\('#reset-view-button'\)\.addEventListener\('click', \(\) => Graph\.zoomToFit\(750, 40\)\)/);
 });
 
+test('Род renderer uses explicit wider link spacing', async () => {
+    const source = await readFile(new URL('./main.js', import.meta.url), 'utf8');
+    assert.match(
+        source,
+        /const ROD_LINK_DISTANCE = 195;\s*Graph\.d3Force\('link'\)\.distance\(parm_user_genesis_tree \? ROD_LINK_DISTANCE : 195\)/,
+    );
+});
+
 test('rendering pauses when idle or hidden and resumes on interaction', async () => {
     const target = new EventTarget();
     target.hidden = false;
