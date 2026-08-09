@@ -21,6 +21,14 @@ test('shared graph renderer always creates visible photo nodes', async () => {
     assert.match(showNodeDetail, /node\.__labelObj\.visible = true/);
 });
 
+test('Schema renderer exposes a mobile reset-view control', async () => {
+    const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+    const source = await readFile(new URL('./main.js', import.meta.url), 'utf8');
+    assert.match(html, /<button id="reset-view-button"[^>]*title="Сбросить вид"[^>]*aria-label="Сбросить вид"/);
+    assert.match(html, /#reset-view-button\s*\{[\s\S]*position: fixed;[\s\S]*top: 12px;[\s\S]*right: 12px;/);
+    assert.match(source, /querySelector\('#reset-view-button'\)\.addEventListener\('click', \(\) => Graph\.zoomToFit\(750, 40\)\)/);
+});
+
 test('rendering pauses when idle or hidden and resumes on interaction', async () => {
     const target = new EventTarget();
     target.hidden = false;

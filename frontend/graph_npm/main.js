@@ -1172,6 +1172,7 @@ import { nodePhotoUrl } from './node-visual.js';
         Graph = Graph(graph_container);
         render_lifecycle = bindRenderLifecycle(Graph, document);
         Graph.onEngineTick(render_lifecycle.keepAlive).onEngineStop(render_lifecycle.idle);
+        document.querySelector('#reset-view-button').addEventListener('click', () => Graph.zoomToFit(750, 40));
         if (parm_user_genesis_tree) {
             // if (!parm_up && !parm_down) {
                 // nodes_by_id[root_node.id].collapsed = true;
