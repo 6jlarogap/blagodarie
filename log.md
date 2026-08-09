@@ -1,5 +1,18 @@
 # Log
 
+## 2026-08-09
+
+- Implemented and deployed `doverabot-schema-own-profile-anchor-button` in
+  source commit `ded6bba`: authenticated `user_trusts` Schema pages now expose
+  a hidden-until-eligible mobile control below reset-view; it resolves the own
+  node by UUID/ID, reuses its sprite at the root's size, and pins it with the
+  existing graph screen-to-scene and fixed-coordinate APIs without changing
+  `node_current` or refetching. Focused npm contract `5/5`, JS syntax, build,
+  Graphify update, and diff checks passed. Wrapper deploy, dry-run, Django,
+  nginx, and service checks passed; public HTML/JS markers are live at
+  `d3.doverabot.ru`. Existing Django `security.W002` remains. Status is
+  `awaiting_human_checkpoint`; next slug: none.
+
 ## 2026-08-01
 
 - Recovered reproducible d3 source in `b75aa0e` for
