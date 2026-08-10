@@ -77,7 +77,7 @@ import SpriteText from 'three-spritetext';
 import ForceGraph3D from '3d-force-graph';
 import { bindRenderLifecycle } from './render-lifecycle.js';
 import { nodePhotoUrl, nodeSize } from './node-visual.js';
-import { shortestTrustPathLinks } from './trust-path-button.js';
+import { allTrustPathLinks } from './trust-path-button.js';
 
 (async function() {
 // ----------
@@ -425,6 +425,71 @@ import { shortestTrustPathLinks } from './trust-path-button.js';
         window.location.assign(url_path() + '?f=0&q=' + paginate_users_count);
         return;
     }
+    const viewer_uuid = auth_data && auth_data.user_uuid || get_parm('viewer_uuid') || '';
+    const VIEWER_ANCHOR_BOTTOM_OFFSET = 64;
+    let Graph = null;
+    let viewer_node = null;
+    let viewer_anchor_distance = null;
+
+    function anchor_viewer_node(nodeObject, node) {
+        if (!nodeObject || !node || !parm_user_trusts || node.uuid !== viewer_uuid || !Graph || !Graph.camera || !Graph.renderer) return false;
+        const renderer = Graph.renderer();
+        const camera = Graph.camera();
+        const width = renderer.domElement.clientWidth;
+        const height = renderer.domElement.clientHeight;
+        if (!width || !height) return false;
+        camera.updateMatrixWorld();
+        const controls = Graph.controls();
+        const distance = Math.max(1, camera.position.distanceTo(controls?.target || new THREE.Vector3()));
+        if (viewer_anchor_distance === null) viewer_anchor_distance = distance;
+        const anchor = Graph.screen2GraphCoords(
+            width / 2,
+            height - VIEWER_ANCHOR_BOTTOM_OFFSET,
+            distance,
+        );
+        node.x = node.fx = anchor.x;
+        node.y = node.fy = anchor.y;
+        node.z = node.fz = anchor.z;
+        nodeObject.position.copy(anchor);
+        const size = nodeSize(node, data && data.root_node) * distance / viewer_anchor_distance;
+        nodeObject.scale.set(size, size, size);
+        viewer_node = node;
+        return true;
+    }
+
+    function endpoint_node(endpoint) {
+        return typeof endpoint === 'object' ? endpoint : data && data.nodes.find(node => node.id === endpoint);
+    }
+
+    function is_viewer_link(link) {
+        const source = endpoint_node(link.source);
+        const target = endpoint_node(link.target);
+        return Boolean(viewer_node && (source === viewer_node || target === viewer_node));
+    }
+
+    function refresh_viewer_link(link) {
+        if (!is_viewer_link(link)) return;
+        const source = endpoint_node(link.source);
+        const target = endpoint_node(link.target);
+        const start = new THREE.Vector3(source.x, source.y || 0, source.z || 0);
+        const end = new THREE.Vector3(target.x, target.y || 0, target.z || 0);
+        const direction = new THREE.Vector3().subVectors(end, start);
+        link.__curve = null;
+        const line = link.__threeObj && (link.__threeObj.children[0] || link.__threeObj);
+        if (line && line.type === 'Mesh') {
+            line.position.copy(start);
+            line.scale.z = direction.length();
+            const lineEnd = end.clone();
+            line.parent.localToWorld(lineEnd);
+            line.lookAt(lineEnd);
+        }
+    }
+
+    function refresh_viewer_links() {
+        if (!viewer_node || !data) return;
+        data.links.forEach(refresh_viewer_link);
+    }
+
     function node_draw(node) {
         const photoTexture = new THREE.TextureLoader().load(nodePhotoUrl(node));
         const material = new THREE.SpriteMaterial({ map: photoTexture, depthTest: false });
@@ -449,7 +514,6 @@ import { shortestTrustPathLinks } from './trust-path-button.js';
     let node_current = {};
     let hovered_node = null;
     let last_click_node_time = 0;
-    const viewer_uuid = auth_data && auth_data.user_uuid || get_parm('viewer_uuid') || '';
     const menu__title_span = document.querySelector(".menu__title-span");
     const menu_wrapper = document.querySelector(".menu-wrapper");
     const trust_path_button = document.querySelector('#show-trust-path-button');
@@ -458,7 +522,7 @@ import { shortestTrustPathLinks } from './trust-path-button.js';
     let trust_path_timer = null;
 
     function update_trust_path_visibility() {
-        trust_path_links = parm_user_trusts ? shortestTrustPathLinks(
+        trust_path_links = parm_user_trusts ? allTrustPathLinks(
             data.nodes, data.links, viewer_uuid, data.root_node && data.root_node.uuid,
         ) : [];
         trust_path_button.hidden = trust_path_links.length === 0;
@@ -631,16 +695,17 @@ import { shortestTrustPathLinks } from './trust-path-button.js';
         if (render_lifecycle) render_lifecycle.resume();
         Graph.graphData(graphData);
     };
-    let Graph = ForceGraph3D()
+    Graph = ForceGraph3D()
         .nodeThreeObject(node => node_draw(node))
+        .nodePositionUpdate((nodeObject, coords, node) => anchor_viewer_node(nodeObject, node))
         // Если не дерево родства: если есть и родственная связь, и доверие, и если задано
         // искать родственные связи, то показываем стрелку цвета родственной связи.
         // В дереве родства своя цветовая гамма для оконченых узлов
 
         .linkColor(link => highlighted_trust_path_links.has(link) ? '#00bfff' : link_color(link, 'rgb'))
-        .linkWidth(link => highlighted_trust_path_links.has(link) ? 6 : 1)
+        .linkWidth(link => highlighted_trust_path_links.has(link) ? 3 : 1)
         .linkOpacity(0.8)
-        .linkCurvature(0.25)
+        .linkCurvature(link => is_viewer_link(link) ? 0 : 0.25)
         .backgroundColor("#FFFFFF")
         .nodeLabel('first_name')
         .onNodeHover(node => {
@@ -1212,6 +1277,11 @@ import { shortestTrustPathLinks } from './trust-path-button.js';
         }
         Graph = Graph(graph_container);
         render_lifecycle = bindRenderLifecycle(Graph, document);
+        const refresh_viewer_anchor = () => {
+            if (viewer_node && anchor_viewer_node(viewer_node.__threeObj, viewer_node)) refresh_viewer_links();
+        };
+        Graph.controls().addEventListener('change', refresh_viewer_anchor);
+        window.addEventListener('resize', refresh_viewer_anchor, {passive: true});
         Graph.onEngineTick(render_lifecycle.keepAlive).onEngineStop(render_lifecycle.idle);
         document.querySelector('#reset-view-button').addEventListener('click', () => {
             clear_trust_path_highlight();

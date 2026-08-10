@@ -2,6 +2,13 @@
 
 ## 2026-08-10
 
+- Implemented `doverabot-schema-all-paths-fixed-viewer`: Schema now highlights
+  all loaded directed simple trust/acquaintance routes, keeps the viewer fixed
+  bottom-center with coherent incident links, and uses a thinner route line
+  plus accessible path icon/label. Frontend tests, production build, built
+  asset check, diff check, and Graphify update passed; deploy and public smoke
+  are pending.
+
 - Implemented and deployed `doverabot-schema-visible-path-highlight` in source
   commit `5f763f0`: the Schema path control now computes the union of all loaded
   directed shortest trust/acquaintance paths in place, reveals their links

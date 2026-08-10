@@ -7,7 +7,7 @@ import {
     nodeSize,
     PROFILE_NODE_SIZE,
 } from './node-visual.js';
-import { shortestTrustPathLinks } from './trust-path-button.js';
+import { allTrustPathLinks } from './trust-path-button.js';
 import { bindRenderLifecycle } from './render-lifecycle.js';
 
 test('shared graph renderer always creates visible photo nodes', async () => {
@@ -32,19 +32,27 @@ test('Schema renderer exposes a mobile reset-view control', async () => {
     assert.match(html, /<button id="reset-view-button"[^>]*title="Сбросить вид"[^>]*aria-label="Сбросить вид"/);
     assert.match(html, /#reset-view-button\s*\{[\s\S]*position: fixed;[\s\S]*top: 12px;[\s\S]*right: 12px;/);
     assert.match(source, /querySelector\('#reset-view-button'\)[\s\S]*?clear_trust_path_highlight\(\);[\s\S]*?Graph\.zoomToFit\(750, 40\)/);
-    assert.match(html, /<button id="show-trust-path-button"[^>]*title="Подсветить кратчайшие пути доверия"[^>]*aria-label="Подсветить кратчайшие пути доверия"[^>]*hidden>/);
+    assert.match(html, /<button id="show-trust-path-button"[^>]*title="Подсветить все пути доверия"[^>]*aria-label="Подсветить все пути доверия"[^>]*hidden>/);
+    assert.match(html, /id="show-trust-path-button"[^>]*>↝<\/button>/);
     assert.match(html, /#show-trust-path-button\s*\{[\s\S]*top: 64px;[\s\S]*right: 12px;/);
-    assert.match(source, /shortestTrustPathLinks\(\s*data\.nodes, data\.links, viewer_uuid, data\.root_node && data\.root_node\.uuid/);
+    assert.match(source, /allTrustPathLinks\(\s*data\.nodes, data\.links, viewer_uuid, data\.root_node && data\.root_node\.uuid/);
     assert.match(source, /linkColor\(link => highlighted_trust_path_links\.has\(link\)/);
     assert.match(source, /linkWidth\(link => highlighted_trust_path_links\.has\(link\)/);
+    assert.match(source, /linkWidth\(link => highlighted_trust_path_links\.has\(link\) \? 3 : 1\)/);
     assert.doesNotMatch(source, /trustPathUrl|window\.location\.assign\(path\)/);
-    assert.doesNotMatch(source, /anchorOwnNode|own_profile_anchor|canShowOwnProfileAnchor/);
+    assert.match(source, /screen2GraphCoords\(\s*width \/ 2,[\s\S]*distance/);
+    assert.match(source, /node\.x = node\.fx = anchor\.x/);
+    assert.match(source, /Graph\.controls\(\)\.addEventListener\('change', refresh_viewer_anchor\)/);
+    assert.match(source, /linkCurvature\(link => is_viewer_link\(link\) \? 0 : 0\.25\)/);
+    const refreshAnchor = source.match(/const refresh_viewer_anchor[\s\S]*?\n        };/)[0];
+    assert.doesNotMatch(refreshAnchor, /Graph\.refresh/);
+    assert.match(source, /refresh_viewer_links\(\)/);
 });
 
-test('Schema highlights all loaded directed shortest trust paths', () => {
+test('Schema highlights all loaded directed trust paths', () => {
     const nodes = ['viewer', 'left', 'right', 'root', 'outside'].map((uuid, id) => ({id, uuid}));
     const direct = {source: 0, target: 3, attitude: 't'};
-    assert.deepEqual(shortestTrustPathLinks(nodes, [direct], 'viewer', 'root'), [direct]);
+    assert.deepEqual(allTrustPathLinks(nodes, [direct], 'viewer', 'root'), [direct]);
 
     const links = [
         {source: 0, target: 1, attitude: 't'},
@@ -55,10 +63,28 @@ test('Schema highlights all loaded directed shortest trust paths', () => {
         {source: 4, target: 3, attitude: 't'}, // wrong direction
         {source: 0, target: 3, attitude: 'mt'},
     ];
-    assert.deepEqual(shortestTrustPathLinks(nodes, links, 'viewer', 'root'), links.slice(0, 4));
-    assert.deepEqual(shortestTrustPathLinks(nodes, links, 'root', 'viewer'), []);
-    assert.deepEqual(shortestTrustPathLinks(nodes, links, 'viewer', 'outside'), []);
-    assert.deepEqual(shortestTrustPathLinks(nodes, links, 'viewer', 'viewer'), []);
+    assert.deepEqual(allTrustPathLinks(nodes, links, 'viewer', 'root'), links.slice(0, 4));
+    assert.deepEqual(allTrustPathLinks(nodes, links, 'root', 'viewer'), []);
+    assert.deepEqual(allTrustPathLinks(nodes, links, 'viewer', 'outside'), []);
+    assert.deepEqual(allTrustPathLinks(nodes, links, 'viewer', 'viewer'), []);
+});
+
+test('Schema keeps longer alternatives and excludes cycles that cannot reach root', () => {
+    const nodes = ['viewer', 'branch', 'root'].map((uuid, id) => ({id, uuid}));
+    const links = [
+        {source: 0, target: 2, attitude: 't'},
+        {source: 0, target: 1, attitude: 'a'},
+        {source: 1, target: 2, attitude: 't'},
+        {source: 1, target: 0, attitude: 't'},
+    ];
+    assert.deepEqual(allTrustPathLinks(nodes, links, 'viewer', 'root'), links.slice(0, 3));
+
+    const cycleLinks = [
+        {source: 0, target: 1, attitude: 't'},
+        {source: 1, target: 0, attitude: 't'},
+        {source: 1, target: 2, attitude: 'a'},
+    ];
+    assert.deepEqual(allTrustPathLinks(nodes, cycleLinks, 'viewer', 'root'), [cycleLinks[0], cycleLinks[2]]);
 });
 
 test('root profile remains the larger Schema node', () => {

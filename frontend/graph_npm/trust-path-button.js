@@ -1,6 +1,6 @@
 const endpointId = endpoint => typeof endpoint === 'object' ? endpoint.id : endpoint;
 
-export function shortestTrustPathLinks(nodes, links, viewerUuid, rootUuid) {
+export function allTrustPathLinks(nodes, links, viewerUuid, rootUuid) {
     if (!viewerUuid || !rootUuid || viewerUuid === rootUuid) return [];
 
     const viewer = nodes.find(node => node.uuid === viewerUuid);
@@ -17,38 +17,43 @@ export function shortestTrustPathLinks(nodes, links, viewerUuid, rootUuid) {
         outgoing.get(source).push(link);
     }
 
-    const distances = new Map([[viewer.id, 0]]);
-    const predecessors = new Map();
-    const queue = [viewer.id];
-    for (let index = 0; index < queue.length; index++) {
-        const source = queue[index];
-        for (const link of outgoing.get(source) || []) {
+    const reverse = new Map();
+    for (const [source, sourceLinks] of outgoing) {
+        for (const link of sourceLinks) {
             const target = endpointId(link.target);
-            const distance = distances.get(source) + 1;
-            if (!distances.has(target)) {
-                distances.set(target, distance);
-                predecessors.set(target, [link]);
-                queue.push(target);
-            } else if (distances.get(target) === distance) {
-                predecessors.get(target).push(link);
+            if (!reverse.has(target)) reverse.set(target, []);
+            reverse.get(target).push(source);
+        }
+    }
+    const canReachRoot = new Set([root.id]);
+    const pending = [root.id];
+    for (let index = 0; index < pending.length; index++) {
+        for (const source of reverse.get(pending[index]) || []) {
+            if (!canReachRoot.has(source)) {
+                canReachRoot.add(source);
+                pending.push(source);
             }
         }
     }
-    if (!distances.has(root.id)) return [];
+    if (!canReachRoot.has(viewer.id)) return [];
 
     const selected = new Set();
-    const pending = [root.id];
-    const visited = new Set();
-    while (pending.length) {
-        const target = pending.pop();
-        if (visited.has(target)) continue;
-        visited.add(target);
-        for (const link of predecessors.get(target) || []) {
-            selected.add(link);
-            pending.push(endpointId(link.source));
+    // ponytail: exhaustive paths fit the paginated Schema; bound traversal if graph sizes grow.
+    const visit = (source, path) => {
+        let reachesRoot = source === root.id;
+        for (const link of outgoing.get(source) || []) {
+            const target = endpointId(link.target);
+            if (!canReachRoot.has(target) || path.has(target)) continue;
+            const nextPath = new Set(path);
+            nextPath.add(target);
+            if (visit(target, nextPath)) {
+                selected.add(link);
+                reachesRoot = true;
+            }
         }
-    }
+        return reachesRoot;
+    };
+    visit(viewer.id, new Set([viewer.id]));
     return links
         .filter(link => selected.has(link))
-        .sort((left, right) => distances.get(endpointId(left.target)) - distances.get(endpointId(right.target)));
 }

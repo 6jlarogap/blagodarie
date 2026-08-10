@@ -100,6 +100,23 @@ generated-bundle `node --check`, Graphify update, deploy, active services,
 nginx syntax, and public HTML smoke all passed; deploy emitted only existing
 `security.W002`.
 
+## Slice 4: All Trust Paths and Fixed Viewer
+
+Slug: `doverabot-schema-all-paths-fixed-viewer`
+Status: completed
+Next: none
+
+Scope:
+
+- Highlight every loaded directed simple `a`/`t` route to the Schema root,
+  including longer alternatives while excluding cycles and dead branches.
+- Keep the authenticated viewer node bottom-centered through pan/zoom/rotate;
+  preserve graph link endpoints and use thinner highlighted lines.
+- Keep the route icon and Russian title/aria label truthful and accessible.
+
+Handoff: source and focused frontend checks passed; deployment and public smoke
+are pending the operational handoff commit.
+
 ## Worker Rules
 
 - Read `AGENTS.md`, root and nearest `CODE_INDEX.md`, `DEPLOYMENT.md`, and this
@@ -166,5 +183,9 @@ passed; Django emitted only the existing `security.W002` warning.
 
 ## Final Handoff
 
-Report completed slugs, commit hashes, deploy status, checks, blockers, changed
-files, and the next active slug (or `none`).
+Completed slugs: `doverabot-miniapp-launcher-unification`,
+`doverabot-schema-path-button-rebuild`,
+`doverabot-schema-visible-path-highlight`,
+`doverabot-schema-all-paths-fixed-viewer`. Commit hashes, deploy status,
+checks, blockers, changed files, and next active slug are recorded here after
+the operational handoff; next active slug: `none`.
