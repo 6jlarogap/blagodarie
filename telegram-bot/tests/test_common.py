@@ -104,10 +104,13 @@ class PendingProfileCardTests(unittest.IsolatedAsyncioTestCase):
             'send_or_edit_card',
             mock.AsyncMock(),
         ) as send_card:
-            await self.common.Misc.show_card(pending, sender, tg_user)
+            await self.common.Misc.show_card(pending, sender, tg_user, use_mini_app=True)
 
         reply, markup = send_card.await_args.args[:2]
         labels = [button.text for row in markup.inline_keyboard for button in row]
+        schema_button = next(button for row in markup.inline_keyboard for button in row if button.text == 'Схема доверия')
+        self.assertIn('login_url', schema_button.kwargs)
+        self.assertNotIn('web_app', schema_button.kwargs)
         self.assertIn('Неподтверждённое имя Telegram: @pending_name', reply)
         self.assertNotIn('Написать', labels)
         self.assertNotIn('Архив', labels)

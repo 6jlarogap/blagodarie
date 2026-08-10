@@ -1398,7 +1398,8 @@ class Misc(object):
         inline_btn_trusts = cls.make_launch_button(
             text='Схема доверия',
             redirect_path=f'{settings.GRAPH_HOST}/?user_trusts={profile["username"]}',
-            use_mini_app=use_mini_app,
+            # Signed login_url keeps the viewer identity reliable for own-node controls.
+            use_mini_app=False,
             keep_user_data='on',
         )
         login_url_buttons = [inline_btn_trusts, ]
