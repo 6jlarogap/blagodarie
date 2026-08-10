@@ -1,5 +1,17 @@
 # Log
 
+## 2026-08-10
+
+- Implemented and deployed `doverabot-schema-visible-path-highlight` in source
+  commit `5f763f0`: the Schema path control now computes the union of all loaded
+  directed shortest trust/acquaintance paths in place, reveals their links
+  through existing renderer callbacks, and clears them on reset without path
+  navigation or another API request. Focused frontend tests (`6`), production
+  build, generated-bundle syntax, diff checks, and Graphify update passed;
+  Django and nginx checks passed, all four services are active, recent web/bot
+  logs show clean restarts, and the public HTML plus hashed bundle smoke passed.
+  Existing Django `security.W002` remains; next slug: none.
+
 ## 2026-08-09
 
 - Implemented and deployed `doverabot-schema-own-profile-anchor-button` in

@@ -1,9 +1,9 @@
 # Doverabot Mini App Path Button Rebuild Chain
 
 Date: 2026-08-10
-Status: resumed for browser-only path highlighting
-Active slug: `doverabot-schema-visible-path-highlight`
-Next slug: `doverabot-schema-visible-path-highlight`
+Status: completed
+Active slug: none
+Next slug: none
 
 ## Decision
 
@@ -116,7 +116,7 @@ nginx syntax, and public HTML smoke all passed; deploy emitted only existing
 ## Slice 3: Visible Schema Path Highlight
 
 Slug: `doverabot-schema-visible-path-highlight`
-Status: ready
+Status: completed
 Depends on: completed Slice 2 at `1d9218f`
 Next: none
 
@@ -154,9 +154,15 @@ Complete when:
   Mini App smoke pass.
 - Commit, deploy, service/log checks, and handoff updates are complete.
 
-Resume command after starting a new session:
-
-`/new go doverabot-schema-visible-path-highlight`
+Handoff: commit `5f763f0`; the existing Schema control now computes the union
+of loaded directed shortest `t`/`a` paths in the browser, reveals their links
+in breadth order through the existing color/width callbacks, and clears the
+highlight on reset. It makes no path navigation or API request and stays hidden
+for missing, identical, or disconnected endpoints. Frontend tests (`6`), the
+production build, generated-bundle `node --check`, diff checks, and Graphify
+update passed. Wrapper deploy, Django and nginx checks, all four service checks,
+recent web/bot logs, public HTML markers, and the public hashed bundle (`200`)
+passed; Django emitted only the existing `security.W002` warning.
 
 ## Final Handoff
 
