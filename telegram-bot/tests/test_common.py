@@ -109,8 +109,10 @@ class PendingProfileCardTests(unittest.IsolatedAsyncioTestCase):
         reply, markup = send_card.await_args.args[:2]
         labels = [button.text for row in markup.inline_keyboard for button in row]
         schema_button = next(button for row in markup.inline_keyboard for button in row if button.text == 'Схема доверия')
-        self.assertIn('login_url', schema_button.kwargs)
-        self.assertNotIn('web_app', schema_button.kwargs)
+        self.assertEqual(
+            schema_button.kwargs['web_app']['url'],
+            'https://d3.doverabot.ru/?user_trusts=targetsid1&viewer_uuid=sender-uuid&mini_app=1',
+        )
         self.assertIn('Неподтверждённое имя Telegram: @pending_name', reply)
         self.assertNotIn('Написать', labels)
         self.assertNotIn('Архив', labels)

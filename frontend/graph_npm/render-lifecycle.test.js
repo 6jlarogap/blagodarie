@@ -36,6 +36,7 @@ test('Schema renderer exposes a mobile reset-view control', async () => {
     assert.match(source, /querySelector\('#reset-view-button'\)\.addEventListener\('click', \(\) => Graph\.zoomToFit\(750, 40\)\)/);
     assert.match(html, /<button id="anchor-own-profile-button"[^>]*title="Показать и закрепить мой профиль"[^>]*aria-label="Показать и закрепить мой профиль"[^>]*hidden>/);
     assert.match(html, /#anchor-own-profile-button\s*\{[\s\S]*top: 64px;[\s\S]*right: 12px;/);
+    assert.match(source, /const own_profile_identity = auth_data \|\| \{user_uuid: get_parm\('viewer_uuid'\)\}/);
     assert.match(source, /canShowOwnProfileAnchor\(\s*Boolean\(parm_user_trusts\)/);
     assert.match(source, /anchorOwnNode\(Graph, own_profile_node/);
 });

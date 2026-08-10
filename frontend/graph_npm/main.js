@@ -450,6 +450,7 @@ import { anchorOwnNode, canShowOwnProfileAnchor, findOwnNode, nodeSize } from '.
     let hovered_node = null;
     let last_click_node_time = 0;
     let own_profile_node = null;
+    const own_profile_identity = auth_data || {user_uuid: get_parm('viewer_uuid')};
     const menu__title_span = document.querySelector(".menu__title-span");
     const menu_wrapper = document.querySelector(".menu-wrapper");
     const own_profile_anchor_button = document.querySelector('#anchor-own-profile-button');
@@ -457,9 +458,9 @@ import { anchorOwnNode, canShowOwnProfileAnchor, findOwnNode, nodeSize } from '.
     function update_own_profile_anchor_visibility() {
         own_profile_node = canShowOwnProfileAnchor(
             Boolean(parm_user_trusts),
-            auth_data,
+            own_profile_identity,
             data && data.nodes,
-        ) ? findOwnNode(data.nodes, auth_data) : null;
+        ) ? findOwnNode(data.nodes, own_profile_identity) : null;
         own_profile_anchor_button.hidden = !own_profile_node;
     }
 
