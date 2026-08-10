@@ -76,8 +76,8 @@ import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import ForceGraph3D from '3d-force-graph';
 import { bindRenderLifecycle } from './render-lifecycle.js';
-import { nodePhotoUrl } from './node-visual.js';
-import { anchorOwnNode, canShowOwnProfileAnchor, findOwnNode, nodeSize } from './own-profile-anchor.js';
+import { nodePhotoUrl, nodeSize } from './node-visual.js';
+import { trustPathUrl } from './trust-path-button.js';
 
 (async function() {
 // ----------
@@ -449,19 +449,15 @@ import { anchorOwnNode, canShowOwnProfileAnchor, findOwnNode, nodeSize } from '.
     let node_current = {};
     let hovered_node = null;
     let last_click_node_time = 0;
-    let own_profile_node = null;
-    const own_profile_identity = auth_data || {user_uuid: get_parm('viewer_uuid')};
+    const viewer_uuid = auth_data && auth_data.user_uuid || get_parm('viewer_uuid') || '';
     const menu__title_span = document.querySelector(".menu__title-span");
     const menu_wrapper = document.querySelector(".menu-wrapper");
-    const own_profile_anchor_button = document.querySelector('#anchor-own-profile-button');
+    const trust_path_button = document.querySelector('#show-trust-path-button');
 
-    function update_own_profile_anchor_visibility() {
-        own_profile_node = canShowOwnProfileAnchor(
-            Boolean(parm_user_trusts),
-            own_profile_identity,
-            data && data.nodes,
-        ) ? findOwnNode(data.nodes, own_profile_identity) : null;
-        own_profile_anchor_button.hidden = !own_profile_node;
+    function update_trust_path_visibility() {
+        trust_path_button.hidden = !trustPathUrl(
+            url_path(), viewer_uuid, data && data.root_node && data.root_node.uuid,
+        );
     }
 
     function show_node_detail(node) {
@@ -1187,11 +1183,11 @@ import { anchorOwnNode, canShowOwnProfileAnchor, findOwnNode, nodeSize } from '.
         render_lifecycle = bindRenderLifecycle(Graph, document);
         Graph.onEngineTick(render_lifecycle.keepAlive).onEngineStop(render_lifecycle.idle);
         document.querySelector('#reset-view-button').addEventListener('click', () => Graph.zoomToFit(750, 40));
-        own_profile_anchor_button.addEventListener('click', () => {
-            anchorOwnNode(Graph, own_profile_node, {
-                width: window.innerWidth,
-                height: window.innerHeight,
-            });
+        trust_path_button.addEventListener('click', () => {
+            const path = trustPathUrl(
+                url_path(), viewer_uuid, data && data.root_node && data.root_node.uuid,
+            );
+            if (path) window.location.assign(path);
         });
         if (parm_user_genesis_tree) {
             // if (!parm_up && !parm_down) {
@@ -1205,7 +1201,7 @@ import { anchorOwnNode, canShowOwnProfileAnchor, findOwnNode, nodeSize } from '.
             }
             set_graph_data(get_pruned_tree());
         } else set_graph_data(data);
-        update_own_profile_anchor_visibility();
+        update_trust_path_visibility();
     }
 // ----------
 })();
