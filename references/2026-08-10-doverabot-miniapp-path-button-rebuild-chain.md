@@ -1,8 +1,8 @@
 # Doverabot Mini App Path Button Rebuild Chain
 
 Date: 2026-08-10
-Status: ready
-Active slug: `doverabot-miniapp-launcher-unification`
+Status: in_progress
+Active slug: `doverabot-schema-path-button-rebuild`
 Next slug: `doverabot-schema-path-button-rebuild`
 
 ## Decision
@@ -19,7 +19,7 @@ contract and the shared graph frontend.
 ## Slice 1: Mini App Launcher Unification
 
 Slug: `doverabot-miniapp-launcher-unification`
-Status: pending
+Status: completed
 Next: `doverabot-schema-path-button-rebuild`
 
 Scope:
@@ -48,6 +48,13 @@ Complete when:
 - Group/channel launchers use the existing Main Mini App route and still open.
 - Focused bot tests and compile checks pass; source is committed, deployed,
   checked, and recorded here before the next slice.
+
+Handoff: commit `742e010`; private Schema/Род/Карта launchers now default to
+Mini App buttons, forwarded profile cards retain their target and viewer query
+parameters, and group pins continue using Main Mini App startapp URLs. Focused
+bot tests (`22`) and Python compile checks passed; Graphify updated; deploy
+completed with Django warning `security.W002`, nginx syntax passed, and all
+services reported active.
 
 ## Slice 2: Schema Path Button Rebuild
 

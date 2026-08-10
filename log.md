@@ -446,3 +446,9 @@
 - Committed and deployed `doverabot-rental-runtime-concierge-owner-consumer-agent`: synced source, applied `users.0059_rentalreservationevent`, restarted web/bot, verified services active, and smoked `/api/rental/search`.
 - Implemented and deployed `blagodarie-chain-wrapper-commit-migrate-deploy-handoff`: added a maintainer-side chain handoff helper, committed it as `66b8c08`, ran wrapper-backed dry-run/sync/migrate/deploy/status/log checks, and confirmed nginx, web, and bot active.
 - Tightened the chain handoff helper so `/new go` slug is mandatory via `--new-go-slug SLUG`; positional slug arguments are rejected.
+- Implemented and deployed `doverabot-miniapp-launcher-unification`: made
+  private Schema/Род/Карта launchers Mini App-first, including forwarded cards,
+  consolidated direct post-operation/sympathy/video launchers, preserved group
+  Main Mini App routing, committed as `742e010`, passed 22 focused bot tests
+  plus Python compile checks, updated Graphify, and confirmed nginx plus all
+  services active; Django reported only existing `security.W002`.
