@@ -1,9 +1,9 @@
 # Doverabot Mini App Path Button Rebuild Chain
 
 Date: 2026-08-10
-Status: in_progress
-Active slug: `doverabot-schema-path-button-rebuild`
-Next slug: `doverabot-schema-path-button-rebuild`
+Status: completed
+Active slug: `none`
+Next slug: `none`
 
 ## Decision
 
@@ -59,7 +59,7 @@ services reported active.
 ## Slice 2: Schema Path Button Rebuild
 
 Slug: `doverabot-schema-path-button-rebuild`
-Status: pending
+Status: completed
 Next: none
 
 Scope:
@@ -89,6 +89,16 @@ Complete when:
 - Obsolete pinning code is gone, focused frontend tests/build pass, generated
   dist changes are limited to the required build, and the slice is committed,
   deployed, checked, and recorded here and in `log.md`.
+
+Handoff: commit `1d9218f`; removed the own-profile pin/anchor module and made
+the second control navigate to `user_trust_path=<viewer uuid>,<root uuid>` only
+when both UUIDs exist and differ. The browser renders the server-returned
+`/api/profile_trust` result; server-side `find_trust_path_shortest` remains the
+authoritative visibility-filtered union of all shortest paths, not a client BFS
+or enumeration of cyclic paths. Frontend tests (`6`), production build,
+generated-bundle `node --check`, Graphify update, deploy, active services,
+nginx syntax, and public HTML smoke all passed; deploy emitted only existing
+`security.W002`.
 
 ## Worker Rules
 

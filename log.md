@@ -452,3 +452,11 @@
   Main Mini App routing, committed as `742e010`, passed 22 focused bot tests
   plus Python compile checks, updated Graphify, and confirmed nginx plus all
   services active; Django reported only existing `security.W002`.
+- Implemented and deployed `doverabot-schema-path-button-rebuild`: replaced
+  the non-working own-profile anchor with a distinct viewer-to-root
+  `user_trust_path` navigation control, removed obsolete anchor code, retained
+  reset/Род behavior, and kept pathfinding server-side through the existing
+  visibility-filtered all-shortest-path API. Frontend tests (6), production
+  build, bundle syntax check, Graphify update, deploy, active services, nginx,
+  and public HTML smoke passed; committed as `1d9218f`; Django reported only
+  existing `security.W002`.
