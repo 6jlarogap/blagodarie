@@ -77,7 +77,7 @@ import SpriteText from 'three-spritetext';
 import ForceGraph3D from '3d-force-graph';
 import { bindRenderLifecycle } from './render-lifecycle.js';
 import { nodePhotoUrl, nodeSize } from './node-visual.js';
-import { trustPathUrl } from './trust-path-button.js';
+import { shortestTrustPathLinks } from './trust-path-button.js';
 
 (async function() {
 // ----------
@@ -453,10 +453,40 @@ import { trustPathUrl } from './trust-path-button.js';
     const menu__title_span = document.querySelector(".menu__title-span");
     const menu_wrapper = document.querySelector(".menu-wrapper");
     const trust_path_button = document.querySelector('#show-trust-path-button');
+    const highlighted_trust_path_links = new Set();
+    let trust_path_links = [];
+    let trust_path_timer = null;
 
     function update_trust_path_visibility() {
-        trust_path_button.hidden = !trustPathUrl(
-            url_path(), viewer_uuid, data && data.root_node && data.root_node.uuid,
+        trust_path_links = parm_user_trusts ? shortestTrustPathLinks(
+            data.nodes, data.links, viewer_uuid, data.root_node && data.root_node.uuid,
+        ) : [];
+        trust_path_button.hidden = trust_path_links.length === 0;
+    }
+
+    function clear_trust_path_highlight() {
+        clearInterval(trust_path_timer);
+        trust_path_timer = null;
+        highlighted_trust_path_links.clear();
+        Graph.refresh();
+    }
+
+    function show_trust_path() {
+        clear_trust_path_highlight();
+        let index = 0;
+        const reveal_next = () => {
+            if (index === trust_path_links.length) {
+                clearInterval(trust_path_timer);
+                trust_path_timer = null;
+                return;
+            }
+            highlighted_trust_path_links.add(trust_path_links[index++]);
+            Graph.refresh();
+        };
+        reveal_next();
+        trust_path_timer = setInterval(
+            reveal_next,
+            180,
         );
     }
 
@@ -607,7 +637,8 @@ import { trustPathUrl } from './trust-path-button.js';
         // искать родственные связи, то показываем стрелку цвета родственной связи.
         // В дереве родства своя цветовая гамма для оконченых узлов
 
-        .linkColor(link => link_color(link, 'rgb'))
+        .linkColor(link => highlighted_trust_path_links.has(link) ? '#00bfff' : link_color(link, 'rgb'))
+        .linkWidth(link => highlighted_trust_path_links.has(link) ? 6 : 1)
         .linkOpacity(0.8)
         .linkCurvature(0.25)
         .backgroundColor("#FFFFFF")
@@ -643,7 +674,7 @@ import { trustPathUrl } from './trust-path-button.js';
         })
         .linkDirectionalArrowLength(10)
         .linkDirectionalArrowRelPos(1)
-        .linkDirectionalArrowColor(link => link_color(link, 'rgba'))
+        .linkDirectionalArrowColor(link => highlighted_trust_path_links.has(link) ? '#00bfff' : link_color(link, 'rgba'))
     ;
     const ROD_LINK_DISTANCE = 195;
     Graph.d3Force('link').distance(parm_user_genesis_tree ? ROD_LINK_DISTANCE : 195);
@@ -1182,13 +1213,11 @@ import { trustPathUrl } from './trust-path-button.js';
         Graph = Graph(graph_container);
         render_lifecycle = bindRenderLifecycle(Graph, document);
         Graph.onEngineTick(render_lifecycle.keepAlive).onEngineStop(render_lifecycle.idle);
-        document.querySelector('#reset-view-button').addEventListener('click', () => Graph.zoomToFit(750, 40));
-        trust_path_button.addEventListener('click', () => {
-            const path = trustPathUrl(
-                url_path(), viewer_uuid, data && data.root_node && data.root_node.uuid,
-            );
-            if (path) window.location.assign(path);
+        document.querySelector('#reset-view-button').addEventListener('click', () => {
+            clear_trust_path_highlight();
+            Graph.zoomToFit(750, 40);
         });
+        trust_path_button.addEventListener('click', show_trust_path);
         if (parm_user_genesis_tree) {
             // if (!parm_up && !parm_down) {
                 // nodes_by_id[root_node.id].collapsed = true;
