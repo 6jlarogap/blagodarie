@@ -1,9 +1,9 @@
 # Doverabot Mini App Path Button Rebuild Chain
 
 Date: 2026-08-10
-Status: completed
-Active slug: `none`
-Next slug: `none`
+Status: resumed for browser-only path highlighting
+Active slug: `doverabot-schema-visible-path-highlight`
+Next slug: `doverabot-schema-visible-path-highlight`
 
 ## Decision
 
@@ -112,6 +112,51 @@ nginx syntax, and public HTML smoke all passed; deploy emitted only existing
   ledger and `log.md`, then continue.
 - Stop and report the exact blocker if a required check, commit, permission, or
   deploy step fails; do not paper over failures or revert unrelated work.
+
+## Slice 3: Visible Schema Path Highlight
+
+Slug: `doverabot-schema-visible-path-highlight`
+Status: ready
+Depends on: completed Slice 2 at `1d9218f`
+Next: none
+
+Scope:
+
+- Keep the completed Mini App launcher unification from `742e010`.
+- Replace the second button's `user_trust_path` navigation/API round-trip with
+  in-place highlighting over the `data.nodes` and `data.links` already returned
+  by `/api/profile_graph` for the current Schema.
+- Follow directed trust/acquaintance edges (`t`/`a`) from the viewing user to
+  the viewed root. Compute the union of all shortest paths in the loaded graph;
+  do not enumerate cyclic or longer paths.
+- On one button press, reveal the path edges in order in the existing graph.
+  Keep the existing reset button and make it clear the highlight.
+- Hide or disable the path button when the viewer/root is absent, identical, or
+  disconnected inside the loaded graph. Keep a truthful Russian accessible
+  label.
+- Reuse the existing graph renderer and its link color/width callbacks. Replace
+  the small `trust-path-button.js` helper rather than adding another module or
+  backend endpoint.
+
+Out of scope:
+
+- Searching through unloaded database profiles, calling `/api/profile_trust`,
+  changing Django/PostgreSQL pathfinding, enumerating all simple paths, or
+  changing which nodes `/api/profile_graph` returns.
+
+Complete when:
+
+- Clicking the second button causes no navigation and no API request.
+- All loaded shortest viewer-to-root trust/acquaintance path edges are visibly
+  highlighted in place, reset clears them, and no-path state is handled.
+- One focused helper test covers direct, multiple-shortest, directed, cyclic,
+  disconnected, and same-endpoint cases; frontend tests/build and public
+  Mini App smoke pass.
+- Commit, deploy, service/log checks, and handoff updates are complete.
+
+Resume command after starting a new session:
+
+`/new go doverabot-schema-visible-path-highlight`
 
 ## Final Handoff
 
