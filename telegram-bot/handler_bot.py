@@ -1350,18 +1350,14 @@ async def answer_youtube_message(message, youtube_id, youtube_link):
             redirect_path=redirect_path,
             keep_user_data='on'
     ))
-    inline_btn_scheme = InlineKeyboardButton(
+    inline_btn_scheme = Misc.make_launch_button(
         text='Схема',
-        login_url=Misc.make_login_url(
-            redirect_path=f'{settings.GRAPH_HOST}/?videoid={youtube_id}&source=yt',
-            keep_user_data='on',
-        ))
-    inline_btn_map = InlineKeyboardButton(
+        redirect_path=f'{settings.GRAPH_HOST}/?videoid={youtube_id}&source=yt',
+    )
+    inline_btn_map = Misc.make_launch_button(
         text='Карта',
-        login_url=Misc.make_login_url(
-            redirect_path=f'{settings.MAP_HOST}/?videoid={youtube_id}&source=yt',
-            keep_user_data='on',
-        ))
+        redirect_path=f'{settings.MAP_HOST}/?videoid={youtube_id}&source=yt',
+    )
     buttons = [ [inline_btn_redirect], [inline_btn_scheme, inline_btn_map] ]
     await message.reply(
         reply,

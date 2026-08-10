@@ -75,12 +75,10 @@ class Common(object):
 
     @classmethod
     def inline_btn_map(cls):
-        return InlineKeyboardButton(
+        return Misc.make_launch_button(
             text='Карта участников игры',
-            login_url=Misc.make_login_url(
-                redirect_path=settings.MEET_HOST,
-                keep_user_data='on'
-        ))
+            redirect_path=settings.MEET_HOST,
+        )
 
     @classmethod
     async def check_common_callback(cls, callback):
@@ -312,12 +310,10 @@ class Common(object):
             text='Скрыть',
             callback_data=cls.CALLBACK_DATA_TEMPLATE % callback_dict
         )
-        button_trusts = InlineKeyboardButton(
+        button_trusts = Misc.make_launch_button(
             text='Смотреть доверие',
-            login_url=Misc.make_login_url(
-                redirect_path=settings.GRAPH_MEET_HOST + f'/?id={profile_to["username"]}',
-                keep_user_data='on'
-        ))
+            redirect_path=settings.GRAPH_MEET_HOST + f'/?id={profile_to["username"]}',
+        )
         reply_markup = InlineKeyboardMarkup(inline_keyboard=[
             [button_trusts],
             [button_sympa, button_hide],

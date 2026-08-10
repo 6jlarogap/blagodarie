@@ -1041,7 +1041,7 @@ class Misc(object):
         return cls.make_launch_button(text, redirect_path)
 
     @classmethod
-    def make_launch_button(cls, text, redirect_path, use_mini_app=False, **kwargs):
+    def make_launch_button(cls, text, redirect_path, use_mini_app=True, **kwargs):
         button_data = dict(text=text)
         if use_mini_app:
             button_data['web_app'] = WebAppInfo(url=cls.make_mini_app_url(redirect_path))
@@ -1316,7 +1316,7 @@ class Misc(object):
         # Сообщение с карточкой, которое надо подправить, а не слать новую карточку
         #
         card_message=None,
-        use_mini_app=False,
+        use_mini_app=True,
     ):
         """
         Показать карточку пользователя
@@ -2317,21 +2317,17 @@ class Misc(object):
 
             if not group_member and (operation_done or operation_already):
                 if not buttons:
-                    inline_btn_trusts = InlineKeyboardButton(
+                    inline_btn_trusts = cls.make_launch_button(
                         text='Схема доверия',
-                        login_url=cls.make_login_url(
-                            redirect_path=f'{settings.GRAPH_HOST}/?user_trusts={profile_to["username"]}',
-                            keep_user_data='on',
-                    ))
-                    inline_btn_map = InlineKeyboardButton(
+                        redirect_path=f'{settings.GRAPH_HOST}/?user_trusts={profile_to["username"]}',
+                    )
+                    inline_btn_map = cls.make_launch_button(
                         text='Карта',
-                        login_url=cls.make_login_url(
-                            redirect_path='%(map_host)s/?uuid_trustees=%(user_uuid)s' % dict(
-                                map_host=settings.MAP_HOST,
-                                user_uuid=profile_to['uuid'],
-                            ),
-                            keep_user_data='on',
-                    ))
+                        redirect_path='%(map_host)s/?uuid_trustees=%(user_uuid)s' % dict(
+                            map_host=settings.MAP_HOST,
+                            user_uuid=profile_to['uuid'],
+                        ),
+                    )
                     buttons.append([inline_btn_trusts, inline_btn_map])
 
             if not group_member and data.get('callback') and \
@@ -2871,18 +2867,14 @@ class Misc(object):
                 keyboard_type=KeyboardType.MEET_INVITE,
                 sep=KeyboardType.SEP,
             ))
-            inline_btn_map = InlineKeyboardButton(
+            inline_btn_map = Misc.make_launch_button(
                 text='Карта участников игры',
-                login_url=Misc.make_login_url(
-                    redirect_path=settings.MEET_HOST,
-                    keep_user_data='on'
-            ))
-            inline_btn_mgraph = InlineKeyboardButton(
+                redirect_path=settings.MEET_HOST,
+            )
+            inline_btn_mgraph = Misc.make_launch_button(
                 text='Отношения участников',
-                login_url=Misc.make_login_url(
-                    redirect_path=settings.GRAPH_MEET_HOST,
-                    keep_user_data='on'
-            ))
+                redirect_path=settings.GRAPH_MEET_HOST,
+            )
             inline_btn_edit = InlineKeyboardButton(
                 text='Редактировать',
                 callback_data=cls.CALLBACK_DATA_SID_TEMPLATE % dict(

@@ -46,6 +46,17 @@ class CommonRuntimeDeeplinkTests(unittest.TestCase):
         self.assertNotIn('web_app', fallback.kwargs)
         self.assertIn('login_url', fallback.kwargs)
 
+    def test_schema_rod_map_launchers_are_mini_app_first(self):
+        for label, path in (
+            ('Схема доверия', 'https://graph.example/?user_trusts=alice'),
+            ('Род', 'https://graph.example/?user_genesis_tree=alice'),
+            ('Карта', 'https://map.example/?uuid_trustees=alice'),
+        ):
+            with self.subTest(label=label):
+                button = self.common.Misc.make_launch_button(label, path)
+                self.assertIn('web_app', button.kwargs)
+                self.assertNotIn('login_url', button.kwargs)
+
     def test_main_mini_app_group_routes_are_whitelisted_and_compact(self):
         self.assertEqual(
             self.common.Misc.make_main_mini_app_url('map', chat_id=-100123),
@@ -104,7 +115,9 @@ class PendingProfileCardTests(unittest.IsolatedAsyncioTestCase):
             'send_or_edit_card',
             mock.AsyncMock(),
         ) as send_card:
-            await self.common.Misc.show_card(pending, sender, tg_user, use_mini_app=True)
+            await self.common.Misc.show_card(
+                pending, sender, tg_user, message_to_forward_id='forwarded-message',
+            )
 
         reply, markup = send_card.await_args.args[:2]
         labels = [button.text for row in markup.inline_keyboard for button in row]
