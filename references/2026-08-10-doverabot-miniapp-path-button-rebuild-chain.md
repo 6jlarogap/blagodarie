@@ -114,8 +114,13 @@ Scope:
   preserve graph link endpoints and use thinner highlighted lines.
 - Keep the route icon and Russian title/aria label truthful and accessible.
 
-Handoff: source and focused frontend checks passed; deployment and public smoke
-are pending the operational handoff commit.
+Handoff: commit `7aacf19`; frontend tests (`7`), production build, built asset
+check, diff checks, and Graphify update passed. Deploy-dry-run and wrapper
+deploy passed; Django reported only existing `security.W002`, nginx syntax
+passed, all four services are active, and requested web/bot logs completed.
+Public HTML contains `Подсветить все пути доверия`, icon `↝`, and bundle
+`index-DDCO1iQ9.js`; the bundle returns HTTP 200. Documentation-only result
+is recorded in this follow-up commit.
 
 ## Worker Rules
 
@@ -186,6 +191,6 @@ passed; Django emitted only the existing `security.W002` warning.
 Completed slugs: `doverabot-miniapp-launcher-unification`,
 `doverabot-schema-path-button-rebuild`,
 `doverabot-schema-visible-path-highlight`,
-`doverabot-schema-all-paths-fixed-viewer`. Commit hashes, deploy status,
-checks, blockers, changed files, and next active slug are recorded here after
-the operational handoff; next active slug: `none`.
+`doverabot-schema-all-paths-fixed-viewer`. Slice 4 source commit: `7aacf19`;
+the documentation follow-up records deploy completion, checks, and changed
+files; next active slug: `none`.

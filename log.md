@@ -6,8 +6,12 @@
   all loaded directed simple trust/acquaintance routes, keeps the viewer fixed
   bottom-center with coherent incident links, and uses a thinner route line
   plus accessible path icon/label. Frontend tests, production build, built
-  asset check, diff check, and Graphify update passed; deploy and public smoke
-  are pending.
+  asset check, diff check, and Graphify update passed. Source/docs commit:
+  `7aacf19`; deploy-dry-run and wrapper deploy passed, Django emitted only
+  existing `security.W002`, nginx syntax passed, all four services are active,
+  and web/bot log checks completed. Public HTML contains the new label/icon and
+  `/assets/index-DDCO1iQ9.js` returns HTTP 200. Documentation follow-up
+  completed.
 
 - Implemented and deployed `doverabot-schema-visible-path-highlight` in source
   commit `5f763f0`: the Schema path control now computes the union of all loaded
