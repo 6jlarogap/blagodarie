@@ -137,10 +137,13 @@ Scope:
 - Ensure paginated Schema responses include a disconnected Token-authenticated
   viewer without leaking that viewer through shared URL caching.
 
-Result/checks: source and frontend contract updated; frontend tests (`7/7`),
-production build, generated-bundle syntax check, diff check, and Graphify
-update passed. The targeted PostgreSQL-backed regression passed when rerun by
-the parent worker. Deploy, public smoke, and push remain pending.
+Result/checks: source commit `61450b8`; frontend tests (`7/7`), production
+build, generated-bundle syntax check, diff check, and Graphify update passed.
+The targeted PostgreSQL-backed regression passed when rerun by the parent
+worker. Deploy succeeded; Django reported only existing `security.W002`, nginx
+syntax passed, all four services are active, and web/bot logs show clean normal
+restarts. Public HTML contains the route control with `aria-pressed` and the
+bundle `index-C7DNXQfA.js` returns HTTP 200. Push remains pending.
 
 ## Worker Rules
 
@@ -212,8 +215,9 @@ Completed slugs: `doverabot-miniapp-launcher-unification`,
 `doverabot-schema-path-button-rebuild`,
 `doverabot-schema-visible-path-highlight`,
 `doverabot-schema-all-paths-fixed-viewer`,
-`doverabot-schema-route-toggle-viewer-presence`. Slice 4 source commit:
-`7aacf19`;
-the documentation follow-up records deploy completion, checks, and changed
-files; Slice 5 source remains uncommitted pending deploy/public verification;
-next active slug: `none`.
+`doverabot-schema-route-toggle-viewer-presence`. Slice 5 source commit:
+`61450b8`; deploy succeeded with only existing Django `security.W002`, nginx
+syntax passed, all four services are active, logs show clean normal restarts,
+and public HTML/bundle checks passed (`aria-pressed`,
+`index-C7DNXQfA.js` HTTP 200). Push remains pending; next active slug:
+`none`.

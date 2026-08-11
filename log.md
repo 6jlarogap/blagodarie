@@ -4,9 +4,13 @@
 
 - Implemented `doverabot-schema-route-toggle-viewer-presence`: route toggle
   release/native lifecycle handling and paginated Token viewer inclusion are
-  covered; frontend tests (`7/7`), build/bundle syntax, diff check, and
-  Graphify passed, and the targeted PostgreSQL regression passed on parent
-  rerun. Deploy and push remain pending.
+  covered in source commit `61450b8`; frontend tests (`7/7`), build/bundle
+  syntax, diff check, and Graphify passed, and the targeted PostgreSQL
+  regression passed on parent rerun. Deploy succeeded; Django reported only
+  existing `security.W002`, nginx syntax passed, all four services are active,
+  and web/bot logs show clean normal restarts. Public HTML contains the route
+  control with `aria-pressed`, and `index-C7DNXQfA.js` returns HTTP 200. Push
+  remains pending.
 
 ## 2026-08-10
 
