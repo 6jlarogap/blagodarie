@@ -7,7 +7,6 @@ from django.db import transaction, IntegrityError, connection
 from django.db.models import F, Sum, Max, Min, Prefetch
 from django.db.models.query_utils import Q
 from django.views.generic.base import View
-from django.views.decorators.cache import cache_page
 from django.http import Http404
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
@@ -3332,7 +3331,7 @@ class ApiProfileGenesisAll(TelegramApiMixin, APIView):
             data = dict(users=users, connections=connections, trust_connections=[])
         return data
 
-api_profile_genesis_all = cache_page(30)(ApiProfileGenesisAll.as_view())
+api_profile_genesis_all = ApiProfileGenesisAll.as_view()
 
 
 class ApiProfileGenesis(GetTrustGenesisMixin, UuidMixin, SQL_Mixin, TelegramApiMixin, APIView):

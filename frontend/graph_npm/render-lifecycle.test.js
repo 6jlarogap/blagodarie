@@ -32,7 +32,7 @@ test('Schema renderer exposes a mobile reset-view control', async () => {
     assert.match(html, /<button id="reset-view-button"[^>]*title="Сбросить вид"[^>]*aria-label="Сбросить вид"/);
     assert.match(html, /#reset-view-button\s*\{[\s\S]*position: fixed;[\s\S]*top: 12px;[\s\S]*right: 12px;/);
     assert.match(source, /querySelector\('#reset-view-button'\)[\s\S]*?clear_trust_path_highlight\(\);[\s\S]*?Graph\.zoomToFit\(750, 40\)/);
-    assert.match(html, /<button id="show-trust-path-button"[^>]*title="Подсветить все пути доверия"[^>]*aria-label="Подсветить все пути доверия"[^>]*hidden>/);
+    assert.match(html, /<button id="show-trust-path-button"[^>]*title="Подсветить все пути доверия"[^>]*aria-label="Подсветить все пути доверия"[^>]*aria-pressed="false"[^>]*hidden>/);
     assert.match(html, /id="show-trust-path-button"[^>]*>↝<\/button>/);
     assert.match(html, /#show-trust-path-button\s*\{[\s\S]*top: 64px;[\s\S]*right: 12px;/);
     assert.match(source, /allTrustPathLinks\(\s*data\.nodes, data\.links, viewer_uuid, data\.root_node && data\.root_node\.uuid/);
@@ -42,11 +42,18 @@ test('Schema renderer exposes a mobile reset-view control', async () => {
     assert.doesNotMatch(source, /trustPathUrl|window\.location\.assign\(path\)/);
     assert.match(source, /screen2GraphCoords\(\s*width \/ 2,[\s\S]*distance/);
     assert.match(source, /node\.x = node\.fx = anchor\.x/);
+    assert.match(source, /function toggle_trust_path\(\)/);
+    assert.match(source, /delete viewer_node\.fx/);
+    assert.match(source, /trust_path_button\.setAttribute\('aria-pressed', 'true'\)/);
+    assert.match(source, /trust_path_button\.setAttribute\('aria-pressed', 'false'\)/);
+    assert.match(source, /trust_path_button\.hidden = !parm_user_trusts \|\| !viewer_loaded \|\| trust_path_links\.length === 0/);
     assert.match(source, /Graph\.controls\(\)\.addEventListener\('change', refresh_viewer_anchor\)/);
-    assert.match(source, /linkCurvature\(link => is_viewer_link\(link\) \? 0 : 0\.25\)/);
+    assert.match(source, /linkCurvature\(link => viewer_anchor_active && is_viewer_link\(link\) \? 0 : 0\.25\)/);
     const refreshAnchor = source.match(/const refresh_viewer_anchor[\s\S]*?\n        };/)[0];
     assert.doesNotMatch(refreshAnchor, /Graph\.refresh/);
-    assert.match(source, /refresh_viewer_links\(\)/);
+    assert.doesNotMatch(refreshAnchor, /d3ReheatSimulation/);
+    assert.doesNotMatch(source, /refresh_viewer_link/);
+    assert.match(source, /render_lifecycle\.resume\(\)/);
 });
 
 test('Schema highlights all loaded directed trust paths', () => {

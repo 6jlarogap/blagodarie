@@ -1,5 +1,13 @@
 # Log
 
+## 2026-08-11
+
+- Implemented `doverabot-schema-route-toggle-viewer-presence`: route toggle
+  release/native lifecycle handling and paginated Token viewer inclusion are
+  covered; frontend tests (`7/7`), build/bundle syntax, diff check, and
+  Graphify passed, and the targeted PostgreSQL regression passed on parent
+  rerun. Deploy and push remain pending.
+
 ## 2026-08-10
 
 - Implemented `doverabot-schema-all-paths-fixed-viewer`: Schema now highlights

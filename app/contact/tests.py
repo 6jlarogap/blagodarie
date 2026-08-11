@@ -5,6 +5,7 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import RequestFactory, SimpleTestCase, TestCase
+from rest_framework.authtoken.models import Token
 
 from users.models import Profile
 
@@ -120,6 +121,32 @@ class GraphContractBaselineTests(TestCase):
         self.assertEqual(edge(initial)['attitude'], CurrentState.TRUST)
         self.assertEqual(edge(cached)['attitude'], CurrentState.TRUST)
         self.assertEqual(edge(refreshed)['attitude'], CurrentState.MISTRUST)
+
+    def test_paginated_token_viewer_is_not_shared_or_omitted(self):
+        viewer = User.objects.create_user(username='disconnected-viewer', first_name='Viewer')
+        Profile.objects.create(user=viewer, latitude=56, longitude=38)
+        token = Token.objects.create(user=viewer)
+        params = {
+            'rod': 'on', 'dover': 'on', 'withalone': 'on',
+            'fmt': '3d-force-graph', 'from': '1', 'number': '1',
+        }
+
+        anonymous = self.client.get('/api/profile_genesis/all/', params)
+        authenticated = self.client.get(
+            '/api/profile_genesis/all/', params,
+            HTTP_AUTHORIZATION='Token %s' % token.key,
+        )
+
+        self.assertEqual(anonymous.status_code, 200, anonymous.data)
+        self.assertEqual(authenticated.status_code, 200, authenticated.data)
+        self.assertNotIn(viewer.pk, {node['id'] for node in anonymous.data['nodes']})
+        self.assertIn(viewer.pk, {node['id'] for node in authenticated.data['nodes']})
+        self.assertFalse(
+            any(
+                viewer.pk in {edge['source'], edge['target']}
+                for edge in authenticated.data['links']
+            )
+        )
 
     def test_full_map_marker_contract_is_uncapped_and_interactive(self):
         response = self.client.get('/api/user/points/', {'participants': 'on', 'owned': 'on'})

@@ -430,9 +430,10 @@ import { allTrustPathLinks } from './trust-path-button.js';
     let Graph = null;
     let viewer_node = null;
     let viewer_anchor_distance = null;
+    let viewer_anchor_active = false;
 
     function anchor_viewer_node(nodeObject, node) {
-        if (!nodeObject || !node || !parm_user_trusts || node.uuid !== viewer_uuid || !Graph || !Graph.camera || !Graph.renderer) return false;
+        if (!viewer_anchor_active || !nodeObject || !node || !parm_user_trusts || node.uuid !== viewer_uuid || !Graph || !Graph.camera || !Graph.renderer) return false;
         const renderer = Graph.renderer();
         const camera = Graph.camera();
         const width = renderer.domElement.clientWidth;
@@ -465,29 +466,6 @@ import { allTrustPathLinks } from './trust-path-button.js';
         const source = endpoint_node(link.source);
         const target = endpoint_node(link.target);
         return Boolean(viewer_node && (source === viewer_node || target === viewer_node));
-    }
-
-    function refresh_viewer_link(link) {
-        if (!is_viewer_link(link)) return;
-        const source = endpoint_node(link.source);
-        const target = endpoint_node(link.target);
-        const start = new THREE.Vector3(source.x, source.y || 0, source.z || 0);
-        const end = new THREE.Vector3(target.x, target.y || 0, target.z || 0);
-        const direction = new THREE.Vector3().subVectors(end, start);
-        link.__curve = null;
-        const line = link.__threeObj && (link.__threeObj.children[0] || link.__threeObj);
-        if (line && line.type === 'Mesh') {
-            line.position.copy(start);
-            line.scale.z = direction.length();
-            const lineEnd = end.clone();
-            line.parent.localToWorld(lineEnd);
-            line.lookAt(lineEnd);
-        }
-    }
-
-    function refresh_viewer_links() {
-        if (!viewer_node || !data) return;
-        data.links.forEach(refresh_viewer_link);
     }
 
     function node_draw(node) {
@@ -525,7 +503,21 @@ import { allTrustPathLinks } from './trust-path-button.js';
         trust_path_links = parm_user_trusts ? allTrustPathLinks(
             data.nodes, data.links, viewer_uuid, data.root_node && data.root_node.uuid,
         ) : [];
-        trust_path_button.hidden = trust_path_links.length === 0;
+        const viewer_loaded = data.nodes.some(node => node.uuid === viewer_uuid);
+        trust_path_button.hidden = !parm_user_trusts || !viewer_loaded || trust_path_links.length === 0;
+        trust_path_button.setAttribute('aria-pressed', viewer_anchor_active ? 'true' : 'false');
+    }
+
+    function release_viewer_anchor() {
+        viewer_anchor_active = false;
+        viewer_anchor_distance = null;
+        trust_path_button.setAttribute('aria-pressed', 'false');
+        if (!viewer_node) return;
+        delete viewer_node.fx;
+        delete viewer_node.fy;
+        delete viewer_node.fz;
+        render_lifecycle.resume();
+        Graph.d3ReheatSimulation();
     }
 
     function clear_trust_path_highlight() {
@@ -537,6 +529,7 @@ import { allTrustPathLinks } from './trust-path-button.js';
 
     function show_trust_path() {
         clear_trust_path_highlight();
+        if (!trust_path_links.length) return;
         let index = 0;
         const reveal_next = () => {
             if (index === trust_path_links.length) {
@@ -552,6 +545,19 @@ import { allTrustPathLinks } from './trust-path-button.js';
             reveal_next,
             180,
         );
+    }
+
+    function toggle_trust_path() {
+        if (viewer_anchor_active) {
+            clear_trust_path_highlight();
+            release_viewer_anchor();
+            return;
+        }
+        viewer_anchor_active = true;
+        viewer_anchor_distance = null;
+        trust_path_button.setAttribute('aria-pressed', 'true');
+        render_lifecycle.resume();
+        show_trust_path();
     }
 
     function show_node_detail(node) {
@@ -705,7 +711,7 @@ import { allTrustPathLinks } from './trust-path-button.js';
         .linkColor(link => highlighted_trust_path_links.has(link) ? '#00bfff' : link_color(link, 'rgb'))
         .linkWidth(link => highlighted_trust_path_links.has(link) ? 3 : 1)
         .linkOpacity(0.8)
-        .linkCurvature(link => is_viewer_link(link) ? 0 : 0.25)
+        .linkCurvature(link => viewer_anchor_active && is_viewer_link(link) ? 0 : 0.25)
         .backgroundColor("#FFFFFF")
         .nodeLabel('first_name')
         .onNodeHover(node => {
@@ -1278,16 +1284,19 @@ import { allTrustPathLinks } from './trust-path-button.js';
         Graph = Graph(graph_container);
         render_lifecycle = bindRenderLifecycle(Graph, document);
         const refresh_viewer_anchor = () => {
-            if (viewer_node && anchor_viewer_node(viewer_node.__threeObj, viewer_node)) refresh_viewer_links();
+            if (viewer_anchor_active) {
+                render_lifecycle.resume();
+            }
         };
         Graph.controls().addEventListener('change', refresh_viewer_anchor);
         window.addEventListener('resize', refresh_viewer_anchor, {passive: true});
         Graph.onEngineTick(render_lifecycle.keepAlive).onEngineStop(render_lifecycle.idle);
         document.querySelector('#reset-view-button').addEventListener('click', () => {
             clear_trust_path_highlight();
+            release_viewer_anchor();
             Graph.zoomToFit(750, 40);
         });
-        trust_path_button.addEventListener('click', show_trust_path);
+        trust_path_button.addEventListener('click', toggle_trust_path);
         if (parm_user_genesis_tree) {
             // if (!parm_up && !parm_down) {
                 // nodes_by_id[root_node.id].collapsed = true;

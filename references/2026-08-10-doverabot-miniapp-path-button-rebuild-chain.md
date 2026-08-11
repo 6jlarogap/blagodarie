@@ -122,6 +122,26 @@ Public HTML contains `Подсветить все пути доверия`, icon
 `index-DDCO1iQ9.js`; the bundle returns HTTP 200. Documentation-only result
 is recorded in this follow-up commit.
 
+## Slice 5: Route Toggle and Viewer Presence
+
+Slug: `doverabot-schema-route-toggle-viewer-presence`
+Status: completed
+Next: none
+
+Scope:
+
+- Make the all-path control a toggle that releases the anchored viewer and
+  clears the sequential highlight on the second press or reset.
+- Use the native graph render/link lifecycle during controls changes without
+  rebuilding link meshes or reheating the simulation on every pan/zoom.
+- Ensure paginated Schema responses include a disconnected Token-authenticated
+  viewer without leaking that viewer through shared URL caching.
+
+Result/checks: source and frontend contract updated; frontend tests (`7/7`),
+production build, generated-bundle syntax check, diff check, and Graphify
+update passed. The targeted PostgreSQL-backed regression passed when rerun by
+the parent worker. Deploy, public smoke, and push remain pending.
+
 ## Worker Rules
 
 - Read `AGENTS.md`, root and nearest `CODE_INDEX.md`, `DEPLOYMENT.md`, and this
@@ -191,6 +211,9 @@ passed; Django emitted only the existing `security.W002` warning.
 Completed slugs: `doverabot-miniapp-launcher-unification`,
 `doverabot-schema-path-button-rebuild`,
 `doverabot-schema-visible-path-highlight`,
-`doverabot-schema-all-paths-fixed-viewer`. Slice 4 source commit: `7aacf19`;
+`doverabot-schema-all-paths-fixed-viewer`,
+`doverabot-schema-route-toggle-viewer-presence`. Slice 4 source commit:
+`7aacf19`;
 the documentation follow-up records deploy completion, checks, and changed
-files; next active slug: `none`.
+files; Slice 5 source remains uncommitted pending deploy/public verification;
+next active slug: `none`.
