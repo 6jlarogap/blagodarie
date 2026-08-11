@@ -143,7 +143,8 @@ The targeted PostgreSQL-backed regression passed when rerun by the parent
 worker. Deploy succeeded; Django reported only existing `security.W002`, nginx
 syntax passed, all four services are active, and web/bot logs show clean normal
 restarts. Public HTML contains the route control with `aria-pressed` and the
-bundle `index-C7DNXQfA.js` returns HTTP 200. Push remains pending.
+bundle `index-C7DNXQfA.js` returns HTTP 200. GitHub main push succeeded through
+`a4dbcb2`.
 
 ## Worker Rules
 
@@ -219,5 +220,5 @@ Completed slugs: `doverabot-miniapp-launcher-unification`,
 `61450b8`; deploy succeeded with only existing Django `security.W002`, nginx
 syntax passed, all four services are active, logs show clean normal restarts,
 and public HTML/bundle checks passed (`aria-pressed`,
-`index-C7DNXQfA.js` HTTP 200). Push remains pending; next active slug:
-`none`.
+`index-C7DNXQfA.js` HTTP 200). GitHub main push succeeded through `a4dbcb2`;
+next active slug: `none`.

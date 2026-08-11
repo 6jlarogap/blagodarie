@@ -9,8 +9,8 @@
   regression passed on parent rerun. Deploy succeeded; Django reported only
   existing `security.W002`, nginx syntax passed, all four services are active,
   and web/bot logs show clean normal restarts. Public HTML contains the route
-  control with `aria-pressed`, and `index-C7DNXQfA.js` returns HTTP 200. Push
-  remains pending.
+  control with `aria-pressed`, and `index-C7DNXQfA.js` returns HTTP 200.
+  GitHub main push succeeded through `a4dbcb2`.
 
 ## 2026-08-10
 
